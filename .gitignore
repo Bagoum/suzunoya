@@ -1,0 +1,15 @@
+.vs
+.idea
+Logs
+Temp
+obj
+bin
+
+*.unityproj
+*.tmp
+*.user
+*.userprefs
+*.pdb
+
+docs/_site
+docs/api
