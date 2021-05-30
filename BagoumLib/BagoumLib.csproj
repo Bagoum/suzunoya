@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <Nullable>enable</Nullable>
-        <TargetFramework>net472</TargetFramework>
         <LangVersion>9</LangVersion>
+        <TargetFrameworks>net472;net5.0</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>

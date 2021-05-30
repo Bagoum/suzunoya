@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading.Tasks;
+using BagoumLib.DataStructures;
 using BagoumLib.Mathematics;
 using JetBrains.Annotations;
 
@@ -15,6 +17,36 @@ public static class Extensions {
             if (s[ii] == c) ++ct;
         }
         return ct;
+    }
+
+    public static char? TryIndex(this string s, int ii) {
+        if (ii >= 0 && ii < s.Length) return s[ii];
+        return null;
+    }
+
+    public static string ToLiteral(this string s) {
+        var sb = new StringBuilder(s.Length + 10);
+        sb.Append('"');
+        foreach (var c in s) {
+            if (     c == '"')
+                sb.Append("\\\"");
+            else if (c == '\\')
+                sb.Append("\\");
+            else if (c == '\n')
+                sb.Append("\\n");
+            else if (c == '\r')
+                sb.Append("\\n");
+            else if (c == '\t')
+                sb.Append("\\t");
+            else if (c >= 0x20 && c <= 0x7e) {
+                sb.Append(c);
+            } else {
+                sb.Append("\\u");
+                sb.Append(((int)c).ToString("x4"));
+            }
+        }
+        sb.Append('"');
+        return sb.ToString();
     }
 }
 
@@ -210,6 +242,52 @@ public static class IEnumExtensions {
         }
         return (obj, val);
     }
+    
+    /// <summary>
+    /// Skip the first SKIP elements of the enumerable.
+    /// If there are fewer than SKIP elements, then return an empty enumerable instead of throwing.
+    /// </summary>
+    public static IEnumerable<T> SoftSkip<T>(this IEnumerable<T> arr, int skip) {
+        foreach (var x in arr) {
+            if (skip-- <= 0) yield return x;
+        }
+    }
+
+    public static IEnumerable<T> Join<T>(this IEnumerable<IEnumerable<T>> arrs) {
+        foreach (var arr in arrs) {
+            foreach (var x in arr) {
+                yield return x;
+            }
+        }
+    }
+
+    public static Dictionary<K, V> ToDict<K, V>(this IEnumerable<(K, V)> arr) {
+        var dict = new Dictionary<K, V>();
+        foreach (var (k, v) in arr) dict[k] = v;
+        return dict;
+    }
+    
+    public static IEnumerable<T> SeparateBy<T>(this IEnumerable<IEnumerable<T>> arrs, T sep) {
+        bool first = true;
+        foreach (var arr in arrs) {
+            if (!first) yield return sep;
+            first = false;
+            foreach (var x in arr) yield return x;
+        }
+    }
+
+    public static int MaxConsecutive<T>(this IList<T> arr, T obj) where T:IEquatable<T> {
+        int max = 0;
+        int curr = 0;
+        for (int ii = 0; ii < arr.Count; ++ii) {
+            if (arr[ii].Equals(obj)) {
+                if (++curr > max) max = curr;
+            } else {
+                curr = 0;
+            }
+        }
+        return max;
+    }
 }
 
 [PublicAPI]
@@ -264,6 +342,8 @@ public static class NullableExtensions {
 [PublicAPI]
 public static class DataStructureExtensions {
     public static T? TryPeek<T>(this Stack<T> stack) where T : class =>
+        stack.Count > 0 ? stack.Peek() : null;
+    public static T? TryPeek<T>(this StackList<T> stack) where T : class =>
         stack.Count > 0 ? stack.Peek() : null;
 }
 

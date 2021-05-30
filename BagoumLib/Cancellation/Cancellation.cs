@@ -11,7 +11,12 @@ namespace BagoumLib.Cancellation {
 /// </summary>
 [PublicAPI]
 public interface ICancellee {
-    bool Cancelled { get; }
+    /// <summary>
+    /// Used to mark the significance of cancellation client-side.
+    /// A value LEQ 0 (default 0) indicates that the operation has not been cancelled.
+    /// </summary>
+    int CancelLevel { get; }
+    bool Cancelled { get; } // => CancelLevel > 0
     /// <summary>
     /// Get the youngest ancestor cancellee that is not a passthrough.
     /// </summary>
@@ -21,9 +26,12 @@ public interface ICancellee {
 [PublicAPI]
 public class Cancellable : ICancellee {
     public static readonly ICancellee Null = new Cancellable();
-    public bool Cancelled { get; private set; } = false;
+    public int CancelLevel { get; private set; }
+    public bool Cancelled => CancelLevel > 0;
     public ICancellee Root => this;
-    public void Cancel() => Cancelled = true;
+    public void Cancel(int level) => CancelLevel = Math.Max(level, CancelLevel);
+    public void Cancel() => Cancel(CancelHelpers.HardCancelLevel);
+    public void SoftCancel() => Cancel(CancelHelpers.SoftSkipLevel);
 }
 
 /// <summary>
@@ -36,6 +44,8 @@ public class Cancellable : ICancellee {
 public class PassthroughCancellee : ICancellee {
     public readonly ICancellee root;
     private readonly ICancellee local;
+    public int CancelLevel => Math.Max(root.CancelLevel, local.CancelLevel);
+    public bool Cancelled => CancelLevel > 0;
     public ICancellee Root => root.Root;
 
     public PassthroughCancellee(ICancellee? root, ICancellee? local) {
@@ -43,13 +53,14 @@ public class PassthroughCancellee : ICancellee {
         this.local = local ?? Cancellable.Null;
     }
 
-    public bool Cancelled => root.Cancelled || local.Cancelled;
 }
 
 [PublicAPI]
 public class JointCancellee : ICancellee {
     private readonly ICancellee c1;
     private readonly ICancellee c2;
+    public int CancelLevel => Math.Max(c1.CancelLevel, c2.CancelLevel);
+    public bool Cancelled => CancelLevel > 0;
     public ICancellee Root => this;
 
     public JointCancellee(ICancellee? c1, ICancellee? c2) {
@@ -57,7 +68,6 @@ public class JointCancellee : ICancellee {
         this.c2 = c2 ?? Cancellable.Null;
     }
 
-    public bool Cancelled => c1.Cancelled || c2.Cancelled;
 }
 
 /// <summary>

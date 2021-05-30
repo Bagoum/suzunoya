@@ -15,7 +15,7 @@ public class Evented<T> : IBSubject<T> {
     
     public T Value {
         get => _value;
-        set => onSet.Publish(this._value = value);
+        set => onSet.OnNext(this._value = value);
     }
     public Maybe<T> LastPublished => Maybe<T>.Of(_value);
     
@@ -27,7 +27,7 @@ public class Evented<T> : IBSubject<T> {
     public Evented(T val) {
         _value = val;
         onSet = new Event<T>();
-        onSet.Publish(_value);
+        onSet.OnNext(_value);
     }
 
     public static implicit operator T(Evented<T> evo) => evo._value;
@@ -42,7 +42,10 @@ public class Evented<T> : IBSubject<T> {
     public void OnError(Exception error) => onSet.OnError(error);
 
     public void OnCompleted() => onSet.OnCompleted();
-    
-    public void Publish(T value) => OnNext(value);
+
+    public void PublishIfNotSame(T value) {
+        if (!Equals(value, _value))
+            OnNext(value);
+    }
 }
 }

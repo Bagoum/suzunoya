@@ -41,7 +41,7 @@ public readonly struct LogMessage {
 
 [PublicAPI]
 public static class Logging {
-    public static readonly ISubject<LogMessage> Logs = new PersistentEvent<LogMessage>();
+    public static readonly ISubject<LogMessage> Logs = new Event<LogMessage>();
     public static void Log(LogMessage lm) => Logs.OnNext(lm);
 
 }

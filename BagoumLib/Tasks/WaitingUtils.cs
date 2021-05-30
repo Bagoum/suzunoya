@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Threading.Tasks;
+using BagoumLib.Cancellation;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Tasks {
@@ -12,7 +14,7 @@ public static class WaitingUtils {
         return () => tcs.SetResult(true);
     }
 
-    public static Action<Completion> GetCompletionAwaiter(out Task t) {
+    public static Action<Completion> GetCompletionAwaiter(out Task<Completion> t) {
         var tcs = new TaskCompletionSource<Completion>();
         t = tcs.Task;
         return c => {
@@ -49,6 +51,29 @@ public static class WaitingUtils {
         return () => {
             if (++acc == ct) whenAll();
         };
+    }
+    
+
+    /// <summary>
+    /// Waits for the given amount of time, but can be cancelled early by the cT.
+    /// </summary>
+    public static IEnumerator WaitFor(float time, Action<Completion> done, ICancellee cT, Func<float> dT) {
+        for (float elapsed = 0; elapsed < time; elapsed += dT()) {
+            if (cT.Cancelled) break;
+            yield return null;
+        }
+        done(cT.ToCompletion());
+    }
+
+    /// <summary>
+    /// Waits until the cT is cancelled.
+    /// </summary>
+    public static IEnumerator Spin(Action<Completion> done, ICancellee cT) {
+        while (true) {
+            if (cT.Cancelled) break;
+            yield return null;
+        }
+        done(cT.ToCompletion());
     }
 }
 }

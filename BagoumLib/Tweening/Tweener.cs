@@ -14,24 +14,34 @@ using static BagoumLib.Tweening.Tween;
 namespace BagoumLib.Tweening {
 [PublicAPI]
 public interface ITweener {
-    Task Run(ICoroutineRunner cors);
+    /// <summary>
+    /// Runs the tweener.
+    /// </summary>
+    Task<Completion> Run(ICoroutineRunner cors);
+
+    /// <summary>
+    /// Nondestructively modify all nested tweeners.
+    /// </summary>
+    ITweener With(ICancellee cT, Func<float> dTProvider);
 }
 
 [PublicAPI]
 public static class Tween {
     public static Func<float>? DefaultDeltaTimeProvider { get; set; }
     
-    private static readonly Dictionary<Type, object> lerpers = new Dictionary<Type, object>() {
+    private static readonly Dictionary<Type, object> lerpers = new() {
         {typeof(float), (Func<float, float, float, float>) BMath.Lerp},
         {typeof(Vector2), (Func<Vector2, Vector2, float, Vector2>) Vector2.Lerp},
         {typeof(Vector3), (Func<Vector3, Vector3, float, Vector3>) Vector3.Lerp},
         {typeof(Vector4), (Func<Vector4, Vector4, float, Vector4>) Vector4.Lerp},
+        {typeof(FColor), (Func<FColor, FColor, float, FColor>) FColor.Lerp},
     };
-    private static readonly Dictionary<Type, object> multiplyOps = new Dictionary<Type, object>() {
+    private static readonly Dictionary<Type, object> multiplyOps = new() {
         {typeof(float), (Func<float, float, float>) ((x, y) => x * y)},
         {typeof(Vector2), (Func<Vector2, float, Vector2>) ((x, y) => x * y)},
         {typeof(Vector3), (Func<Vector3, float, Vector3>) ((x, y) => x * y)},
         {typeof(Vector4), (Func<Vector4, float, Vector4>) ((x, y) => x * y)},
+        {typeof(FColor), (Func<FColor, float, FColor>) ((x, y) => x * y)},
     };
     public static Func<T, T, float, T> GetLerp<T>() => lerpers.TryGetValue(typeof(T), out var l) ?
         (Func<T, T, float, T>)l :
@@ -63,7 +73,8 @@ public static class Tween {
 
 [PublicAPI]
 public record Tweener<T> : ITweener {
-    //Required variables
+    //----- Required variables
+    
     /// <summary>
     /// Initial value of tweening.
     /// </summary>
@@ -80,15 +91,21 @@ public record Tweener<T> : ITweener {
     /// Method to update tweened value.
     /// </summary>
     public Action<T> Apply { get; init; }
-    //Required variables with defaults provided
     
+    //----- Required variables with defaults provided
+    
+    /// <summary>
+    /// Easing method used to smooth the tweening process. By default, set to IOSine (not Linear).
+    /// </summary>
+    public Easer Ease { get; init; } = Easers.EIOSine;
     /// <summary>
     /// Cancellation token used to stop execution.
     /// If set to null, then will use the RunDroppable interface on the executing coroutine manager.
     /// </summary>
     public ICancellee? CToken { get; init; }
 
-    //Optional variables set via initializer syntax (or possibly fluent API)
+    //-----Optional variables set via initializer syntax (or possibly fluent API)
+    
     /// <summary>
     /// Lerp function specific to type T. Add handling for types via Tween.RegisterLerper.
     /// </summary>
@@ -97,20 +114,22 @@ public record Tweener<T> : ITweener {
     /// Method to retrieve the delta-time of the current frame. Preferably set this via Tween.DefaultDeltaTimeProvider.
     /// </summary>
     public Func<float> DeltaTimeProvider { get; init; } = DefaultDeltaTimeProvider!;
-    /// <summary>
-    /// Easing method used to smooth the tweening process. By default, set to IOSine (not Linear).
-    /// </summary>
-    public Easer Ease { get; init; } = Easers.EIOSine;
-    /// <summary>
-    /// When cancelled, the tween will also apply the End value if this flag is true.
-    /// Whether or not you should enable this depends on the semantics of cancelling.
-    /// <br/>If cancelling has the semantics of "skip animation", then you should set it to true.
-    /// <br/>If cancelling has the semantics of "animation has been superseded", then you should set it to false. 
-    /// </summary>
-    public bool SetFinalOnCancel { get; init; } = false;
 
-    //Fluent methods for consumers without c#9 access
-    public Tweener<T> WithEaser(Easer? e) => this with {Ease = e ?? Ease };
+    /// <summary>
+    /// If present, will be executed at task start time to derive the start value.
+    /// Overrides Start.
+    /// </summary>
+    public Func<T>? StartGetter = null;
+
+    /// <summary>
+    /// If present, will be executed throughout task execution time to derive the target value.
+    /// Overrides End.
+    /// </summary>
+    public Func<T>? EndGetter = null;
+    
+    //----- Properties
+    private T effectiveStart => StartGetter == null ? Start : StartGetter();
+    private T effectiveEnd => EndGetter == null ? End : EndGetter();
 
     public Tweener(T start, T end, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
         Start = start;
@@ -125,71 +144,92 @@ public record Tweener<T> : ITweener {
         "No delta time provider has been set! It is recommended to set TweenHelpers.DefaultDeltaTimeProvider."))();
 
 
-    private IEnumerator RunIEnum(Action<Completion> done) {
+    private IEnumerator RunIEnum(T start, Action<Completion> done) {
         for (float t = 0; t < Time; t += DeltaTime) {
             if (CToken?.Cancelled == true) 
                 break;
-            Apply(Lerp(Start, End, Ease(t / Time)));
+            Apply(Lerp(start, effectiveEnd, Ease(t / Time)));
             yield return null;
         }
-        if (SetFinalOnCancel || CToken?.Cancelled != true)
-            Apply(End);
-        done(CToken?.Cancelled == true ? Completion.Cancelled : Completion.Standard);
+        if (CToken?.IsHardCancelled() != true)
+            Apply(effectiveEnd);
+        done(CToken?.ToCompletion() ?? Completion.Standard);
     }
 
-    public Task Run(ICoroutineRunner cors) {
-        Apply(Start);
-        var ienum = RunIEnum(WaitingUtils.GetCompletionAwaiter(out var t));
-        if (CToken != null)
-            cors.Run(ienum);
-        else
-            cors.RunDroppable(ienum);
-        return t;
+    public async Task<Completion> Run(ICoroutineRunner cors) {
+        if (CToken?.IsHardCancelled() == true)
+            throw new OperationCanceledException();
+        var st = effectiveStart;
+        Apply(st);
+        var ienum = RunIEnum(st, WaitingUtils.GetCompletionAwaiter(out var t));
+        cors.Run(ienum, new CoroutineOptions(CToken == null));
+        return await t;
     }
+
+    public ITweener With(ICancellee cT, Func<float> dTProvider) => this with {CToken = cT, DeltaTimeProvider = dTProvider};
 
     public Tweener<T> Reverse(bool reverseEase = true) => 
         new(End, Start, Time, Apply, reverseEase ? new Easer(t => 1 - Ease(1 - t)) : Ease, CToken) {
-            DeltaTimeProvider = DeltaTimeProvider,
-            SetFinalOnCancel = SetFinalOnCancel
+            DeltaTimeProvider = DeltaTimeProvider
         };
 }
 
-public class SequentialTweener : ITweener {
-    private readonly ITweener[] states;
-    public SequentialTweener(params ITweener[] states) {
-        this.states = states;
+public record SequentialTweener(params ITweener[] states) : ITweener {
+    public async Task<Completion> Run(ICoroutineRunner cors) {
+        var c = Completion.Standard;
+        for (int ii = 0; ii < states.Length; ++ii) {
+            try {
+                //Report last state
+                c = await states[ii].Run(cors);
+            } catch (OperationCanceledException) {
+                c = Completion.Cancelled;
+            }
+        }
+        if (c == Completion.Cancelled) throw new OperationCanceledException();
+        return c;
     }
 
-    public async Task Run(ICoroutineRunner cors) {
-        for (int ii = 0; ii < states.Length; ++ii)
-            await states[ii].Run(cors);
-    }
+    public ITweener With(ICancellee cT, Func<float> dTProvider) =>
+        new SequentialTweener(states.Select(s => s.With(cT, dTProvider)).ToArray());
 }
 
-public class ParallelTweener : ITweener {
-    private readonly ITweener[] states;
-    public ParallelTweener(params ITweener[] states) {
-        this.states = states;
-    }
+public record ParallelTweener(params ITweener[] states) : ITweener {
 
-    public Task Run(ICoroutineRunner cors) {
+    public async Task<Completion> Run(ICoroutineRunner cors) {
         if (states.Length == 1)
-            return states[0].Run(cors);
-        return Task.WhenAll(states.Select(s => s.Run(cors)));
+            return await states[0].Run(cors);
+        var results = await Task.WhenAll(states.Select(s => s.Run(cors)));
+        var c = Completion.Cancelled;
+        for (int ii = 0; ii < results.Length; ++ii) {
+            if (results[ii] < c)
+                c = results[ii];
+        }
+        if (c == Completion.Cancelled) throw new OperationCanceledException();
+        return c;
     }
+    
+    public ITweener With(ICancellee cT, Func<float> dTProvider) =>
+        new ParallelTweener(states.Select(s => s.With(cT, dTProvider)).ToArray());
 }
 
-public class LoopTweener : ITweener {
-    private readonly ITweener subj;
-    public LoopTweener(ITweener subj) {
-        this.subj = subj;
+public record LoopTweener(ITweener subj, int? count = null) : ITweener {
+    public async Task<Completion> Run(ICoroutineRunner cors) {
+        var c = Completion.Standard;
+        for (int ii = 0; count == null || ii < count.Value; ++ii) {
+            c = await subj.Run(cors);
+            if (c > Completion.Standard) {
+                if (c == Completion.Cancelled) 
+                    throw new OperationCanceledException();
+                //If given a fixed iteration number, then run each iteration for softskip.
+                if (count == null)
+                    return c;
+            }
+        }
+        return c;
     }
 
-    public async Task Run(ICoroutineRunner cors) {
-        while (true)
-            await subj.Run(cors);
-        // ReSharper disable once FunctionNeverReturns
-    }
+    public ITweener With(ICancellee cT, Func<float> dTProvider) =>
+        new LoopTweener(subj.With(cT, dTProvider));
 }
 
 }

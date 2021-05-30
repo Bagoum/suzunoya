@@ -11,20 +11,20 @@ public class Events {
         var ev = new Event<int>();
         var l1 = new List<int>();
         var l2 = new List<int>();
-        var d1 = ev.Subscribe(l1.Add);
-        ev.Publish(1);
+        var d1 = ev.Subscribe<int>(l1.Add);
+        ev.OnNext(1);
         ListEq(l1, new[]{ 1 });
         ListEq(l2, new int[]{});
-        var d2 = ev.Subscribe(l2.Add);
-        ev.Publish(2);
+        var d2 = ev.Subscribe<int>(l2.Add);
+        ev.OnNext(2);
         ListEq(l1, new[]{ 1, 2});
         ListEq(l2, new[]{ 2 });
         d1.Dispose();
-        ev.Publish(3);
+        ev.OnNext(3);
         ListEq(l1, new[]{ 1, 2 });
         ListEq(l2, new[]{ 2, 3 });
         ev.OnCompleted();
-        ev.Publish(4);
+        ev.OnNext(4);
         ListEq(l1, new[]{ 1, 2 });
         ListEq(l2, new[]{ 2, 3 });
     }
@@ -35,7 +35,7 @@ public class Events {
         var l1 = new List<int>();
         var l2 = new List<int>();
         var d1 = ev.Subscribe(l1.Add);
-        ev.Publish(1);
+        ev.OnNext(1);
         ListEq(l1, new[]{ 7, 1 });
         ListEq(l2, new int[]{});
         var d2 = ev.Subscribe(l2.Add);
@@ -47,9 +47,29 @@ public class Events {
         ListEq(l1, new[]{ 7, 1, 2 });
         ListEq(l2, new[]{ 1, 2, 3 });
         ev.OnCompleted();
-        ev.Publish(4);
+        ev.OnNext(4);
         ListEq(l1, new[]{ 7, 1, 2 });
         ListEq(l2, new[]{ 1, 2, 3 });
+    }
+
+    [Test]
+    public void ReplaySubject() {
+        var rs = new ReplayEvent<int>(2);
+        var l1 = new List<int>();
+        var l2 = new List<int>();
+        var l3 = new List<int>();
+        var d = rs.Subscribe(l1.Add);
+        rs.OnNext(1);
+        rs.OnNext(2);
+        rs.Subscribe(l2.Add);
+        rs.OnNext(3);
+        rs.OnNext(4);
+        rs.Subscribe(l3.Add);
+        d.Dispose();
+        rs.OnNext(5);
+        ListEq(l1, new[]{1,2,3,4});
+        ListEq(l2, new[]{1,2,3,4,5});
+        ListEq(l3,new[]{3,4,5});
     }
 }
 }

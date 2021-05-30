@@ -27,7 +27,13 @@ public static class Easers {
     
     public static float EOutQuad(float x) => 1f - (float)Math.Pow(1 - x, 4);
 
+    /// <summary>
+    /// f(x) = x. Same as EIdentity.
+    /// </summary>
     public static float ELinear(float x) => x;
+    /// <summary>
+    /// f(x) = x. Same as ELinear.
+    /// </summary>
     public static float EIdentity(float x) => x;
 
     public static Easer CEOutPow(float pow) => x => 1f - (float) Math.Pow(1 - x, pow);

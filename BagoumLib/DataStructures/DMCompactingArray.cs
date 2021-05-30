@@ -33,10 +33,10 @@ public class DeletionMarker<T> : IDeletionMarker {
 public class DMCompactingArray<T> : IEnumerable<T> {
     private int count;
     public int Count => count;
-    public DeletionMarker<T>[] arr;
+    public DeletionMarker<T>[] Data { get; private set; }
 
     public DMCompactingArray(int size = 8) {
-        arr = new DeletionMarker<T>[size];
+        Data = new DeletionMarker<T>[size];
         count = 0;
     }
 
@@ -44,7 +44,7 @@ public class DMCompactingArray<T> : IEnumerable<T> {
         int ii = 0;
         bool foundDeleted = false;
         while (ii < count) {
-            if (arr[ii++].MarkedForDeletion) {
+            if (Data[ii++].MarkedForDeletion) {
                 foundDeleted = true;
                 break;
             }
@@ -53,32 +53,32 @@ public class DMCompactingArray<T> : IEnumerable<T> {
         int deficit = 1;
         int start_copy = ii;
         for (; ii < count; ++ii) {
-            if (arr[ii].MarkedForDeletion) {
+            if (Data[ii].MarkedForDeletion) {
                 if (ii > start_copy) {
-                    Array.Copy(arr, start_copy,
-                        arr, start_copy - deficit, ii - start_copy);
+                    Array.Copy(Data, start_copy,
+                        Data, start_copy - deficit, ii - start_copy);
                 }
                 ++deficit;
                 start_copy = ii + 1;
             }
         }
-        Array.Copy(arr, start_copy,
-            arr, start_copy - deficit, count - start_copy);
+        Array.Copy(Data, start_copy,
+            Data, start_copy - deficit, count - start_copy);
         count -= deficit;
     }
 
     private void MaybeResize() {
-        if (count >= arr.Length) {
-            var narr = new DeletionMarker<T>[arr.Length * 2];
-            arr.CopyTo(narr, 0);
-            arr = narr;
+        if (count >= Data.Length) {
+            var narr = new DeletionMarker<T>[Data.Length * 2];
+            Data.CopyTo(narr, 0);
+            Data = narr;
         }
     }
 
     public DeletionMarker<T> Add(T obj) {
         MaybeResize();
         var dm = new DeletionMarker<T>(obj, 0);
-        arr[count++] = dm;
+        Data[count++] = dm;
         return dm;
     }
 
@@ -90,7 +90,7 @@ public class DMCompactingArray<T> : IEnumerable<T> {
     private int NextIndexForPriority(int p) {
         //TODO you can make this binary search or whatever
         for (int ii = 0; ii < count; ++ii) {
-            if (arr[ii].Priority > p) return ii;
+            if (Data[ii].Priority > p) return ii;
         }
         return count;
     }
@@ -112,25 +112,25 @@ public class DMCompactingArray<T> : IEnumerable<T> {
 
     public void AddPriority(DeletionMarker<T> dm) {
         MaybeResize();
-        arr.Insert(ref count, dm, NextIndexForPriority(dm.Priority));
+        Data.Insert(ref count, dm, NextIndexForPriority(dm.Priority));
     }
 
     public void Empty() {
         for (int ii = 0; ii < count; ++ii) {
-            arr[ii] = null!;
+            Data[ii] = null!;
         }
         count = 0;
     }
 
-    public void Delete(int ii) => arr[ii].MarkForDeletion();
+    public void Delete(int ii) => Data[ii].MarkForDeletion();
 
-    public bool ExistsAt(int index) => !arr[index].MarkedForDeletion;
-    public T this[int index] => arr[index].Value;
+    public bool ExistsAt(int index) => !Data[index].MarkedForDeletion;
+    public T this[int index] => Data[index].Value;
 
     public IEnumerator<T> GetEnumerator() {
         int ct = count;
         for (int ii = 0; ii < ct; ++ii) {
-            if (!arr[ii].MarkedForDeletion) yield return arr[ii].Value;
+            if (!Data[ii].MarkedForDeletion) yield return Data[ii].Value;
         }
     }
 

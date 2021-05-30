@@ -7,10 +7,10 @@ using NUnit.Framework;
 
 namespace Tests {
 public static class AssertHelpers {
-    public static void ListEq<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) where T : IEquatable<T> {
+    public static void ListEq<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) {
         string extraFail = (left.Count == right.Count) ? "" : $"Lengths are mismatched: {left.Count}, {right.Count}. ";
         for (int ii = 0; ii < left.Count && ii < right.Count; ++ii) {
-            if (!left[ii].Equals(right[ii])) {
+            if (!Equals(left[ii], right[ii])) {
                 Assert.Fail($"{extraFail}At index {ii}, left is {left[ii]} and right is {right[ii]}.");
             }
         }

@@ -4,6 +4,10 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
 
+public interface IStackList<T> : IReadOnlyList<T> {
+    
+}
+
 [PublicAPI]
 public class StackList<T> : IEnumerable<T> {
     public int Count { get; private set; }
@@ -24,6 +28,7 @@ public class StackList<T> : IEnumerable<T> {
     }
 
     public T Pop() => arr[--Count];
+    public T Peek() => arr[Count - 1];
 
     public void Clear() {
         Count = 0;

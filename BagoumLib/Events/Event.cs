@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Reactive;
 using System.Reactive.Subjects;
 using BagoumLib.DataStructures;
 using BagoumLib.Functional;
@@ -10,17 +12,24 @@ public interface IBObservable<T> : IObservable<T> {
     Maybe<T> LastPublished { get; }
 }
 [PublicAPI]
-public interface IBSubject<T> : ISubject<T>, IBObservable<T> {
-    void Publish(T value);
+public interface IBSubject<T, U> : ISubject<T, U>, IBObservable<U> {
 }
 
 [PublicAPI]
-public class Event<T> : IBSubject<T> {
-    private readonly DMCompactingArray<IObserver<T>> callbacks = new DMCompactingArray<IObserver<T>>();
-    public Maybe<T> LastPublished { get; private set; } = Maybe<T>.None;
+public interface IBSubject<T> : IBSubject<T, T>, ISubject<T> {
+    
+}
 
-
-    public void OnNext(T value) => Publish(value);
+[PublicAPI]
+public class Event<T, U> : IBSubject<T, U> {
+    private readonly DMCompactingArray<IObserver<U>> callbacks = new();
+    public Maybe<U> LastPublished { get; private set; } = Maybe<U>.None;
+    
+    
+    private readonly Func<T, U> mapper;
+    public Event(Func<T, U> mapper) {
+        this.mapper = mapper;
+    }
 
     public void OnError(Exception error) {
         var ct = callbacks.Count;
@@ -42,20 +51,21 @@ public class Event<T> : IBSubject<T> {
     /// <summary>
     /// Do not call this directly. Use Observer.Register instead.
     /// </summary>
-    public IDisposable Subscribe(IObserver<T> observer) => callbacks.Add(observer);
+    public virtual IDisposable Subscribe(IObserver<U> observer) => callbacks.Add(observer);
 
     
     /// <summary>
     /// Same as OnNext.
     /// </summary>
     /// <param name="value"></param>
-    public void Publish(T value) {
-        LastPublished = Maybe<T>.Of(value);
+    public virtual void OnNext(T value) {
+        var mvalue = mapper(value);
+        LastPublished = Maybe<U>.Of(mvalue);
         var ct = callbacks.Count;
         var nulled = 0;
         for (int ii = 0; ii < ct; ++ii) {
             if (callbacks.ExistsAt(ii))
-                callbacks[ii].OnNext(value);
+                callbacks[ii].OnNext(mvalue);
             else
                 ++nulled;
         }
@@ -63,13 +73,26 @@ public class Event<T> : IBSubject<T> {
             callbacks.Compact();
     }
 }
+[PublicAPI]
+public class Event<T> : Event<T, T>, IBSubject<T> {
+    public Event() : base(x => x) { }
+}
 
 /// <summary>
-/// A hub that cannot be closed via OnCompleted.
+/// An event that records all its published values in a list.
 /// </summary>
-public class PersistentEvent<T> : Event<T> {
-    public override void OnCompleted() {
-        throw new Exception("Persistent hubs cannot be closed");
+public class AccEvent<T> : Event<T> {
+    private readonly List<T> published = new();
+    public IReadOnlyList<T> Published => published;
+
+    public override void OnNext(T value) {
+        published.Add(value);
+        base.OnNext(value);
     }
+
+    /// <summary>
+    /// Clear the accumulated values in Published.
+    /// </summary>
+    public void Clear() => published.Clear();
 }
 }

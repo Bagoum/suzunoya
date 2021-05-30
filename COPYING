@@ -8,6 +8,7 @@ All source code in this project is distributed under the MIT license.
 With the exception of the testing subproject, this project consumes the following packages:
 - JetBrains.Annotations: MIT (https://www.nuget.org/packages/JetBrains.Annotations/)
 - System.Reactive: MIT (https://www.nuget.org/packages/System.Reactive/)
+- Newtonsoft.Json: MIT (https://github.com/JamesNK/Newtonsoft.Json)
 
 
 --- MIT license for this project's source code
