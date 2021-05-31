@@ -36,7 +36,7 @@ public class RenderGroup : Transform {
         Key = key;
         Priority = new(priority);
         Visible = new(visible);
-        tokens.Add(Container.AddRenderGroup(this));
+        tokens.Add(Container._AddRenderGroup(this));
     }
 
     public override void AddToVNState(IVNState container) =>

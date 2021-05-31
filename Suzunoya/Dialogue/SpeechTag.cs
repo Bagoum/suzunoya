@@ -1,6 +1,6 @@
 ﻿namespace Suzunoya.Dialogue {
 
-public abstract record SpeechTag {
+public abstract class SpeechTag {
     /// <summary>
     /// Apply modifications to the text unrolling settings.
     /// </summary>
@@ -13,7 +13,12 @@ public abstract record SpeechTag {
     /// <summary>
     /// Changes the speed of text unrolling.
     /// </summary>
-    public record Speed(float multiplier) : SpeechTag {
+    public class Speed: SpeechTag {
+        public readonly float multiplier;
+        public Speed(float multiplier) {
+            this.multiplier = multiplier;
+        }
+
         public override SpeechSettings ModifySettings(SpeechSettings src) =>
             src with {opsPerSecond = src.opsPerSecond * multiplier};
 
@@ -23,7 +28,7 @@ public abstract record SpeechTag {
     /// <summary>
     /// Disables rolling events.
     /// </summary>
-    public record Silent() : SpeechTag {
+    public class Silent : SpeechTag {
         public override SpeechSettings ModifySettings(SpeechSettings src) =>
             src with {rollEventAllowed = (_, __) => false};
 
@@ -33,11 +38,21 @@ public abstract record SpeechTag {
     /// <summary>
     /// Changes text color.
     /// </summary>
-    public record Color(string color) : SpeechTag;
+    public class Color : SpeechTag {
+        public readonly string color;
+        public Color(string color) {
+            this.color = color;
+        }
+    }
 
     /// <summary>
     /// Shows furigana (ruby) next to the main text.
     /// </summary>
-    public record Furigana(string furigana) : SpeechTag;
+    public class Furigana : SpeechTag {
+        public readonly string furigana;
+        public Furigana(string furigana) {
+            this.furigana = furigana;
+        }
+    }
 }
 }

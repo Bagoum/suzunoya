@@ -11,6 +11,7 @@ using Suzunoya.Data;
 using Suzunoya.Display;
 using Suzunoya.Entities;
 
+
 namespace Suzunoya {
 public static class Helpers {
     //Default interface implementations when?
@@ -28,8 +29,8 @@ public static class Helpers {
     /// </summary>
     public static ICancellee BindLifetime(this IEntity e, ICancellee cT) => new JointCancellee(e.LifetimeToken, cT);
 
-    public static VNOperation MakeVNOp(this IEntity e, Func<ICancellee, Task> task) {
-        return new(e.Container.AssertActive(), null, task);
+    public static VNOperation MakeVNOp(this IEntity e, Func<ICancellee, Task> task, bool allowUserSkip=true) {
+        return new(e.Container.AssertActive(), null, task) { AllowUserSkip = allowUserSkip };
     }
 
     //For these helpers, StartGetter is important in case the tween is run after it is created
@@ -38,7 +39,12 @@ public static class Helpers {
             StartGetter = () => c.Location
         });
 
-    public static VNOperation RotateTo(this ITransform c, Vector3 targetEulers, float time, Easer? ease = null) {
+    public static VNOperation RotateTo(this ITransform c, Vector3 targetEulers, float time, Easer? ease = null) =>
+        c.Tween(new Tweener<Vector3>(c.EulerAnglesD, targetEulers, time, c.EulerAnglesD.OnNext, ease) {
+            StartGetter = () => c.EulerAnglesD
+        });
+    
+    public static VNOperation RotateToClosest(this ITransform c, Vector3 targetEulers, float time, Easer? ease = null) {
         Vector3 src = c.EulerAnglesD;
         var target = new Vector3(
             BMath.GetClosestAroundBound(360f, src.X, targetEulers.X),

@@ -52,6 +52,9 @@ public abstract class Entity : IEntity {
         cors.Run(ienum, opts);
     }
 
+    protected void AddToken(IDisposable token) => tokens.Add(token);
+    public void Listen<T>(IObservable<T> obs, Action<T> listener) => AddToken(obs.Subscribe(listener));
+
     public VNOperation Tween(ITweener tweener) => this.AssertActive().MakeVNOp(ct => 
         tweener.With(this.BindLifetime(ct), () => Container.dT).Run(cors));
 

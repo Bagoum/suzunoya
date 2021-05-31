@@ -80,7 +80,7 @@ public interface IInterrogatorReceiver {
 }
 
 public interface IInterrogatorConstructor {
-    public void Subscribe(IInterrogatorReceiver obs);
+    public IDisposable Subscribe(IInterrogatorReceiver obs);
 }
 
 public interface IInterrogatorSubject : IInterrogatorReceiver, IInterrogatorConstructor {
@@ -98,7 +98,7 @@ public class InterrogatorEvent : IInterrogatorSubject {
         callbacks.Compact();
     }
 
-    public void Subscribe(IInterrogatorReceiver obs) => callbacks.Add(obs);
+    public IDisposable Subscribe(IInterrogatorReceiver obs) => callbacks.Add(obs);
 }
 
 }

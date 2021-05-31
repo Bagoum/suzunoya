@@ -41,10 +41,14 @@ public interface IVNState {
     
     RenderGroup DefaultRenderGroup { get; }
 
-    public IDisposable AddEntity(IEntity ent);
-    public IDisposable AddRenderGroup(RenderGroup rg);
-    public void OpenExecCtx(string scriptId);
-    public void CloseExecCtx();
+    RenderGroup MakeDefaultRenderGroup();
+    IDisposable AddEntity(IEntity ent);
+    /// <summary>
+    /// This is called within the RenderGroup constructor. You do not need to call it explicitly.
+    /// </summary>
+    IDisposable _AddRenderGroup(RenderGroup rg);
+    void OpenExecCtx(string scriptId);
+    void CloseExecCtx();
 
     //IVNExecCtx? ForceViewExecCtx { get; set; }
     
@@ -63,7 +67,7 @@ public interface IVNState {
     /// <summary>
     /// Use this to skip animations or the like.
     /// </summary>
-    void SkipOperation();
+    void RequestSkipOperation();
 
 
     void RecordCG(IGalleryable cg);
@@ -75,6 +79,7 @@ public interface IVNState {
     void DeleteAll();
     
     Event<IEntity> EntityCreated { get; }
+    ReplayEvent<RenderGroup> RenderGroupCreated { get; }
     /// <summary>
     /// Called immediately before an interrogator is started (but not if it is skipped).
     /// </summary>
@@ -112,6 +117,8 @@ public class VNState : IVNState, IConfirmationReceiver {
     private Cancellable? confirmToken;
     public ICancellee CToken { get; }
     private StackList<VNExecCtx> ExecCtxes { get; } = new();
+
+    public int ForceSkip { get; set; } = 0;
     
     public RenderGroup DefaultRenderGroup { get; }
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
@@ -139,8 +146,12 @@ public class VNState : IVNState, IConfirmationReceiver {
         CToken = new JointCancellee(extCToken, lifetimeToken);
         OpenExecCtx(scriptId);
 
-        DefaultRenderGroup = new RenderGroup(this, visible: true);
+        // ReSharper disable once VirtualMemberCallInConstructor
+        DefaultRenderGroup = MakeDefaultRenderGroup();
     }
+
+    public virtual RenderGroup MakeDefaultRenderGroup() => new RenderGroup(this, visible: true);
+
     
     public void OpenExecCtx(string? scriptId) {
         ExecCtxes.Push(new VNExecCtx(this, ExecCtxes.TryPeek(), scriptId));
@@ -174,7 +185,6 @@ public class VNState : IVNState, IConfirmationReceiver {
         Entities.Compact();
         vnUpdated = false;
     }
-
     public IDisposable AddEntity(IEntity ent) {
         var dsp = Entities.Add(ent);
         EntityCreated.OnNext(ent);
@@ -194,7 +204,7 @@ public class VNState : IVNState, IConfirmationReceiver {
         return ent;
     }
 
-    public IDisposable AddRenderGroup(RenderGroup rg) {
+    public IDisposable _AddRenderGroup(RenderGroup rg) {
         if (RenderGroups.Any(x => x.Priority == rg.Priority.Value))
             throw new Exception("Cannot have multiple render groups with the same priority");
         var dsp = RenderGroups.Add(rg);
@@ -218,11 +228,12 @@ public class VNState : IVNState, IConfirmationReceiver {
             new CoroutineOptions(execType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
     }
 
-    public VNOperation Parallel(params VNOperation[] ops) => VNOperation.Parallel(ops);
+    public LazyAwaitable Parallel(params LazyAwaitable[] ops) =>
+        new LazyTask(() => Task.WhenAll(ops.Select(la => la.Task)));
 
     public LazyAwaitable Sequential(params LazyAwaitable[] tasks) => new LazyTask(async () => {
         foreach (var t in tasks)
-            await t.Task;
+            await t;
     });
 
     public VNComfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
@@ -233,7 +244,7 @@ public class VNState : IVNState, IConfirmationReceiver {
             if (AwaitingConfirm.Value == null)
                 AwaitingConfirm.Value = this;
             confirmToken ??= new Cancellable();
-            Run(WaitingUtils.Spin(WaitingUtils.GetCompletionAwaiter(out var t), confirmToken));
+            Run(WaitingUtils.Spin(WaitingUtils.GetCompletionAwaiter(out var t), new JointCancellee(CToken, confirmToken)));
             return t;
         });
     }
@@ -247,9 +258,9 @@ public class VNState : IVNState, IConfirmationReceiver {
         }
     }
     
-    public void SkipOperation() {
+    public void RequestSkipOperation() {
         this.AssertActive();
-        ExecCtx.SkipOperation();
+        ExecCtx.RequestSkipOperation();
     }
 
     public async Task<T> Ask<T>(IInterrogator<T> asker, bool throwIfExists=true) {
@@ -276,6 +287,14 @@ public class VNState : IVNState, IConfirmationReceiver {
 
     public void DeleteAll() {
         lifetimeToken.Cancel(CancelHelpers.HardCancelLevel);
+        for (int ii = 0; ii < RenderGroups.Count; ++ii) {
+            if (RenderGroups.ExistsAt(ii))
+                RenderGroups[ii].Delete();
+        }
+        RenderGroups.Compact();
+        if (RenderGroups.Count > 0)
+            throw new Exception("Some VNState render groups were not deleted in the cull process. " +
+                                $"Script {ExecCtx.ScriptID} has {RenderGroups.Count} remaining.");
         for (int ii = 0; ii < Entities.Count; ++ii) {
             if (Entities.ExistsAt(ii))
                 Entities[ii].Delete();

@@ -96,17 +96,45 @@ public class Speech {
 
 }
 
-public abstract record SpeechFragment {
-    public record Char(char fragment) : SpeechFragment;
-    public record Wait(float time) : SpeechFragment;
+public abstract class SpeechFragment {
+    public class Char : SpeechFragment {
+        public readonly char fragment;
+        public Char(char fragment) {
+            this.fragment = fragment;
+        }
+    }
+
+    public class Wait : SpeechFragment {
+        public readonly float time;
+        public Wait(float time) {
+            this.time = time;
+        }
+    }
 
     //change to internal management type
-    public record RollEvent(Action ev) : SpeechFragment;
+    public class RollEvent : SpeechFragment {
+        public readonly Action ev;
+        public RollEvent(Action ev) {
+            this.ev = ev;
+        }
+    }
 
     //Tags can be used to modify SpeakSettings, eg. <speed=*2>fast text!</speed>
-    public record TagOpen(string name, SpeechTag tag) : SpeechFragment;
+    public class TagOpen : SpeechFragment {
+        public readonly string name;
+        public readonly SpeechTag tag;
+        public TagOpen(string name, SpeechTag tag) {
+            this.name = name;
+            this.tag = tag;
+        }
+    }
 
-    public record TagClose(TagOpen opener) : SpeechFragment;
+    public class TagClose : SpeechFragment {
+        public readonly TagOpen opener;
+        public TagClose(TagOpen opener) {
+            this.opener = opener;
+        }
+    }
 }
 
 

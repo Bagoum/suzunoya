@@ -29,7 +29,7 @@ public class _2TweeningBatchingTest {
 
             //No sequential batching (base case)
             var t = reimu.MoveTo(Vector3.One, 30f).Task;
-            vn.SkipOperation();
+            vn.RequestSkipOperation();
             await t;
             var t2 = reimu.RotateTo(Vector3.One, 5f).Task;
             Assert.IsTrue(exc.OperationCount == 3 && exc.SuboperationCount == 3);
@@ -57,7 +57,7 @@ public class _2TweeningBatchingTest {
             //Sequential batching (raw)
             var d = vn.ExecCtx.GetOperationCanceller(out _);
             t = reimu.MoveTo(Vector3.Zero, 30f).Task;
-            vn.SkipOperation();
+            vn.RequestSkipOperation();
             await t;
             t2 = reimu.RotateTo(Vector3.Zero, 30f).Task;
             Assert.IsTrue(exc.OperationCount == 4 && exc.SuboperationCount == 6);
@@ -78,7 +78,7 @@ public class _2TweeningBatchingTest {
             //Sequential batching
             t = reimu.MoveTo(Vector3.One, 30f)
                 .Then(reimu.MoveTo(Vector3.Zero, 30f)).Task;
-            vn.SkipOperation();
+            vn.RequestSkipOperation();
             await t;
             Assert.IsTrue(exc.OperationCount == 5 && exc.SuboperationCount == 7);
             
@@ -96,7 +96,7 @@ public class _2TweeningBatchingTest {
             t = reimu.MoveTo(Vector3.One, 30f)
                 .And(reimu.RotateTo(Vector3.One, 30f)).Task;
             t2 = vn.Wait(30).Task;
-            vn.SkipOperation();
+            vn.RequestSkipOperation();
             await t2;
             Assert.IsTrue(exc.OperationCount == 6 && exc.SuboperationCount == 9);
             await t;

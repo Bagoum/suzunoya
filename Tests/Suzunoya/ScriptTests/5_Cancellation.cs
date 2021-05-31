@@ -43,7 +43,7 @@ public class _5CancellationTest {
             s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
             s.vn.Update(1f);
             if (ii == 2)
-                s.vn.SkipOperation();
+                s.vn.RequestSkipOperation();
             if (ii == 7)
                 s.vn.Confirm();
         }

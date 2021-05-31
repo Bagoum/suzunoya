@@ -10,6 +10,8 @@ With the exception of the testing subproject, this project consumes the followin
 - System.Reactive: MIT (https://www.nuget.org/packages/System.Reactive/)
 - Newtonsoft.Json: MIT (https://github.com/JamesNK/Newtonsoft.Json)
 
+The project incorporates code from the following projects:
+- bezier-easing: MIT (https://github.com/gre/bezier-easing/)
 
 --- MIT license for this project's source code
 

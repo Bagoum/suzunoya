@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
+using BagoumLib.Tasks;
 using JetBrains.Annotations;
 
 namespace Suzunoya.ControlFlow {
@@ -12,6 +13,7 @@ namespace Suzunoya.ControlFlow {
 //This allows chaining then in ways that are a bit difficult for tasks.
 public interface LazyAwaitable {
     public Task Task { get; }
+    public TaskAwaiter GetAwaiter(); // => Task.GetAwaiter();
 }
 
 /// <summary>
@@ -20,6 +22,8 @@ public interface LazyAwaitable {
 public record LazyTask(Func<Task> lazyTask) : LazyAwaitable {
     private Task? loadedTask;
     public Task Task => loadedTask ??= lazyTask();
+    
+    public TaskAwaiter GetAwaiter() => Task.GetAwaiter();
 }
 
 /// <summary>
@@ -49,7 +53,9 @@ public record VNComfirmTask(VNOperation? preceding, Func<Task> t) : LazyAwaitabl
 public record VNOperation : LazyAwaitable {
     public IVNState VN { get; }
     private IVNExecCtx VNExec { get; }
-    public Func<ICancellee, Task>[] Suboperations { get; }
+    public Func<ICancellee, Task>[] Suboperations { get; init; }
+
+    public bool AllowUserSkip { get; init; } = true;
 
     private Task? loadedTask;
     public Task Task => loadedTask ??= _AsTask();
@@ -62,7 +68,7 @@ public record VNOperation : LazyAwaitable {
     }
 
     private async Task _AsTask() {
-        using var d = VN.ExecCtx.GetOperationCanceller(out var cT);
+        using var d = VN.ExecCtx.GetOperationCanceller(out var cT, AllowUserSkip);
         cT.ThrowIfHardCancelled();
         foreach (var t in Suboperations) {
             await t(cT);
@@ -70,39 +76,42 @@ public record VNOperation : LazyAwaitable {
         }
     }
 
-    public VNOperation Then(params Func<ICancellee, Task>[] nxt) => 
-        new(VN, VNExec, Suboperations.Concat(nxt).ToArray());
+    public VNOperation Then(Action nxt) {
+        var nsubops = Suboperations.ToArray();
+        var ft = nsubops[nsubops.Length - 1];
+        nsubops[nsubops.Length - 1] = ct => ft(ct).ContinueWithSync(nxt);
+        return this with {Suboperations = nsubops};
+    }
+    public VNOperation Then(params Func<ICancellee, Task>[] nxt) =>
+        this with {Suboperations = Suboperations.Concat(nxt).ToArray()};
 
-    public VNOperation Then(VNOperation nxt) =>
-        VN == nxt.VN ?
-            Then(nxt.Suboperations) :
-            throw new Exception($"Cannot sequence VNOperations across different VNStates: {VN}, {nxt.VN}");
-
-    public VNOperation And(VNOperation nxt) => Parallel(this, nxt);
-    
-    
-    public static VNOperation Parallel(IVNState vn, params Func<ICancellee, Task>[] subops) =>
-        new VNOperation(vn, vn.ExecCtx, ct => Task.WhenAll(subops.Select(s => s(ct))));
-    
-    public static VNOperation Parallel(params VNOperation[] vnos) {
+    private static void CheckUniformity(VNOperation[] vnos) {
         for (int ii = 1; ii < vnos.Length; ++ii) {
             if (vnos[ii].VN != vnos[0].VN || vnos[ii].VNExec != vnos[0].VNExec)
                 throw new Exception(
-                    $"Cannot parallelize VNOperations across different VNStates: {vnos[0].VN}, {vnos[ii].VN}");
-
+                    $"Cannot join VNOperations across different VNStates: {vnos[0].VN}, {vnos[ii].VN}");
         }
-        return new VNOperation(vnos[0].VN, vnos[0].VNExec, Parallel(vnos.Select(vno => Sequential(vno.Suboperations))));
     }
 
-    public static Func<T, Task> Parallel<T>(params Func<T, Task>[] tasks) =>
-        x => Task.WhenAll(tasks.Select(t => t(x)));
+    public VNOperation And(params VNOperation[] nxt) => Parallel(nxt.Prepend(this).ToArray());
+
+    public VNOperation Then(params VNOperation[] nxt) {
+        nxt = nxt.Prepend(this).ToArray();
+        CheckUniformity(nxt);
+        return new VNOperation(nxt[0].VN, nxt[0].VNExec, nxt.SelectMany(vno => vno.Suboperations).ToArray()) {
+            AllowUserSkip = nxt.All(v => v.AllowUserSkip)
+        };
+    }
+    public static VNOperation Parallel(params VNOperation[] vnos) {
+        CheckUniformity(vnos);
+        return new VNOperation(vnos[0].VN, vnos[0].VNExec, Parallel(vnos.Select(vno => Sequential(vno.Suboperations)))) {
+            AllowUserSkip = vnos.All(v => v.AllowUserSkip)
+        };
+    }
+
     public static Func<T, Task> Parallel<T>(IEnumerable<Func<T, Task>> tasks) =>
         x => Task.WhenAll(tasks.Select(t => t(x)));
 
-
-    public static Func<ICancellee, Task> Sequential(params Func<ICancellee, Task>[] tasks) =>
-        Sequential((IEnumerable<Func<ICancellee, Task>>)tasks);
-    
     public static Func<ICancellee, Task> Sequential(IEnumerable<Func<ICancellee, Task>> tasks) {
         async Task inner(ICancellee x) {
             x.ThrowIfHardCancelled();

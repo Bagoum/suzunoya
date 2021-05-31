@@ -83,6 +83,7 @@ public class _2TweeningSkipCancelScriptTest {
                 new(reimu, "Location", Vector3.One),
                 new(md, "EntityActive", false),
                 new(reimu, "EntityActive", false),
+                new(vn.DefaultRenderGroup, "EntityActive", false),
                 new(vn, "VNStateActive", false)
                 //The rotation function does not start due to cancellation
             });

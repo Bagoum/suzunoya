@@ -38,5 +38,7 @@ public readonly struct Maybe<T> {
     public static bool operator !=(Maybe<T> a, Maybe<T> b) => !(a == b);
 
     public override string ToString() => Valid ? $"Some({Value?.ToString() ?? "null"})" : $"None<{typeof(T).RName()}>";
+
+    public static implicit operator Maybe<T>(T val) => Maybe<T>.Of(val);
 }
 }
