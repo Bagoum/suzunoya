@@ -7,7 +7,7 @@ It is free (as in free speech) software. The source code is on Github: https://g
 
 The engine name may be abbreviated as **szy**.
 
-Each supported game engine (such as Unity) has its own adapter subproject that maps the objects in the core engine to engine-specific game-objects. SuzunoyaUnity is the only one under current development. 
+Each supported game engine (such as Unity) has its own adapter subproject that maps the objects in the core engine to engine-specific game-objects. SuzunoyaUnity (https://github.com/Bagoum/suzunoya-unity) is the only one under current development. 
 
 All code is written in C#9 and compiled against Framework 4.7.2 for compatibility with Unity. This means that some really useful features, like default interface implementations, cannot presently be used.
 

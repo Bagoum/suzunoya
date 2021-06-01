@@ -68,7 +68,7 @@ public static class Tween {
 
     public static ITweener Then(this ITweener tw, ITweener next) => new SequentialTweener(tw, next);
     public static ITweener Parallel(params ITweener[] tws) => new ParallelTweener(tws);
-    public static ITweener Loop(this ITweener tw) => new LoopTweener(tw);
+    public static ITweener Loop(this ITweener tw, int? times = null) => new LoopTweener(tw, times);
 }
 
 [PublicAPI]
@@ -172,6 +172,8 @@ public record Tweener<T> : ITweener {
         new(End, Start, Time, Apply, reverseEase ? new Easer(t => 1 - Ease(1 - t)) : Ease, CToken) {
             DeltaTimeProvider = DeltaTimeProvider
         };
+
+    public ITweener Yoyo(bool reverseEase = true, int? times = null) => this.Reverse(reverseEase).Loop(times);
 }
 
 public record SequentialTweener(params ITweener[] states) : ITweener {

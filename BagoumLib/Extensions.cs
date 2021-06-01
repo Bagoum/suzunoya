@@ -48,6 +48,11 @@ public static class Extensions {
         sb.Append('"');
         return sb.ToString();
     }
+
+    /// <summary>
+    /// If x is null or empty, return y. Else return x.
+    /// </summary>
+    public static string Or(this string? x, string y) => string.IsNullOrEmpty(x) ? y : x!;
 }
 
 [PublicAPI]
