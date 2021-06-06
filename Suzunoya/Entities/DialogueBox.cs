@@ -4,6 +4,7 @@ using System.Reactive;
 using System.Text;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
+using BagoumLib.Culture;
 using BagoumLib.Events;
 using BagoumLib.Tasks;
 using Suzunoya.ControlFlow;
@@ -19,10 +20,10 @@ public enum SpeakFlags {
     /// </summary>
     DontClearText = 1 << 0,
     /// <summary>
-    /// By default, calling dialogueBox.Say will inherit the existing speaker if the character param is null.
-    /// Add this flag to actually set the speaker to null.
+    /// Don't show the name, image, etc of the speaker on the dialogue box. This should be
+    /// utilized by the mimic class.
     /// </summary>
-    ClearSpeaker = 1 << 1,
+    Anonymous = 1 << 1,
     
     Default = None,
 }
@@ -30,8 +31,9 @@ public enum SpeakFlags {
 public interface IDialogueBox : IEntity {
     AccEvent<(SpeechFragment frag, string lookahead)> Dialogue { get; }
     Event<Unit> DialogueCleared { get; }
-    Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; } 
-    public VNOperation Say(string content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default);
+    Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; }
+    void ClearSpeaker();
+    public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default);
 }
 
 public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
@@ -46,8 +48,14 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
     public Event<Unit> DialogueFinished { get; } = new();
     public Event<Unit> DialogueCleared { get; } = new();
     public Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; } = new((default, SpeakFlags.Default));
-    
 
+    public void Clear() {
+        Dialogue.Clear();
+        DialogueStarted.Clear();
+        DialogueCleared.OnNext(Unit.Default);
+    }
+
+    public void ClearSpeaker() => Speaker.OnNext((null, SpeakFlags.Default));
 
     private static bool LookaheadRequired(char c) => !char.IsWhiteSpace(c) && !char.IsPunctuation(c);
     private IEnumerator Say(Speech s, SpeakFlags flags, Action done, ICancellee cT) {
@@ -56,9 +64,7 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
             yield break;
         }
         if ((flags & SpeakFlags.DontClearText) == 0) {
-            Dialogue.Clear();
-            DialogueStarted.Clear();
-            DialogueCleared.OnNext(Unit.Default);
+            Clear();
         }
         DialogueStarted.OnNext(s);
         float untilProceed = 0f;
@@ -96,10 +102,8 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
         done();
     }
 
-    public VNOperation Say(string content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default) =>
+    public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default) =>
         this.MakeVNOp(cT => {
-            if (!flags.HasFlag(SpeakFlags.ClearSpeaker))
-                character ??= Speaker.Value.speaker;
             Speaker.OnNext((character, flags));
             Run(Say(new Speech(content, character?.SpeechCfg), flags, WaitingUtils.GetAwaiter(out Task t), this.BindLifetime(cT)));
             return t;

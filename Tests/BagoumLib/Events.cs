@@ -71,5 +71,36 @@ public class Events {
         ListEq(l2, new[]{1,2,3,4,5});
         ListEq(l3,new[]{3,4,5});
     }
+
+    [Test]
+    public void TestDisturbed() {
+        var x1 = new Evented<float>(1);
+        var x2 = new Evented<float>(2);
+        var x3 = new Evented<float>(3);
+        var add = new DisturbedSum<float>(10);
+        var mul = new DisturbedProduct<float>(10);
+        var ladd = new List<float>();
+        var lmul = new List<float>();
+        add.Subscribe(ladd.Add);
+        mul.Subscribe(lmul.Add);
+        var ta1 = add.AddDisturbance(x1);
+        var ta2 = add.AddDisturbance(x2);
+        x1.Value = 10;
+        var ta3 = add.AddDisturbance(x3);
+        var tm1 = mul.AddDisturbance(x1);
+        var tm2 = mul.AddDisturbance(x2);
+        var tm3 = mul.AddDisturbance(x3);
+        ListEq(ladd, new float[]{10, 11, 13, 22, 25});
+        ListEq(lmul, new float[]{10, 100, 200, 600});
+        ladd.Clear();
+        lmul.Clear();
+        x2.Value = 20;
+        ta2.Dispose();
+        x2.Value = -2;
+        tm2.Dispose();
+        //Dispose actually causes recalculation, so it goes back to 23
+        ListEq(ladd, new float[]{43, 23});
+        ListEq(lmul, new float[]{6000, -600, 300});
+    }
 }
 }

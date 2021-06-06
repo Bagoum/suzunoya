@@ -19,6 +19,7 @@ public static class EventRecordHelpers {
         foreach (var prop in obj.GetType().GetProperties().OrderBy(p => p.Name)) {
             foreach (var intf in prop.PropertyType.GetInterfaces()) {
                 if (intf.IsConstructedGenericType && intf.GetGenericTypeDefinition() == tobs) {
+                    if (prop.Name.ToLower() == "onupdate") continue; //don't want these
                     var genType = intf.GenericTypeArguments[0];
                     registerEv.MakeGenericMethod(genType).Invoke(er, new[] {obj, prop.Name, prop.GetValue(obj)!});
                 }

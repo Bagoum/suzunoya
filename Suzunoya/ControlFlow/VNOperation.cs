@@ -17,6 +17,21 @@ public interface LazyAwaitable {
 }
 
 /// <summary>
+/// An action pretending to be a task.
+/// </summary>
+public record LazyAction(Action lazyOp) : LazyAwaitable {
+    private Task? loadedTask;
+    public Task Task => loadedTask ??= LazyTask();
+
+    private Task LazyTask() {
+        lazyOp();
+        return Task.CompletedTask;
+    }
+
+    public TaskAwaiter GetAwaiter() => Task.GetAwaiter();
+}
+
+/// <summary>
 /// A generic task that is not started until it is awaited.
 /// </summary>
 public record LazyTask(Func<Task> lazyTask) : LazyAwaitable {
@@ -30,7 +45,7 @@ public record LazyTask(Func<Task> lazyTask) : LazyAwaitable {
 /// The task that is produced when waiting for a confirmation signal.
 /// This is similar to VNOperation, but is not bounded by an operation canceller.
 /// </summary>
-public record VNComfirmTask(VNOperation? preceding, Func<Task> t) : LazyAwaitable {
+public record VNConfirmTask(VNOperation? preceding, Func<Task> t) : LazyAwaitable {
     private Task? loadedTask;
     public Task Task => loadedTask ??= _AsTask();
 
@@ -59,7 +74,7 @@ public record VNOperation : LazyAwaitable {
 
     private Task? loadedTask;
     public Task Task => loadedTask ??= _AsTask();
-    public VNComfirmTask C => VN.SpinUntilConfirm(this);
+    public VNConfirmTask C => VN.SpinUntilConfirm(this);
 
     public VNOperation(IVNState vn, IVNExecCtx? exec = null, params Func<ICancellee, Task>[] suboperations) {
         this.VN = vn;

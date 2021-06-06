@@ -1,4 +1,5 @@
 ﻿using System.Drawing;
+using System.Linq;
 using System.Numerics;
 using System.Reactive;
 using System.Threading.Tasks;
@@ -25,6 +26,7 @@ public class _1BasicVNStateFunctionalityTest {
 /// </summary>
     public class _TestScript : TestScript {
         public void Run() {
+            RenderGroup.DefaultSortingIDStep = 1;
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
             var roll = new EventRecord.LogEvent(reimu, "$SPEAK", typeof(string), "");
@@ -58,8 +60,9 @@ public class _1BasicVNStateFunctionalityTest {
                 "<TestDialogueBox>.Scale ~ <1, 1, 1>",
                 "<TestDialogueBox>.SortingID ~ 0",
                 "<TestDialogueBox>.Speaker ~ (, Default)",
-                "<TestDialogueBox>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
-                "<TestDialogueBox>.Visible ~ False",
+                "<TestDialogueBox>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+                "<TestDialogueBox>.Visible ~ True",
+                "<TestDialogueBox>.SortingID ~ 0",
                 "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.TestDialogueBox",
                 "<TestDialogueBox>.RenderGroup ~ Suzunoya.Display.RenderGroup",
                 "<VNState>.EntityCreated ~ Tests.Suzunoya.Reimu",
@@ -107,7 +110,7 @@ public class _1BasicVNStateFunctionalityTest {
             vn.Update(0.8f);
             Assert.AreEqual(er.LoggedEvents.Published.Count, 7);
             vn.Update(1f);
-            ListEq(er.GetAndClear(), new[] {
+            ListEq(er.GetAndClear().Select(x => x.ToString()).ToArray(), new[] {
                 new(md, "Dialogue", (c('w'), "Orld")),
                 roll,
                 new(md, "Dialogue", (c('O'), "rld")),
@@ -119,7 +122,7 @@ public class _1BasicVNStateFunctionalityTest {
                 new(md, "Dialogue", (c('o'), "o")),
                 new(md, "Dialogue", (c('o'), "")),
                 new(md, "DialogueFinished", Unit.Default)
-            });
+            }.Select(x => x.ToString()).ToArray());
             Assert.IsTrue(t.IsCompleted);
         }
 

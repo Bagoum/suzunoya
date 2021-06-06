@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 using BagoumLib;
+using BagoumLib.Culture;
 using static Suzunoya.Dialogue.SpeechTag;
 
 namespace Suzunoya.Dialogue {
 public class Speech {
-    private readonly string raw;
+    private readonly LString raw;
     private readonly SpeechSettings cfg;
     
     private List<TextUnit>? textUnits;
@@ -16,7 +17,7 @@ public class Speech {
     private string? readable;
     public string Readable => readable ??= ComputeReadable();
 
-    public Speech(string raw, SpeechSettings? cfg = null) {
+    public Speech(LString raw, SpeechSettings? cfg = null) {
         this.raw = raw;
         this.cfg = cfg ?? SpeechSettings.Default;
     }
@@ -91,7 +92,7 @@ public class Speech {
         "silent" => new Silent(),
         "color" or "fontcolor" => new Color(content ?? "#ffffff"),
         "furigana" or "furi" or "ruby" => new Furigana(content ?? ""),
-        _ => throw new Exception($"No speech tag handling for {name}")
+        _ => new Unknown(name, content)
     };
 
 }
@@ -102,6 +103,8 @@ public abstract class SpeechFragment {
         public Char(char fragment) {
             this.fragment = fragment;
         }
+
+        public override string ToString() => $"Char {{ fragment = {fragment} }}";
     }
 
     public class Wait : SpeechFragment {
@@ -127,6 +130,8 @@ public abstract class SpeechFragment {
             this.name = name;
             this.tag = tag;
         }
+
+        public override string ToString() => $"TagOpen {{ name = {name}, tag = {tag} }}";
     }
 
     public class TagClose : SpeechFragment {
@@ -134,6 +139,8 @@ public abstract class SpeechFragment {
         public TagClose(TagOpen opener) {
             this.opener = opener;
         }
+        
+        public override string ToString() => $"TagClose {{ opener = {opener} }}";
     }
 }
 

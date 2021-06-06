@@ -80,6 +80,7 @@ public class _8RenderGroupTest {
         "<Reimu>.SortingID ~ 0",
         "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
         "<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
+        "<Reimu>.SortingID ~ 0",
         "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
         "<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
         "<Reimu>.Location ~ <1, 1, 1>",

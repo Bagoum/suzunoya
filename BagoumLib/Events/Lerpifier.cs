@@ -13,10 +13,10 @@ public class Lerpifier<T> : IObservable<T> where T : IComparable<T> {
     private readonly float lerpTime;
     private T lastSourceValue;
     private T lastTargetValue;
-    public T Value => ev.Value;
+    public T Value => OnChange.Value;
     private float elapsed;
 
-    private readonly Evented<T> ev;
+    public Evented<T> OnChange { get; }
 
     public Lerpifier(Func<T, T, float, T> lerper, Func<T> targetValue, float lerpTime) {
         this.lerper = lerper;
@@ -24,18 +24,18 @@ public class Lerpifier<T> : IObservable<T> where T : IComparable<T> {
         this.lerpTime = lerpTime;
         this.elapsed = this.lerpTime;
         this.lastSourceValue = lastTargetValue = targetValue();
-        this.ev = new Evented<T>(lastTargetValue);
+        this.OnChange = new Evented<T>(lastTargetValue);
     }
 
     public void HardReset() {
         this.elapsed = this.lerpTime;
-        this.lastSourceValue = lastTargetValue = ev.Value = targetValue();
+        this.lastSourceValue = lastTargetValue = OnChange.Value = targetValue();
     }
 
     public void Update(float dt) {
         var nextTarget = targetValue();
         if (nextTarget.CompareTo(lastTargetValue) != 0) {
-            lastSourceValue = ev.Value;
+            lastSourceValue = OnChange.Value;
             lastTargetValue = nextTarget;
             elapsed = 0;
         }
@@ -43,11 +43,11 @@ public class Lerpifier<T> : IObservable<T> where T : IComparable<T> {
         var nxt = elapsed >= lerpTime ? 
             lastTargetValue : 
             lerper(lastSourceValue, lastTargetValue, elapsed / lerpTime);
-        if (ev.Value.CompareTo(nxt) != 0)
-            ev.Value = nxt;
+        if (OnChange.Value.CompareTo(nxt) != 0)
+            OnChange.Value = nxt;
     }
 
-    public IDisposable Subscribe(IObserver<T> observer) => ev.Subscribe(observer);
+    public IDisposable Subscribe(IObserver<T> observer) => OnChange.Subscribe(observer);
 
     public static implicit operator T(Lerpifier<T> lerpifier) => lerpifier.Value;
 }

@@ -9,6 +9,18 @@ public abstract class SpeechTag {
     /// If FALSE, the tag is used internally for data management and does not need to be handled by rendering plugins.
     /// </summary>
     public virtual bool RequiresRender => true;
+
+    /// <summary>
+    /// A speech tag not handled by Suzunoya.
+    /// </summary>
+    public class Unknown : SpeechTag {
+        public readonly string name;
+        public readonly string? content;
+        public Unknown(string name, string? content) {
+            this.name = name;
+            this.content = content;
+        }
+    }
     
     /// <summary>
     /// Changes the speed of text unrolling.
@@ -33,6 +45,8 @@ public abstract class SpeechTag {
             src with {rollEventAllowed = (_, __) => false};
 
         public override bool RequiresRender => false;
+
+        public override string ToString() => "Silent";
     }
 
     /// <summary>
@@ -43,6 +57,8 @@ public abstract class SpeechTag {
         public Color(string color) {
             this.color = color;
         }
+
+        public override string ToString() => $"Color {{ color = {color} }}";
     }
 
     /// <summary>

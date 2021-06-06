@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using NUnit.Framework;
 using Suzunoya.Dialogue;
 using static Tests.AssertHelpers;
@@ -17,7 +18,7 @@ public class Parsing {
             rollEventAllowed = (s, i) => char.IsUpper(s[i]),
             rollEvent = () => { }
         };
-        ListEq(new Speech(data, cfg).Fragments, new SpeechFragment[] {
+        ListEq(new Speech(data, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
             new Char('h'),
             new Wait(1),
             new Char('e'),
@@ -41,7 +42,7 @@ public class Parsing {
             new Wait(1),
             new Char('D'),
             new Wait(1),
-        });
+        }.Select(x => x.ToString()).ToArray());
     }
     
     [Test]
@@ -56,7 +57,7 @@ public class Parsing {
         };
 
         var s1 = new Speech(data, cfg);
-        ListEq(s1.TextUnits, new TextUnit[] {
+        ListEq(s1.TextUnits.Select(x => x.ToString()).ToArray(), new TextUnit[] {
             new TextUnit.String("a"),
             new TextUnit.OpenTag("speed", "2"),
             new TextUnit.String("b"),
@@ -66,10 +67,10 @@ public class Parsing {
             new TextUnit.String("d"),
             new TextUnit.CloseTag("SPEED"),
             new TextUnit.String("efg"),
-        });
+        }.Select(x => x.ToString()).ToArray());
         var t1 = new TagOpen("speed", new SpeechTag.Speed(2));
         var t2 = new TagOpen("SPEED", new SpeechTag.Speed(4));
-        ListEq(s1.Fragments, new SpeechFragment[] {
+        ListEq(s1.Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
             new Char('a'),
             new Wait(1),
             t1,
@@ -88,12 +89,12 @@ public class Parsing {
             new Wait(1),
             new Char('g'),
             new Wait(1),
-        });
+        }.Select(x => x.ToString()).ToArray());
         
         //The parser will prefer to match a closing tag to the last opened tag.
         data = "a<speed=2>b<speed=4>c</speed>d</speed>efg";
         var t3 = new TagOpen("speed", new SpeechTag.Speed(4));
-        ListEq(new Speech(data, cfg).Fragments, new SpeechFragment[] {
+        ListEq(new Speech(data, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
             new Char('a'),
             new Wait(1),
             t1,
@@ -112,7 +113,7 @@ public class Parsing {
             new Wait(1),
             new Char('g'),
             new Wait(1),
-        });
+        }.Select(x => x.ToString()).ToArray());
     }
 }
 }

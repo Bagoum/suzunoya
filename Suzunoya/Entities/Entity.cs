@@ -10,17 +10,23 @@ using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Reflection;
 using BagoumLib.Tweening;
+using JetBrains.Annotations;
 using Suzunoya.ControlFlow;
 
 namespace Suzunoya.Entities {
 //Not inheriting IEntity : ICoroutineRunner in order to provide more protection around
 // always getting BoundedSuboperationToken when running eg. tweens.
+[PublicAPI]
 public interface IEntity {
     ICancellee LifetimeToken { get; }
     VNOperation Tween(ITweener tweener);
     IVNState Container { get; }
     void AddToVNState(IVNState container);
     void Update(float deltaTime);
+    /// <summary>
+    /// Called after Update is complete. Mimics may listen to this.
+    /// </summary>
+    Event<float> OnUpdate { get; }
     void Delete();
     /// <summary>
     /// When this is set to false, the object is destroyed and no further operations can be run.
@@ -34,6 +40,7 @@ public abstract class Entity : IEntity {
     private readonly Cancellable lifetimeToken = new();
     public ICancellee LifetimeToken => lifetimeToken;
     private readonly Coroutines cors = new();
+    public Event<float> OnUpdate { get; } = new();
 
     public Evented<bool> EntityActive { get; } = new(true);
 
@@ -45,7 +52,9 @@ public abstract class Entity : IEntity {
     public virtual void Update(float deltaTime) {
         this.AssertActive();
         cors.Step();
+        OnUpdate.OnNext(deltaTime);
     }
+
 
     public void Run(IEnumerator ienum, CoroutineOptions? opts = null) {
         this.AssertActive();

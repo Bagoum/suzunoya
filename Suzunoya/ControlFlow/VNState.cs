@@ -25,6 +25,11 @@ public interface IVNState {
     /// Within the update loop, this is set to the delta-time of the frame.
     /// </summary>
     float dT { get; }
+    /// <summary>
+    /// True when loading to a position or using a "skip all" feature.
+    /// (Not true when pressing X to skip to end of a line).
+    /// </summary>
+    bool Skipping { get; }
     IDialogueBox? MainDialogue { get; }
     IDialogueBox MainDialogueOrThrow { get; }
     
@@ -57,7 +62,7 @@ public interface IVNState {
     /// <summary>
     /// Create a lazy task that completes when a Confirm is sent to the VNState (see below).
     /// </summary>
-    VNComfirmTask SpinUntilConfirm(VNOperation? preceding = null);
+    VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null);
     
     /// <summary>
     /// Use this to proceed operations that require confirmation via SpinUntilConfirm.
@@ -97,6 +102,7 @@ public interface IVNState {
 }
 public class VNState : IVNState, IConfirmationReceiver {
     public float dT { get; private set; }
+    public bool Skipping => ExecCtx.Skipping;
     private readonly InstanceData? saveData;
     private bool vnUpdated = false;
     private readonly Coroutines cors = new();
@@ -236,9 +242,9 @@ public class VNState : IVNState, IConfirmationReceiver {
             await t;
     });
 
-    public VNComfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
+    public VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
         this.AssertActive();
-        return new VNComfirmTask(preceding, () => {
+        return new VNConfirmTask(preceding, () => {
             if (ExecCtx.Skipping)
                 return Task.FromResult(Completion.SoftSkip);
             if (AwaitingConfirm.Value == null)
@@ -285,7 +291,11 @@ public class VNState : IVNState, IConfirmationReceiver {
         saveData?.GlobalData.GalleryCGViewed(cg.Key);
     }
 
+    //This is separate from EntityVNState, which is not set until DeleteAll ends
+    private bool deleteStarted = false;
     public void DeleteAll() {
+        if (deleteStarted) return;
+        deleteStarted = true;
         lifetimeToken.Cancel(CancelHelpers.HardCancelLevel);
         for (int ii = 0; ii < RenderGroups.Count; ++ii) {
             if (RenderGroups.ExistsAt(ii))

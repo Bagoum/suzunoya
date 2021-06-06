@@ -9,6 +9,7 @@ using BagoumLib.DataStructures;
 using BagoumLib.Mathematics;
 using BagoumLib.Tasks;
 using JetBrains.Annotations;
+using static BagoumLib.Mathematics.GenericOps;
 using static BagoumLib.Tweening.Tween;
 
 namespace BagoumLib.Tweening {
@@ -28,35 +29,6 @@ public interface ITweener {
 [PublicAPI]
 public static class Tween {
     public static Func<float>? DefaultDeltaTimeProvider { get; set; }
-    
-    private static readonly Dictionary<Type, object> lerpers = new() {
-        {typeof(float), (Func<float, float, float, float>) BMath.Lerp},
-        {typeof(Vector2), (Func<Vector2, Vector2, float, Vector2>) Vector2.Lerp},
-        {typeof(Vector3), (Func<Vector3, Vector3, float, Vector3>) Vector3.Lerp},
-        {typeof(Vector4), (Func<Vector4, Vector4, float, Vector4>) Vector4.Lerp},
-        {typeof(FColor), (Func<FColor, FColor, float, FColor>) FColor.Lerp},
-    };
-    private static readonly Dictionary<Type, object> multiplyOps = new() {
-        {typeof(float), (Func<float, float, float>) ((x, y) => x * y)},
-        {typeof(Vector2), (Func<Vector2, float, Vector2>) ((x, y) => x * y)},
-        {typeof(Vector3), (Func<Vector3, float, Vector3>) ((x, y) => x * y)},
-        {typeof(Vector4), (Func<Vector4, float, Vector4>) ((x, y) => x * y)},
-        {typeof(FColor), (Func<FColor, float, FColor>) ((x, y) => x * y)},
-    };
-    public static Func<T, T, float, T> GetLerp<T>() => lerpers.TryGetValue(typeof(T), out var l) ?
-        (Func<T, T, float, T>)l :
-        throw new Exception($"No lerp handling for type {l}");
-    public static Func<T, float, T> GetMulOp<T>() => multiplyOps.TryGetValue(typeof(T), out var l) ?
-        (Func<T, float, T>)l :
-        throw new Exception($"No multiply handling for type {l}");
-
-    public static void RegisterLerper<T>(Func<T, T, float, T> lerper) => lerpers[typeof(T)] = lerper;
-    public static void RegisterMultiplier<T>(Func<T, float, T> mulOp) => multiplyOps[typeof(T)] = mulOp;
-
-    public static void RegisterType<T>(Func<T, T, float, T> lerper, Func<T, float, T> mulOp) {
-        RegisterLerper(lerper);
-        RegisterMultiplier(mulOp);
-    }
 
     public static Tweener<T> TweenTo<T>(T start, T end, float time, Action<T> apply, Easer? ease = null, 
         ICancellee? cT = null) =>
@@ -109,7 +81,7 @@ public record Tweener<T> : ITweener {
     /// <summary>
     /// Lerp function specific to type T. Add handling for types via Tween.RegisterLerper.
     /// </summary>
-    private Func<T, T, float, T> Lerp { get; } = Tween.GetLerp<T>();
+    private Func<T, T, float, T> Lerp { get; } = GetLerp<T>();
     /// <summary>
     /// Method to retrieve the delta-time of the current frame. Preferably set this via Tween.DefaultDeltaTimeProvider.
     /// </summary>
@@ -168,6 +140,10 @@ public record Tweener<T> : ITweener {
 
     public ITweener With(ICancellee cT, Func<float> dTProvider) => this with {CToken = cT, DeltaTimeProvider = dTProvider};
 
+    /// <summary>
+    /// TODO a delayed invocation uses startgetter, and should pass that to Reverse, but Reverse won't work with the same startgetter.
+    /// TODO Reverse is probably better defined with a "delta" field instead.
+    /// </summary>
     public Tweener<T> Reverse(bool reverseEase = true) => 
         new(End, Start, Time, Apply, reverseEase ? new Easer(t => 1 - Ease(1 - t)) : Ease, CToken) {
             DeltaTimeProvider = DeltaTimeProvider

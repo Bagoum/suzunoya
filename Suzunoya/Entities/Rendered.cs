@@ -14,9 +14,9 @@ public interface IRendered : ITransform {
     /// </summary>
     Evented<RenderGroup?> RenderGroup { get; }
     Evented<int> RenderLayer { get; }
-    Evented<int> SortingID { get; }
+    DisturbedSum<int> SortingID { get; }
     Evented<bool> Visible { get; }
-    Evented<FColor> Tint { get; }
+    DisturbedProduct<FColor> Tint { get; }
     
     /// <summary>
     /// If the object is already associated with a render group,
@@ -29,13 +29,13 @@ public class Rendered : Transform, IRendered {
     public Evented<RenderGroup?> RenderGroup { get; } = new(null);
     private IDisposable? renderGroupToken;
     public Evented<int> RenderLayer { get; }
-    public Evented<int> SortingID { get; } = new(0);
+    public DisturbedSum<int> SortingID { get; } = new(0);
     public Evented<bool> Visible { get; }
-    public Evented<FColor> Tint { get; }
+    public DisturbedProduct<FColor> Tint { get; }
 
     public float Alpha {
         get => Tint.Value.a;
-        set => Tint.Value = Tint.Value.WithA(value);
+        set => Tint.Value = Tint.BaseValue.WithA(value);
     }
 
     /// <summary>
@@ -44,18 +44,18 @@ public class Rendered : Transform, IRendered {
     protected virtual int DefaultRenderLayer => 0;
 
     public Rendered(Vector3? location = null, Vector3? eulerAnglesD = null, Vector3? scale = null, 
-        bool visible = false, FColor? color = null) : base(location, eulerAnglesD, scale) {
+        bool visible = true, FColor? color = null) : base(location, eulerAnglesD, scale) {
         // ReSharper disable once VirtualMemberCallInConstructor
         RenderLayer = new(DefaultRenderLayer);
         
         Visible = new(visible);
-        Tint = new(color ?? Color.White);
+        Tint = new(color ?? new FColor(1, 1, 1, 0));
     }
     
     public void AddToRenderGroup(RenderGroup group, int? sortingID = null) {
         if (group.Container != Container)
             throw new Exception($"Cannot add rendered {this} to a render group in a different VNState");
-        SortingID.PublishIfNotSame(sortingID ?? group.NextSortingID());
+        SortingID.OnNext(sortingID ?? group.NextSortingID());
         renderGroupToken?.Dispose();
         renderGroupToken = group.Add(this);
         RenderGroup.Value = group;

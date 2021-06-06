@@ -17,6 +17,7 @@ namespace Suzunoya.Display {
 ///  shader implementation in some engines, it is separated from Zoom, which is a single field.
 /// </summary>
 public class RenderGroup : Transform {
+    public static int DefaultSortingIDStep { get; set; } = 10;
     public const string DEFAULT_KEY = "$default";
     public string Key { get; }
     public Evented<int> Priority { get; }
@@ -49,12 +50,12 @@ public class RenderGroup : Transform {
     }
 
     public int NextSortingID() {
-        var m = -1;
+        var m = -1 * DefaultSortingIDStep;
         for (int ii = 0; ii < Contents.Count; ++ii) {
             if (Contents.ExistsAt(ii))
                 m = Math.Max(m, Contents[ii].SortingID);
         }
-        return m + 1;
+        return m + DefaultSortingIDStep;
     }
 
     private Cancellable? transitionToken;

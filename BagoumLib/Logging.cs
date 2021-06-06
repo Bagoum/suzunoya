@@ -22,7 +22,7 @@ public readonly struct LogMessage {
     public LogLevel Level { get; }
     public Exception? Exception { get; }
 
-    public LogMessage(string message, LogLevel level, Exception? exception, bool? showStackTrace = null) {
+    public LogMessage(string message, LogLevel level, Exception? exception = null, bool? showStackTrace = null) {
         Message = message;
         ShowStackTrace = showStackTrace;
         Level = level;
@@ -30,13 +30,15 @@ public readonly struct LogMessage {
     }
 
     public static LogMessage Info(string message, LogLevel level = LogLevel.INFO) => 
-        new(message, level, null);
+        new(message, level);
     
     public static LogMessage Warning(string message) => 
-        new(message, LogLevel.WARNING, null);
+        new(message, LogLevel.WARNING);
     
     public static LogMessage Error(Exception? exception, string message = "") => 
         new(message, LogLevel.ERROR, exception, true);
+
+    public static implicit operator LogMessage(string message) => LogMessage.Info(message);
 }
 
 [PublicAPI]
