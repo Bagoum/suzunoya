@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using Suzunoya.ControlFlow;
 using Suzunoya.Data;
 
 namespace Tests {
@@ -32,8 +33,8 @@ public class serializeme {
             Settings = new Settings() {
                 TextSpeed = 1.5f
             },
-            ReadLines = new Dictionary<string, int>() {
-                {"script1", 233}
+            ReadLines = new HashSet<string>() {
+                "233", "453"
             }
         };
         var save = new InstanceData() {
@@ -41,16 +42,18 @@ public class serializeme {
                 {"hello", new[] {"w", "orld"}},
                 {"foo", 433}
             },
-            Location = new List<(string, int)>() {("script1", 123)},
+            Location = new VNLocation("l_25", new[] {"dec20"}) {
+            },
             GlobalData = global
         };
 
         var typs = new JsonSerializerSettings() {TypeNameHandling = TypeNameHandling.Auto};
         string s_save = JsonConvert.SerializeObject(save, Formatting.Indented, typs);
+        //Note that the loaded "Global" prop will be default-- this is intentional and you should reassign it after deserialization.
         var r_save = JsonConvert.DeserializeObject<InstanceData>(s_save, typs);
         string s_global = JsonConvert.SerializeObject(global, Formatting.Indented, typs);
         var r_global = JsonConvert.DeserializeObject<GlobalData>(s_global, typs);
-        
+        int k = 5;
     }
 }
 }

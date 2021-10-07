@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using BagoumLib;
 using BagoumLib.Culture;
@@ -55,7 +56,7 @@ public class Speech {
                         opsUntilNextRollEvent = cfg.opsPerRollEvent;
                     }
                     frags.Add(new SpeechFragment.Char(s.fragment[ic]));
-                    var waitTime = cfg.opsPerChar(s.fragment, ic) / cfg.opsPerSecond;
+                    var waitTime = cfg.opsPerChar(s.fragment, ic) / cfg.EffectiveOpsPerSecond;
                     if (waitTime > 0)
                         frags.Add(new SpeechFragment.Wait(waitTime));
                 }
@@ -86,7 +87,8 @@ public class Speech {
     }
 
     private static SpeechTag ToTag(string name, string? content) => name.ToLower() switch {
-        "speed" => float.TryParse(content ?? "", out var f) ?
+        //NOTE: InvariantCulture is CRITICAL here! Otherwise this won't work in comma-decimal countries!
+        "speed" => float.TryParse(content ?? "", NumberStyles.Float, CultureInfo.InvariantCulture, out var f) ?
             new Speed(f) :
             throw new Exception($"Speed tag requires a float value. Couldn't parse given {f}"),
         "silent" => new Silent(),

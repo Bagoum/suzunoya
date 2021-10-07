@@ -6,11 +6,11 @@ using BagoumLib.DataStructures;
 namespace BagoumLib.Mathematics {
 public static class GenericOps {
     private static readonly Dictionary<Type, object> lerpers = new() {
-        {typeof(float), (Func<float, float, float, float>) BMath.Lerp},
-        {typeof(Vector2), (Func<Vector2, Vector2, float, Vector2>) Vector2.Lerp},
-        {typeof(Vector3), (Func<Vector3, Vector3, float, Vector3>) Vector3.Lerp},
-        {typeof(Vector4), (Func<Vector4, Vector4, float, Vector4>) Vector4.Lerp},
-        {typeof(FColor), (Func<FColor, FColor, float, FColor>) FColor.Lerp},
+        {typeof(float), (Func<float, float, float, float>) BMath.LerpU},
+        {typeof(Vector2), (Func<Vector2, Vector2, float, Vector2>) ((a, b, t) => a * (1 - t) + b * t)},
+        {typeof(Vector3), (Func<Vector3, Vector3, float, Vector3>) ((a, b, t) => a * (1 - t) + b * t)},
+        {typeof(Vector4), (Func<Vector4, Vector4, float, Vector4>) ((a, b, t) => a * (1 - t) + b * t)},
+        {typeof(FColor), (Func<FColor, FColor, float, FColor>) FColor.LerpU},
     };
     private static readonly Dictionary<Type, object> addOps = new() {
         {typeof(int), (Func<int, int, int>) ((x, y) => x + y)},
@@ -51,6 +51,9 @@ public static class GenericOps {
         (Func<T, T, T>)l :
         throw new Exception($"No vec-multiply handling for type {typeof(T)}");
 
+    /// <summary>
+    /// Lerper should be unclamped.
+    /// </summary>
     public static void RegisterLerper<T>(Func<T, T, float, T> lerper) => lerpers[typeof(T)] = lerper;
     public static void RegisterMultiplier<T>(Func<T, float, T> mulOp) => multiplyOps[typeof(T)] = mulOp;
     public static void RegisterAdder<T>(Func<T, T, T> addOp) => addOps[typeof(T)] = addOp;

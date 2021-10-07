@@ -11,9 +11,8 @@ public interface IVariant<T> : IVariant {
 }
 
 public class Variant<T> : IVariant<T> {
-    //Should be init instead of set, but framework472 causes issues with that.
     public string? ID { get; set; } = null;
-    protected readonly T defaultValue;
+    public readonly T defaultValue;
     protected readonly Dictionary<string, T> langToValueMap = new();
     
     public T Value => Realize(Localization.Locale);

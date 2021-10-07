@@ -9,30 +9,33 @@ namespace BagoumLib.Events {
 /// <summary>
 /// DisturbedEvented is a wrapper around a core value (eg. a location) that can be modified by any number
 ///  of disturbance effects (eg. shake effects).
-/// Note that get_Value and the onChange event will return the total value,
+/// Note that get_Value, LastPublished, and the onChange event will return the total value,
 ///  whereas set_Value will set the core value.
-/// Use get_BaseValue to get the core value.
+/// Use get_BaseValue to get the core value. set_BaseValue will also set the core value.
 /// </summary>
 [PublicAPI]
 public abstract class DisturbedEvented<T> : IBSubject<T> {
-    private T _value;
-
-    public T BaseValue => _value;
+    private T _baseValue;
+    
+    public T BaseValue {
+        get => _baseValue;
+        set {
+            this._baseValue = value;
+            onSet.OnNext(Value);
+        }
+    }
     public T Value {
         get {
-            var agg = _value;
+            var agg = _baseValue;
             for (int ii = 0; ii < disturbances.Count; ++ii) {
                 if (disturbances.ExistsAt(ii) && disturbances[ii].LastPublished.Try(out var right))
                     agg = Fold(agg, right);
             }
             return agg;
         }
-        set {
-            this._value = value;
-            DoPublish();
-        }
+        set => BaseValue = value;
     }
-    public Maybe<T> LastPublished { get; private set; } = Maybe<T>.None;
+    public Maybe<T> LastPublished => onSet.LastPublished;
 
     private readonly Event<T> onSet;
     private readonly DMCompactingArray<IBObservable<T>> disturbances = new();
@@ -41,9 +44,9 @@ public abstract class DisturbedEvented<T> : IBSubject<T> {
     /// The initial value is published to onSet.
     /// </summary>
     public DisturbedEvented(T val) {
-        _value = val;
+        _baseValue = val;
         onSet = new Event<T>();
-        DoPublish();
+        onSet.OnNext(Value);
     }
 
     public static implicit operator T(DisturbedEvented<T> evo) => evo.Value;
@@ -57,16 +60,10 @@ public abstract class DisturbedEvented<T> : IBSubject<T> {
         return new JointDisposable(DoPublishIfNotSame, trackToken, updateToken);
     }
     
-    private void DoPublish() {
-        var nxt = Value;
-        LastPublished = Maybe<T>.Of(nxt);
-        onSet.OnNext(nxt);
-    }
     private void DoPublishIfNotSame() {
         var nxt = Value;
         if (LastPublished.Try(out var last) && Equals(nxt, last))
             return;
-        LastPublished = Maybe<T>.Of(nxt);
         onSet.OnNext(nxt);
     }
 
@@ -91,6 +88,14 @@ public class DisturbedProduct<T> : DisturbedEvented<T> {
     private readonly Func<T, T, T> prod = GenericOps.GetVecMulOp<T>();
     public DisturbedProduct(T val) : base(val) { }
     protected override T Fold(T left, T right) => prod(left, right);
+}
+public class DisturbedAnd : DisturbedEvented<bool> {
+    public DisturbedAnd(bool val) : base(val) { }
+    protected override bool Fold(bool left, bool right) => left && right;
+}
+public class DisturbedOr : DisturbedEvented<bool> {
+    public DisturbedOr(bool val) : base(val) { }
+    protected override bool Fold(bool left, bool right) => left || right;
 }
 
 }

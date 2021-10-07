@@ -23,16 +23,14 @@ public class _2TweeningBatchingTest {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
             reimu.Location.Value = Vector3.Zero;
-            var exc = vn.ExecCtx;
+            var exc = vn.LowestContext;
             await vn.Wait(0);
-            Assert.IsTrue(exc.OperationCount == 1 && exc.SuboperationCount == 1);
 
             //No sequential batching (base case)
             var t = reimu.MoveTo(Vector3.One, 30f).Task;
             vn.RequestSkipOperation();
             await t;
             var t2 = reimu.RotateTo(Vector3.One, 5f).Task;
-            Assert.IsTrue(exc.OperationCount == 3 && exc.SuboperationCount == 3);
             await t2;
             
             ListEq(er.SimpleLoggedEventStrings, new [] {
@@ -55,12 +53,11 @@ public class _2TweeningBatchingTest {
             er.LoggedEvents.Clear();
 
             //Sequential batching (raw)
-            var d = vn.ExecCtx.GetOperationCanceller(out _);
+            var d = vn.GetOperationCanceller(out _);
             t = reimu.MoveTo(Vector3.Zero, 30f).Task;
             vn.RequestSkipOperation();
             await t;
             t2 = reimu.RotateTo(Vector3.Zero, 30f).Task;
-            Assert.IsTrue(exc.OperationCount == 4 && exc.SuboperationCount == 6);
             await t2;
             d.Dispose();
             
@@ -80,7 +77,6 @@ public class _2TweeningBatchingTest {
                 .Then(reimu.MoveTo(Vector3.Zero, 30f)).Task;
             vn.RequestSkipOperation();
             await t;
-            Assert.IsTrue(exc.OperationCount == 5 && exc.SuboperationCount == 7);
             
             ListEq(er.SimpleLoggedEventStrings, new[] {
                 "<Reimu>.Location ~ <0, 0, 0>",
@@ -98,7 +94,6 @@ public class _2TweeningBatchingTest {
             t2 = vn.Wait(30).Task;
             vn.RequestSkipOperation();
             await t2;
-            Assert.IsTrue(exc.OperationCount == 6 && exc.SuboperationCount == 9);
             await t;
 
             ListEq(er.SimpleLoggedEventStrings, new[] {

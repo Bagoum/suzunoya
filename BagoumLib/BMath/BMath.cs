@@ -18,6 +18,13 @@ public static class BMath {
         x %= by;
         return (x < 0) ? x + by : x;
     }
+
+    public static float SoftMod(float by, float x) {
+        float vd = Mod(2 * by, x);
+        return vd > by ? 
+            (2 * by - vd) : 
+            vd;
+    }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Clamp(int low, int high, int x) => 

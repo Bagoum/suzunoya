@@ -7,7 +7,10 @@ using Suzunoya.ControlFlow;
 using Suzunoya.Display;
 
 namespace Suzunoya.Entities {
-public interface IRendered : ITransform {
+public interface ITinted : IEntity {
+    DisturbedProduct<FColor> Tint { get; }
+}
+public interface IRendered : ITransform, ITinted {
     /// <summary>
     /// A basic plugin setup would be to associate a RenderGroup  with an engine camera and game-object layer,
     ///  then treat RenderLayer and SortingID as equivalent to engine "sorting layer" / "order in layer".
@@ -16,7 +19,6 @@ public interface IRendered : ITransform {
     Evented<int> RenderLayer { get; }
     DisturbedSum<int> SortingID { get; }
     Evented<bool> Visible { get; }
-    DisturbedProduct<FColor> Tint { get; }
     
     /// <summary>
     /// If the object is already associated with a render group,

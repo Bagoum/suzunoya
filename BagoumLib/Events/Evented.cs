@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.Events {
 /// <summary>
-/// Evented is a wrapper around a value that publishes an event whenever it is set.
+/// A wrapper around a value that publishes an event whenever it is set.
 /// New subscribers are sent the existing value as well as any new values.
 /// <br/>(This is effectively the same as BehaviorSubject.)
 /// </summary>
@@ -17,7 +17,7 @@ public class Evented<T> : IBSubject<T> {
         get => _value;
         set => onSet.OnNext(this._value = value);
     }
-    public Maybe<T> LastPublished => Maybe<T>.Of(_value);
+    public Maybe<T> LastPublished => onSet.LastPublished;
     
     private readonly Event<T> onSet;
 

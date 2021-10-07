@@ -1,45 +1,65 @@
 ﻿using System;
+using BagoumLib.Functional;
 using BagoumLib.Mathematics;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Events {
 
-public class PushLerper<T> {
+/// <summary>
+/// A wrapper around a sequence of values that smoothly lerps to the most recent value provided.
+/// </summary>
+/// <typeparam name="T"></typeparam>
+[PublicAPI]
+public class PushLerper<T> : IBObservable<T> {
     private readonly Func<T, T, float, T> lerper;
     private readonly float lerpTime;
 
     private bool set = false;
-    private T lastValue;
+    private T prevValue;
     private T nextValue;
     private float elapsed;
+    private float ElapsedRatio => BMath.Clamp(0, 1, lerpTime <= 0 ? 1 : (elapsed / lerpTime));
 
-    public Evented<T> OnChange { get; }
+    private Evented<T> OnChange { get; }
     public T Value => OnChange.Value;
+    public Maybe<T> LastPublished => OnChange.LastPublished;
     
     public PushLerper(float lerpTime, Func<T, T, float, T> lerper) {
-        this.lerpTime = lerpTime;
+        this.lerpTime = elapsed = lerpTime;
         this.lerper = lerper;
-        this.OnChange = new(this.lastValue = nextValue = default!);
+        this.OnChange = new(this.prevValue = nextValue = default!);
     }
 
-    public void Push(T targetValue) {
+    public void Push(T targetValue, float initTime = 0) {
         if (set) {
-            lastValue = Value;
+            prevValue = Value;
             nextValue = targetValue;
-            OnChange.Value = lerper(lastValue, nextValue, 0);
+            elapsed = initTime;
+            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio);
         } else {
-            OnChange.Value = lastValue = nextValue = targetValue;
+            elapsed = initTime;
+            OnChange.Value = prevValue = nextValue = targetValue;
         }
         set = true;
-        elapsed = 0;
     }
 
     public void Update(float dT) {
         if (elapsed < lerpTime) {
             elapsed += dT;
-            OnChange.Value = lerper(lastValue, nextValue, BMath.Clamp(0, 1, elapsed / lerpTime));
+            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio);
         }
     }
 
+    /// <summary>
+    /// Puts the object in a state such that the next time a value is pushed, it will be instantaneously lerped to.
+    /// </summary>
+    public void Unset() {
+        elapsed = lerpTime;
+        set = false;
+    }
+
     public static implicit operator T(PushLerper<T> pl) => pl.Value;
+    public IDisposable Subscribe(IObserver<T> observer) => OnChange.Subscribe(observer);
+
 }
 }

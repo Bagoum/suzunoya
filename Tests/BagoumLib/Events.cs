@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using BagoumLib.Events;
+using BagoumLib.Mathematics;
 using NUnit.Framework;
 using static Tests.AssertHelpers;
 
@@ -102,5 +103,27 @@ public class Events {
         ListEq(ladd, new float[]{43, 23});
         ListEq(lmul, new float[]{6000, -600, 300});
     }
+
+    [Test]
+    public void TestPushLerpF() {
+        var pl = new PushLerperF<float>(2, BMath.Lerp);
+        var vals = new List<float>();
+        pl.Subscribe(vals.Add); //0
+        pl.Push(t => 10 + t); //10
+        pl.Update(1); //11
+        pl.Push(t => 100 + t); //11, 100 -> 11
+        pl.Update(1); // 12, 101 -> 56.5
+        pl.Update(1); //13, 102 -> 102
+        pl.Update(1); //14, 103 -> 103
+        pl.Push(t => 1000 + t); //103, 1000 -> 103
+        pl.Update(1); //104, 1001 -> 552.5
+        pl.Push(t => 10000 + t); //552.5, 10000 -> 552.5
+        pl.Update(1); //552.5, 10001 -> 5276.75
+        ListEq(vals, new float[] {
+            0, 10, 11, 11, 56.5f, 102, 103, 103, 552.5f, 552.5f, 5276.75f
+            
+        });
+    }
+    
 }
 }

@@ -15,11 +15,12 @@ namespace Tests.Suzunoya {
 public static class EventRecordHelpers {
     private static readonly Type tobs = typeof(IObservable<>);
     private static readonly MethodInfo registerEv = typeof(EventRecord).GetMethod("TrackEvent")!;
+    private static HashSet<string> ignoreKeys = new() {"onupdate", "logs"};
     public static void Record(this EventRecord er, object obj) {
         foreach (var prop in obj.GetType().GetProperties().OrderBy(p => p.Name)) {
             foreach (var intf in prop.PropertyType.GetInterfaces()) {
                 if (intf.IsConstructedGenericType && intf.GetGenericTypeDefinition() == tobs) {
-                    if (prop.Name.ToLower() == "onupdate") continue; //don't want these
+                    if (ignoreKeys.Contains(prop.Name.ToLower())) continue;
                     var genType = intf.GenericTypeArguments[0];
                     registerEv.MakeGenericMethod(genType).Invoke(er, new[] {obj, prop.Name, prop.GetValue(obj)!});
                 }

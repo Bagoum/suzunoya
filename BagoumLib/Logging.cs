@@ -39,6 +39,8 @@ public readonly struct LogMessage {
         new(message, LogLevel.ERROR, exception, true);
 
     public static implicit operator LogMessage(string message) => LogMessage.Info(message);
+
+    public override string ToString() => $"{Level}:{Message}";
 }
 
 [PublicAPI]

@@ -21,13 +21,14 @@ public static partial class SpeechParser {
         c == TAG_OPEN || c == TAG_CLOSE;
 
     private static bool NotTagChar(char c) => !TagChar(c);
+    private static bool NotTagOrEscapeChar(char c) => !TagChar(c) && c != ESCAPER;
 
     private static readonly Parser<TextUnit> escapedFragment =
         Sequential(ch(ESCAPER), satisfy(TagChar), (_, c) => 
             (TextUnit)new TextUnit.String(c.ToString()));
 
     private static readonly Parser<TextUnit> normalFragment =
-        from s in many1String(satisfy(NotTagChar))
+        from s in many1String(satisfy(NotTagOrEscapeChar))
         select (TextUnit) new TextUnit.String(s);
 
     private static readonly Parser<TextUnit> tagFragment =

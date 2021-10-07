@@ -44,7 +44,7 @@ public class _6ConfirmTest {
             s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
             s.vn.Update(1f);
             if (ii == 6 || ii == 10 || ii == 14 || ii == 20)
-                s.vn.Confirm();
+                s.vn.UserConfirm();
         }
         Assert.AreEqual(t.Result, 1337);
         ListEq(s.er.SimpleLoggedEventStrings, stored);

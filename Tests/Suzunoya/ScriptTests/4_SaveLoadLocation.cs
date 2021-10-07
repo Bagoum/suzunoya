@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Numerics;
@@ -20,17 +21,15 @@ using static Suzunoya.Helpers;
 
 namespace Tests.Suzunoya {
 
-public class _4SaveLoadTest {
-    /// <summary>
-    /// Basic example/test of how a script can be executed.
-    /// </summary>
+public class _4SaveLoadLocationTest {
     public class _TestScript : TestScript {
         public _TestScript(VNState vn) : base(vn) { }
-        public async Task Run() {
+
+        public BoundedContext<int> Run() => new(vn, "test4", async () => {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
             await vn.Wait(0);
-            
+
             reimu.Alpha = 0;
             vn.MarkOperation("A");
             await reimu.MoveTo(Vector3.One, 2f).Then(
@@ -46,15 +45,17 @@ public class _4SaveLoadTest {
             vn.MarkOperation("E");
             await reimu.RotateTo(Vector3.Zero, 4f);
             vn.MarkOperation("F");
-        }
+            return 5;
+        });
 
     }
     [Test]
     public void ScriptTest() {
         var sd = new InstanceData();
         var s = new _TestScript(new VNState(Cancellable.Null, sd));
-        var t = s.Run();
+        var t = s.vn.ExecuteContext(s.Run()).Task;
         s.er.LoggedEvents.Clear();
+        VNLocation loc = null!;
         //We play a few lines, then "quit"
         for (int ii = 0; ii < 12; ++ii) {
             bool sendConfirm = s.vn.AwaitingConfirm.Value != null;
@@ -62,20 +63,26 @@ public class _4SaveLoadTest {
             s.vn.Update(1f);
             if (sendConfirm)
                 s.vn.UserConfirm();
+            if (ii == 10)
+                loc = VNLocation.Make(s.vn)!;
         }
         s.vn.UpdateSavedata();
-        Assert.AreEqual(sd.Location, new VNLocation("C", new string[] { }));
+        s.vn.DeleteAll();
+        Assert.AreEqual(loc, new VNLocation("B", new string[] { "test4" }));
+        Assert.AreEqual(sd.Location, new VNLocation("C", new string[] { "test4" }));
         Assert.IsTrue(new[]{"A", "B", "C",}.All(sd.GlobalData.IsLineRead));
         Assert.IsFalse(new[]{"D", "E", "F"}.Any(sd.GlobalData.IsLineRead));
         ListEq(s.er.SimpleLoggedEventStrings, stored1);
+        sd.Location = loc;
         //Then we load again
         s = new _TestScript(new VNState(Cancellable.Null, sd));
-        t = s.Run();
+        t = s.vn.ExecuteContext(s.Run()).Task;
         s.er.LoggedEvents.Clear();
         for (int ii = 0; !t.IsCompleted; ++ii) {
             s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
             s.vn.Update(1f);
         }
+        Assert.AreEqual(t.Result, 5);
         ListEq(s.er.SimpleLoggedEventStrings, stored2);
     }
 
@@ -120,6 +127,11 @@ public class _4SaveLoadTest {
         "<VNState>.CurrentOperationID ~ C",
         "<Reimu>.Location ~ <2, 2, 2>",
         "<Reimu>.Location ~ <2, 2, 2>", //The last process is the beginning of the move location from 2 to 0.
+        "<TestDialogueBox>.EntityActive ~ False",
+        "<VNState>.ContextFinished ~ Context:test4",
+        "<Reimu>.EntityActive ~ False",
+        "<RenderGroup>.EntityActive ~ False",
+        "<VNState>.VNStateActive ~ False"
     };
 
     private static readonly string[] stored2 = {
@@ -134,35 +146,36 @@ public class _4SaveLoadTest {
         "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
         "<VNState>.CurrentOperationID ~ B",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
+        "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
+        "<VNState>.$UpdateCount ~ 1",
+        "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
+        "<VNState>.$UpdateCount ~ 2",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
         "<VNState>.CurrentOperationID ~ C",
         "<Reimu>.Location ~ <2, 2, 2>",
-        "<Reimu>.Location ~ <2, 2, 2>", 
-        //Everything until the last process (move location from 2 to 0) gets hypersped.
-        //Note that it may not always take zero frames. At most, it might take one frame per operation
-        // (which is effectively instantaneous in basically all use cases).
-        "<VNState>.$UpdateCount ~ 1",
-        //From here, everything is normal.
+        "<Reimu>.Location ~ <2, 2, 2>",
+        "<VNState>.$UpdateCount ~ 3",
         "<Reimu>.Location ~ <0, 0, 0>",
         "<VNState>.CurrentOperationID ~ D",
         "<Reimu>.Scale ~ <1, 1, 1>",
         "<Reimu>.Scale ~ <1, 1, 1>",
-        "<VNState>.$UpdateCount ~ 2",
+        "<VNState>.$UpdateCount ~ 4",
         "<Reimu>.Scale ~ <2, 2, 2>",
-        "<VNState>.$UpdateCount ~ 3",
+        "<VNState>.$UpdateCount ~ 5",
         "<Reimu>.Scale ~ <3, 3, 3>",
         "<VNState>.CurrentOperationID ~ E",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
-        "<VNState>.$UpdateCount ~ 4",
-        "<Reimu>.EulerAnglesD ~ <0.8535534, 0.8535534, 0.8535534>",
-        "<VNState>.$UpdateCount ~ 5",
-        "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
         "<VNState>.$UpdateCount ~ 6",
-        "<Reimu>.EulerAnglesD ~ <0.14644659, 0.14644659, 0.14644659>",
+        "<Reimu>.EulerAnglesD ~ <0.8535534, 0.8535534, 0.8535534>",
         "<VNState>.$UpdateCount ~ 7",
+        "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
+        "<VNState>.$UpdateCount ~ 8",
+        "<Reimu>.EulerAnglesD ~ <0.14644659, 0.14644659, 0.14644659>",
+        "<VNState>.$UpdateCount ~ 9",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-        "<VNState>.CurrentOperationID ~ F"
+        "<VNState>.CurrentOperationID ~ F",
+        "<VNState>.ContextFinished ~ Context:test4",
     };
 }
 }

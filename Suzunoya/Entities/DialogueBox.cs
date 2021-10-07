@@ -15,7 +15,7 @@ namespace Suzunoya.Entities {
 public enum SpeakFlags {
     None = 0,
     /// <summary>
-    /// By default, every text command will reset all visible text. To avoid this,
+    /// By default, every text command will reset all visible text and the speaker. To avoid this,
     /// use this flag (or call AlsoSay).
     /// </summary>
     DontClearText = 1 << 0,
@@ -29,49 +29,62 @@ public enum SpeakFlags {
 }
 
 public interface IDialogueBox : IEntity {
+    AccEvent<DialogueOp> DialogueStarted { get; }
     AccEvent<(SpeechFragment frag, string lookahead)> Dialogue { get; }
     Event<Unit> DialogueCleared { get; }
     Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; }
-    void ClearSpeaker();
+    void Clear(bool clearSpeaker=true);
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default);
 }
 
+public class DialogueOp {
+    public Speech Line { get; }
+    public ICharacter? Speaker { get; }
+    public SpeakFlags Flags { get; }
+    public VNLocation? Location { get; }
+    public DialogueOp(LString line, ICharacter? speaker, SpeakFlags flags, VNLocation? loc) {
+        this.Line = new Speech(line, speaker?.SpeechCfg);
+        this.Speaker = speaker;
+        this.Flags = flags;
+        this.Location = loc;
+    }
+
+    public override string ToString() => $"{Speaker?.Name ?? "???"}:{Line.Readable}";
+}
 public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
     /// <summary>
-    /// A dialogue request starts with a DialogueStarted proc containing the readable string of all text to be printed.
+    /// A dialogue request starts with a DialogueStarted proc containing all information of the dialogue request.
     /// It then unrolls the text one character at a time over many Dialogue procs.
     /// Finally, it procs DialogueFinished.
-    /// Note: DialogueStarted and Dialogue are accumulated until a clear command is issued (which also procs DialogueCleared).
+    /// Note: DialogueStarted and Dialogue are accumulated until a clear command is issued (which also procs DialogueCleared and nullifies Speaker). AllDialogue is never cleared.
+    /// Note: the VNContainer should be listening to DialogueStarted to accumulate the dialogue log.
     /// </summary>
-    public AccEvent<Speech> DialogueStarted { get; } = new();
+    public AccEvent<DialogueOp> DialogueStarted { get; } = new();
     public AccEvent<(SpeechFragment frag, string lookahead)> Dialogue { get; } = new();
     public Event<Unit> DialogueFinished { get; } = new();
     public Event<Unit> DialogueCleared { get; } = new();
     public Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; } = new((default, SpeakFlags.Default));
 
-    public void Clear() {
+    public void Clear(bool clearSpeaker=true) {
         Dialogue.Clear();
         DialogueStarted.Clear();
+        if (clearSpeaker)
+            Speaker.OnNext((null, default));
         DialogueCleared.OnNext(Unit.Default);
     }
 
-    public void ClearSpeaker() => Speaker.OnNext((null, SpeakFlags.Default));
-
-    private static bool LookaheadRequired(char c) => !char.IsWhiteSpace(c) && !char.IsPunctuation(c);
-    private IEnumerator Say(Speech s, SpeakFlags flags, Action done, ICancellee cT) {
+    private static bool LookaheadRequired(char c) => !char.IsWhiteSpace(c);
+    private IEnumerator Say(DialogueOp d, Action done, ICancellee cT) {
         if (cT.IsHardCancelled()) {
             done();
             yield break;
         }
-        if ((flags & SpeakFlags.DontClearText) == 0) {
-            Clear();
-        }
-        DialogueStarted.OnNext(s);
+        DialogueStarted.OnNext(d);
         float untilProceed = 0f;
         var lookahead = new StringBuilder();
-        for (int ii = 0; ii < s.Fragments.Count; ++ii) {
+        for (int ii = 0; ii < d.Line.Fragments.Count; ++ii) {
             if (cT.IsHardCancelled()) break;
-            var f = s.Fragments[ii];
+            var f = d.Line.Fragments[ii];
             if (     f is SpeechFragment.Wait w)
                 untilProceed += w.time;
             else if (f is SpeechFragment.RollEvent r) {
@@ -80,8 +93,8 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
             } else {
                 //determine lookahead only if we have a fragment to publish
                 lookahead.Clear();
-                for (int jj = ii; jj < s.Fragments.Count; ++jj) {
-                    if (s.Fragments[jj] is SpeechFragment.Char c) {
+                for (int jj = ii; jj < d.Line.Fragments.Count; ++jj) {
+                    if (d.Line.Fragments[jj] is SpeechFragment.Char c) {
                         if (LookaheadRequired(c.fragment)) {
                             if (jj != ii) lookahead.Append(c.fragment);
                         } else
@@ -90,7 +103,7 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
                 }
                 Dialogue.OnNext((f, lookahead.ToString()));
             }
-            if (ii == s.Fragments.Count - 1)
+            if (ii == d.Line.Fragments.Count - 1)
                 break;
             for (;untilProceed > 0; untilProceed -= Container.dT) {
                 if (cT.Cancelled) 
@@ -104,8 +117,12 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
 
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default) =>
         this.MakeVNOp(cT => {
+            Container.CurrentOperationID.OnNext(content.ID ?? content.defaultValue);
+            if ((flags & SpeakFlags.DontClearText) == 0)
+                Clear(character == null);
             Speaker.OnNext((character, flags));
-            Run(Say(new Speech(content, character?.SpeechCfg), flags, WaitingUtils.GetAwaiter(out Task t), this.BindLifetime(cT)));
+            Run(Say(
+                new DialogueOp(content, character, flags, cT.location), WaitingUtils.GetAwaiter(out Task t), this.BindLifetime(cT)));
             return t;
         });
 }

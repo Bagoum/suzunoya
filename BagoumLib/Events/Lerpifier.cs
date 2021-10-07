@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reactive.Subjects;
+using BagoumLib.Functional;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Events {
@@ -7,16 +8,17 @@ namespace BagoumLib.Events {
 /// Lerpifier tracks a changing value (targetValue) by smoothly lerping to it.
 /// </summary>
 [PublicAPI]
-public class Lerpifier<T> : IObservable<T> where T : IComparable<T> {
+public class Lerpifier<T> : IBObservable<T> where T : IComparable<T> {
     private readonly Func<T, T, float, T> lerper;
     private readonly Func<T> targetValue;
     private readonly float lerpTime;
     private T lastSourceValue;
     private T lastTargetValue;
     public T Value => OnChange.Value;
+    public Maybe<T> LastPublished => OnChange.LastPublished;
     private float elapsed;
 
-    public Evented<T> OnChange { get; }
+    private Evented<T> OnChange { get; }
 
     public Lerpifier(Func<T, T, float, T> lerper, Func<T> targetValue, float lerpTime) {
         this.lerper = lerper;
@@ -42,7 +44,7 @@ public class Lerpifier<T> : IObservable<T> where T : IComparable<T> {
         elapsed += dt;
         var nxt = elapsed >= lerpTime ? 
             lastTargetValue : 
-            lerper(lastSourceValue, lastTargetValue, elapsed / lerpTime);
+            lerper(lastSourceValue, lastTargetValue, lerpTime <= 0 ? 1 : (elapsed / lerpTime));
         if (OnChange.Value.CompareTo(nxt) != 0)
             OnChange.Value = nxt;
     }

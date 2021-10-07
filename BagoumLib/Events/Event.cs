@@ -7,19 +7,32 @@ using BagoumLib.Functional;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Events {
+/// <summary>
+/// An observable that tracks its last published value.
+/// </summary>
 [PublicAPI]
 public interface IBObservable<T> : IObservable<T> {
     Maybe<T> LastPublished { get; }
 }
+
+/// <summary>
+/// A subject that tracks its last published observable value.
+/// </summary>
 [PublicAPI]
 public interface IBSubject<T, U> : ISubject<T, U>, IBObservable<U> {
 }
 
+/// <summary>
+/// A subject that tracks its last published observable value.
+/// </summary>
 [PublicAPI]
 public interface IBSubject<T> : IBSubject<T, T>, ISubject<T> {
     
 }
 
+/// <summary>
+/// A subject that observes elements of type T, maps them to type U, and publishes mapped elements to observers.
+/// </summary>
 [PublicAPI]
 public class Event<T, U> : IBSubject<T, U> {
     private readonly DMCompactingArray<IObserver<U>> callbacks = new();
@@ -49,7 +62,7 @@ public class Event<T, U> : IBSubject<T, U> {
     }
 
     /// <summary>
-    /// Do not call this directly. Use Observer.Register instead.
+    /// Register a callback that is invoked whenever this object observes a new element.
     /// </summary>
     public virtual IDisposable Subscribe(IObserver<U> observer) => callbacks.Add(observer);
 

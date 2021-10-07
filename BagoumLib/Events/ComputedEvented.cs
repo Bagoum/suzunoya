@@ -19,10 +19,10 @@ public class ComputedEvented<T> : IBSubject<T> {
         get => _value;
         set => onSet.OnNext(this._value = value);
     }
-    public Maybe<T> LastPublished => Maybe<T>.Of(_value);
+    public Maybe<T> LastPublished => onSet.LastPublished;
     
     private readonly Event<T> onSet;
-    private readonly List<IDisposable> tokens = new List<IDisposable>();
+    private readonly List<IDisposable> tokens = new();
 
     /// <summary>
     /// The initial value is published to onSet.

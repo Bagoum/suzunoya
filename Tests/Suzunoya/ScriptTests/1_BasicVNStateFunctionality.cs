@@ -40,13 +40,18 @@ public class _1BasicVNStateFunctionalityTest {
             var rg = vn.DefaultRenderGroup;
             ListEq(er.SimpleLoggedEventStrings, new[] {
                 "<VNState>.AwaitingConfirm ~ ",
+                "<VNState>.CurrentOperationID ~ $$__OPEN__$$",
+                "<VNState>.InputAllowed ~ True",
                 "<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
                 "<VNState>.VNStateActive ~ True",
                 "<RenderGroup>.EntityActive ~ True",
                 "<RenderGroup>.EulerAnglesD ~ <0, 0, 0>",
                 "<RenderGroup>.Location ~ <0, 0, 0>",
+                "<RenderGroup>.NestedRenderGroup ~ ",
                 "<RenderGroup>.Priority ~ 0",
+                "<RenderGroup>.RenderLayer ~ 0",
                 "<RenderGroup>.Scale ~ <1, 1, 1>",
+                "<RenderGroup>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
                 "<RenderGroup>.Visible ~ True",
                 "<RenderGroup>.Zoom ~ 1",
                 "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
@@ -86,14 +91,17 @@ public class _1BasicVNStateFunctionalityTest {
 
             //The operation only starts upon "await" or retrieving this property
             var t = t0.Task;
-            ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(md, "Speaker", ((ICharacter)reimu, SpeakFlags.Default))
+            ListEq(er.SimpleLoggedEventStrings, new [] {
+                "<VNState>.CurrentOperationID ~ hEllO wOrld foo",
+                "<TestDialogueBox>.DialogueCleared ~ ()",
+                "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
             });
+            er.LoggedEvents.Clear();
             //The dT on the first frame doesn't matter since the pattern is "yield then -= dT"
             vn.Update(200f);
             ListEq(er.SimpleLoggedEventStrings, new[] {
-                "<TestDialogueBox>.DialogueCleared ~ ()",
-                "<TestDialogueBox>.DialogueStarted ~ Suzunoya.Dialogue.Speech",
+                "<TestDialogueBox>.DialogueStarted ~ Reimu:hEllO wOrld foo",
+                "<VNState>.DialogueLog ~ Reimu:hEllO wOrld foo",
                 "<TestDialogueBox>.Dialogue ~ (Char { fragment = h }, EllO)",
                 "<Reimu>.$SPEAK ~ ",
                 "<TestDialogueBox>.Dialogue ~ (Char { fragment = E }, llO)",

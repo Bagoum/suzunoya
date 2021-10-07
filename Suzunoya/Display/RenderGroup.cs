@@ -15,13 +15,35 @@ namespace Suzunoya.Display {
 ///  of the render group's associated camera.
 /// The Scale field should be considered as referring to axis-specific zoom multipliers. As this requires nontrivial
 ///  shader implementation in some engines, it is separated from Zoom, which is a single field.
+/// A render group is also a rendered object and this has similar fields to IRendered.
 /// </summary>
-public class RenderGroup : Transform {
+public class RenderGroup : Transform, ITinted {
     public static int DefaultSortingIDStep { get; set; } = 10;
     public const string DEFAULT_KEY = "$default";
     public string Key { get; }
+
+    /// <summary>
+    /// A render group may render to another render group. Roughly equivalent to IRendered.RenderGroup,
+    ///  but it is a valid case for this to be null (in which case it renders to screen).
+    /// </summary>
+    public Evented<RenderGroup?> NestedRenderGroup { get; } = new(null);
+
+    /// <summary>
+    /// Equivalent to IRendered.RenderLayer.
+    /// </summary>
+    public Evented<int> RenderLayer { get; } = new(0);
+    
+    /// <summary>
+    /// Equivalent to IRendered.SortingID.
+    /// </summary>
     public Evented<int> Priority { get; }
     public Evented<bool> Visible { get; }
+    public DisturbedProduct<FColor> Tint { get; } = new(new FColor(1, 1, 1, 1));
+    
+    public float Alpha {
+        get => Tint.Value.a;
+        set => Tint.Value = Tint.BaseValue.WithA(value);
+    }
 
     public Evented<float> Zoom { get; } = new(1);
     public Evented<Vector3> ZoomTarget { get; } = new(Vector3.Zero);

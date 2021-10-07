@@ -22,7 +22,6 @@ public class _2TweeningSkipCancelScriptTest {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
             reimu.Location.Value = Vector3.Zero;
-            var exc = vn.ExecCtx;
             var t = reimu.MoveTo(Vector3.One, 1f, Easers.ELinear).Task;
             er.GetAndClear();
             //First update dT not counted
@@ -40,7 +39,7 @@ public class _2TweeningSkipCancelScriptTest {
             });
             Assert.IsTrue(t.IsCompletedSuccessfully);
             t = reimu.MoveTo(Vector3.Zero, 100f, Easers.ELinear).Task;
-            exc.SkipOperation();
+            vn.SkipOperation();
             //No immediate change
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
                 new(reimu, "Location", Vector3.One)
@@ -54,12 +53,10 @@ public class _2TweeningSkipCancelScriptTest {
             
             //Since the task is completed, the operation is closed, and this task will open a new operation
             t = reimu.MoveTo(Vector3.One, 100f).Task;
-            Assert.IsTrue(exc.OperationCount == 3 && exc.SuboperationCount == 3);
-            exc.SkipOperation();
+            vn.SkipOperation();
             //The task is not yet closed, so the operation remains open even if under a skip,
             // so this task is batched under the same operation
             var t2 = reimu.RotateTo(Vector3.One, 100f).Task;
-            Assert.IsTrue(exc.OperationCount == 3 && exc.SuboperationCount == 4);
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
                 new(reimu, "Location", Vector3.Zero),
                 new(reimu, "EulerAnglesD", Vector3.Zero)
@@ -77,7 +74,6 @@ public class _2TweeningSkipCancelScriptTest {
             vn.Update(1f);
             vn.DeleteAll();
             Assert.Throws<DestroyedObjectException>(() => reimu.RotateTo(Vector3.Zero, 2f));
-            Assert.IsTrue(exc.OperationCount == 4 && exc.SuboperationCount == 5);
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
                 new(reimu, "Location", Vector3.One),
                 new(reimu, "Location", Vector3.One),

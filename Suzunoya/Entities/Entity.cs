@@ -18,6 +18,11 @@ namespace Suzunoya.Entities {
 // always getting BoundedSuboperationToken when running eg. tweens.
 [PublicAPI]
 public interface IEntity {
+    /// <summary>
+    /// Plugin libraries generally will try to construct mimics for all entities.
+    /// However, some entities may not desire mimics (such as unsprited characters).
+    /// </summary>
+    bool MimicRequested { get; }
     ICancellee LifetimeToken { get; }
     VNOperation Tween(ITweener tweener);
     IVNState Container { get; }
@@ -27,14 +32,21 @@ public interface IEntity {
     /// Called after Update is complete. Mimics may listen to this.
     /// </summary>
     Event<float> OnUpdate { get; }
+    
+    /// <summary>
+    /// Destroy the object. This also sets EntityActive to false.
+    /// </summary>
     void Delete();
+    
     /// <summary>
     /// When this is set to false, the object is destroyed and no further operations can be run.
+    /// <br/>Do not modify this externally. To destroy the object, run Delete().
     /// </summary>
     Evented<bool> EntityActive { get; }
 }
 
 public abstract class Entity : IEntity {
+    public virtual bool MimicRequested => true;
     public IVNState Container { get; protected set; } = null!;
     protected readonly List<IDisposable> tokens = new();
     private readonly Cancellable lifetimeToken = new();

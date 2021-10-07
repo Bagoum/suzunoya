@@ -44,6 +44,7 @@ public class _6ChoicesTest {
             await vn.Wait(0);
 
             await reimu.MoveTo(Vector3.One, 1);
+            vn.MarkOperation("A");
             vn.InterrogatorCreated.Subscribe(new AskRecvr(this));
 
             Assert.ThrowsAsync<Exception>(async () => 
@@ -51,10 +52,13 @@ public class _6ChoicesTest {
 
             var choice = new ChoiceInterrogator<float>("v1", (4.2f, "hello"), (6.9f, "<color=red>world</color>"));
             er.Record(choice);
+            vn.MarkOperation("B");
             var f = await vn.Ask(choice);
+            vn.MarkOperation("C");
             er.LoggedEvents.OnNext(new EventRecord.LogEvent(vn, "$CHOICE1", typeof(float), f));
 
             await reimu.MoveTo(Vector3.Zero, 5);
+            vn.MarkOperation("D");
 
             return f;
         }
@@ -63,7 +67,7 @@ public class _6ChoicesTest {
     [Test]
     public void ScriptTest() {
         var sd = new InstanceData();
-        var s = new _TestScript(new VNState(Cancellable.Null, "test", sd));
+        var s = new _TestScript(new VNState(Cancellable.Null, sd));
         var t = s.Run();
         s.er.LoggedEvents.Clear();
         //We play a few lines, then "quit"
@@ -74,11 +78,10 @@ public class _6ChoicesTest {
                 ((ChoiceInterrogator<float>) s.asker)!.AwaitingResponse.Value!(4.2f);
         }
         s.vn.UpdateSavedata();
-        ListEq(sd.Location, new[] {("test", 3)});
-        Assert.AreEqual(sd.GlobalData.LastReadLine("test"), 3);
+        Assert.AreEqual(sd.Location, new VNLocation("C", new string[] { }));
         ListEq(s.er.SimpleLoggedEventStrings, stored1);
         //Then we load again
-        s = new _TestScript(new VNState(Cancellable.Null, "test", sd));
+        s = new _TestScript(new VNState(Cancellable.Null, sd));
         t = s.Run();
         s.er.LoggedEvents.Clear();
         for (int ii = 0; !t.IsCompleted; ++ii) {
@@ -95,14 +98,17 @@ public class _6ChoicesTest {
         "<Reimu>.Location ~ <0, 0, 0>",
         "<VNState>.$UpdateCount ~ 1",
         "<Reimu>.Location ~ <1, 1, 1>",
+        "<VNState>.CurrentOperationID ~ A",
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ ",
         "<ChoiceInterrogator<Single>>.EntityActive ~ True",
+        "<VNState>.CurrentOperationID ~ B",
         "<VNState>.Interrogator ~ Suzunoya.ControlFlow.ChoiceInterrogator`1[System.Single]",
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ System.Action`1[System.Single]",
         "<VNState>.$UpdateCount ~ 2",
         "<VNState>.$UpdateCount ~ 3",
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ ",
         "<ChoiceInterrogator<Single>>.EntityActive ~ False",
+        "<VNState>.CurrentOperationID ~ C",
         "<VNState>.$CHOICE1 ~ 4.2",
         "<Reimu>.Location ~ <1, 1, 1>",
         "<VNState>.$UpdateCount ~ 4",
@@ -118,11 +124,14 @@ public class _6ChoicesTest {
         "<VNState>.$UpdateCount ~ 0",
         "<Reimu>.Location ~ <0, 0, 0>",
         "<Reimu>.Location ~ <1, 1, 1>",
+        "<VNState>.CurrentOperationID ~ A",
         //The VN does not send an InterrogatorCreated event, 
         // and interrogator.AwaitingResponse is never changed from null.
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ ",
         "<ChoiceInterrogator<Single>>.EntityActive ~ True",
+        "<VNState>.CurrentOperationID ~ B",
         "<ChoiceInterrogator<Single>>.EntityActive ~ False",
+        "<VNState>.CurrentOperationID ~ C",
         "<VNState>.$CHOICE1 ~ 4.2",
         "<Reimu>.Location ~ <1, 1, 1>",
         "<Reimu>.Location ~ <1, 1, 1>",
@@ -135,7 +144,8 @@ public class _6ChoicesTest {
         "<VNState>.$UpdateCount ~ 4",
         "<Reimu>.Location ~ <0.09549147, 0.09549147, 0.09549147>",
         "<VNState>.$UpdateCount ~ 5",
-        "<Reimu>.Location ~ <0, 0, 0>"
+        "<Reimu>.Location ~ <0, 0, 0>",
+        "<VNState>.CurrentOperationID ~ D"
     };
 }
 }

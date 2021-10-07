@@ -28,6 +28,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace BagoumLib.Mathematics {
 public static class Bezier {
@@ -40,8 +41,11 @@ public static class Bezier {
     private const double kSampleStepSize = 1.0 / (kSplineTableSize - 1.0);
     
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double A(double c1, double c2) => 1 - 3 * c2 + 3 * c1;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double B(double c1, double c2) => 3 * c2 - 6 * c1;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double C(double c1) => 3 * c1;
 
     /// <summary>
@@ -51,12 +55,15 @@ public static class Bezier {
     /// <param name="c1">First control point</param>
     /// <param name="c2">Second control point</param>
     /// <returns></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcBezier(double t, double c1, double c2) =>
         ((A(c1, c2) * t + B(c1, c2)) * t + C(c1)) * t;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double CalcBezierDerivative(double t, double c1, double c2) =>
         3 * A(c1, c2) * t * t + 2 * B(c1, c2) * t + C(c1);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double BinarySubdivide(double x, double a, double b, double x1, double x2) {
         var currx = 0.0;
         var currt = 0.0;
@@ -72,6 +79,7 @@ public static class Bezier {
         return currt;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double NewtonRaphsonIterate(double x, double guessT, double x1, double x2) {
         for (var ii = 0; ii < NEWTON_ITERATIONS; ++ii) {
             var currSlope = CalcBezierDerivative(guessT, x1, x2);
@@ -90,6 +98,7 @@ public static class Bezier {
         return x => (float)CalcBezier(GetTForX(x, samples, x1, x2), y1, y2);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double GetTForX(double x, double[] samples, double x1, double x2) {
         var intervalStart = 0.0;
         int currSample = 1;
@@ -109,7 +118,6 @@ public static class Bezier {
             return guessT;
         else
             return BinarySubdivide(x, intervalStart, intervalStart + kSampleStepSize, x1, x2);
-
     }
 
 

@@ -22,9 +22,10 @@ public class MyTestCharacter : Character {
 //Character-specific subclasses are for convenience, and also can contain character-specific information
 public class Reimu : MyTestCharacter {
     public Evented<float> GoheiLength { get; } = new(14);
+    public override string Name => "Reimu";
 }
 
-public class YukariC : MyTestCharacter {
+public class Yukari : MyTestCharacter {
     public Evented<Vector2> PositionOfYukarisChair { get; } = new(new Vector2(2f, 3f));
 }
 

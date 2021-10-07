@@ -74,7 +74,6 @@ public class ChoiceInterrogator<T> : Interrogator<T> {
     public ChoiceInterrogator(params (T, string)[] choices) : this(null, choices) { }
 }
 
-//imagine not having higher kinded types. this meme was brought to you by haskell gang
 public interface IInterrogatorReceiver {
     public void OnNext<T>(IInterrogator<T> data);
 }

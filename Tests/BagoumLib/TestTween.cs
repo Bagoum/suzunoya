@@ -46,6 +46,14 @@ public class TestTween {
             new Vector2(0.5f, 0.5f), 
             Vector2.One,
         }, VecEq);
+
+        v = new Vector2(-2, -2);
+        TestSteps(Tween.TweenDelta(Vector2.One, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null), 
+            null, () => v, new [] {
+                Vector2.One, 
+                new Vector2(1.5f, 1.5f), 
+                Vector2.One * 2,
+            }, VecEq);
     }
 
     [Test]

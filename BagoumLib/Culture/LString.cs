@@ -10,7 +10,7 @@ public class LString : Variant<string> {
 
     public override string ToString() => Value;
 
-    public static implicit operator LString(string s) => new LString(s);
+    public static implicit operator LString(string s) => new LString(s) { ID = s };
     
     public static string Format(string? locale, string fmtString, params LString[] args) =>
         string.Format(fmtString, args.Select(s => (object) s.Realize(locale)).ToArray());

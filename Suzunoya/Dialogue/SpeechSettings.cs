@@ -1,8 +1,12 @@
 ﻿using System;
 using BagoumLib;
+using BagoumLib.Events;
 
 namespace Suzunoya.Dialogue {
 public record SpeechSettings(float opsPerSecond, Func<string, int, float> opsPerChar, float opsPerRollEvent, Func<string, int, bool> rollEventAllowed, Action? rollEvent) {
+    public static readonly DisturbedProduct<float> SpeedMultiplier = new(1);
+
+    public float EffectiveOpsPerSecond => opsPerSecond * SpeedMultiplier;
 
     //For consumers without with expressions :(
     public SpeechSettings(SpeechSettings copy) {
@@ -21,14 +25,14 @@ public record SpeechSettings(float opsPerSecond, Func<string, int, float> opsPer
     public static float DefaultOpsPerChar(string s, int index) {
         var ch = s[index];
         return ch switch {
-            '\n' => 2,
+            '\n' => 3,
             { } when char.IsWhiteSpace(ch) => 1.5f,
-            ',' => 2,
-            ';' => 2.5f,
-            ':' => 2.5f,
-            '!' => 3.5f,
-            '?' => 3.5f,
-            '.' => IsEllipses(s, index) ? 2 : 3.5f,
+            ',' => 3,
+            ';' => 3.5f,
+            ':' => 3.5f,
+            '!' => 5f,
+            '?' => 5f,
+            '.' => IsEllipses(s, index) ? 3 : 5f,
             _ => 1
         };
     }

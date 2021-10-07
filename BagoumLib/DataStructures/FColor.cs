@@ -23,14 +23,14 @@ public struct FColor {
 
     public FColor WithA(float newA) => new(r, g, b, newA);
 
-    public static FColor Lerp(FColor a, FColor b, float t) {
-        t = BMath.Clamp(0, 1, t);
+    public static FColor Lerp(FColor a, FColor b, float t) => LerpU(a, b, BMath.Clamp(0, 1, t));
+    public static FColor LerpU(FColor a, FColor b, float t) {
         return new FColor(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t);
     }
 
     public override string ToString() => $"RGBA({r:F3}, {g:F3}, {b:F3}, {a:F3})";
     public override int GetHashCode() => ((Vector4) this).GetHashCode();
-    public override bool Equals(object other) => other is FColor c && this == c;
+    public override bool Equals(object? other) => other is FColor c && this == c;
 
     public static FColor operator +(FColor x, FColor y) => new(x.r + y.r, x.g + y.g, x.b + y.b, x.a + y.a);
     public static FColor operator -(FColor x, FColor y) => new(x.r - y.r, x.g - y.g, x.b - y.b, x.a - y.a);
