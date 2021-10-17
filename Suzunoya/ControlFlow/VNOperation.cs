@@ -11,8 +11,17 @@ using JetBrains.Annotations;
 
 namespace Suzunoya.ControlFlow {
 
-//LazyAwaitable are lazy wrappers around tasks that are not started until they are awaited.
-//This allows chaining then in ways that are a bit difficult for tasks.
+
+public interface ILazyAwaitable {
+    public Task Task { get; }
+    public TaskAwaiter GetAwaiter(); //=> Task.GetAwaiter();
+}
+
+/// <summary>
+/// A lazy wrappers around a task that is not started until it is awaited.
+/// This allows chaining in ways that are a bit difficult for tasks.
+/// </summary>
+/// <typeparam name="T"></typeparam>
 public interface ILazyAwaitable<T> {
     public Task<T> Task { get; }
     public TaskAwaiter<T> GetAwaiter(); // => Task.GetAwaiter();
@@ -21,7 +30,7 @@ public interface ILazyAwaitable<T> {
 /// <summary>
 /// An function pretending to be a task.
 /// </summary>
-public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
+public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T>, ILazyAwaitable {
     private Task<T>? loadedTask;
     public Task<T> Task => loadedTask ??= LazyTask();
 
@@ -33,6 +42,9 @@ public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
     public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
 
     public static implicit operator LazyFunc<T>(Func<T> op) => new(op);
+
+    Task ILazyAwaitable.Task => Task;
+    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 
 /// <summary>
@@ -53,11 +65,13 @@ public record LazyAction : LazyFunc<Unit> {
 /// <summary>
 /// A generic task that is not started until it is awaited.
 /// </summary>
-public record LazyTask<T>(Func<Task<T>> lazyTask) : ILazyAwaitable<T> {
+public record LazyTask<T>(Func<Task<T>> lazyTask) : ILazyAwaitable<T>, ILazyAwaitable {
     private Task<T>? loadedTask;
     public Task<T> Task => loadedTask ??= lazyTask();
     
     public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
+    Task ILazyAwaitable.Task => Task;
+    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 public record LazyTask : LazyTask<Unit> {
     public LazyTask(Func<Task> lazyTask) : base(async () => {
@@ -70,7 +84,7 @@ public record LazyTask : LazyTask<Unit> {
 /// The task that is produced when waiting for a confirmation signal.
 /// This is similar to VNOperation, but is not bounded by an operation canceller.
 /// </summary>
-public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : ILazyAwaitable<Completion> {
+public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : ILazyAwaitable<Completion>, ILazyAwaitable {
     private Task<Completion>? loadedTask;
     public Task<Completion> Task => loadedTask ??= _AsTask();
 
@@ -83,6 +97,8 @@ public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : 
     
     [UsedImplicitly]
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
+    Task ILazyAwaitable.Task => Task;
+    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 
 /// <summary>
@@ -90,7 +106,7 @@ public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : 
 /// If multiple VNOperations are run at the same time, they may end up sharing the same operation token.
 /// Tasks batched under a VNOperation do not need to check cancellation at their start or end.
 /// </summary>
-public record VNOperation : ILazyAwaitable<Completion> {
+public record VNOperation : ILazyAwaitable<Completion>, ILazyAwaitable {
     public IVNState VN { get; }
     public Func<VNOpTracker, Task>[] Suboperations { get; init; }
 
@@ -108,7 +124,7 @@ public record VNOperation : ILazyAwaitable<Completion> {
     private async Task<Completion> _AsTask() {
         using var d = VN.GetOperationCanceller(out var cT, AllowUserSkip);
         cT.ThrowIfHardCancelled();
-        var tracker = new VNOpTracker(VNLocation.Make(VN), cT);
+        var tracker = new VNOpTracker(VN, cT);
         foreach (var t in Suboperations) {
             await t(tracker);
             cT.ThrowIfHardCancelled();
@@ -167,5 +183,7 @@ public record VNOperation : ILazyAwaitable<Completion> {
 
     [UsedImplicitly]
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
+    Task ILazyAwaitable.Task => Task;
+    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 }

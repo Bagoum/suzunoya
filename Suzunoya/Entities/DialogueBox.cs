@@ -117,12 +117,13 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
 
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default) =>
         this.MakeVNOp(cT => {
-            Container.CurrentOperationID.OnNext(content.ID ?? content.defaultValue);
+            Container.OperationID.OnNext(content.ID ?? content.defaultValue);
             if ((flags & SpeakFlags.DontClearText) == 0)
                 Clear(character == null);
             Speaker.OnNext((character, flags));
             Run(Say(
-                new DialogueOp(content, character, flags, cT.location), WaitingUtils.GetAwaiter(out Task t), this.BindLifetime(cT)));
+                new DialogueOp(content, character, flags, cT.Location), 
+                                WaitingUtils.GetAwaiter(out Task t), this.BindLifetime(cT)));
             return t;
         });
 }

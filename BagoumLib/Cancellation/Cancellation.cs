@@ -68,6 +68,11 @@ public class JointCancellee : ICancellee {
         this.c2 = c2 ?? Cancellable.Null;
     }
 
+    public JointCancellee(ICancellee? c1, out Cancellable token) {
+        this.c1 = c1 ?? Cancellable.Null;
+        this.c2 = token = new Cancellable();
+    }
+
 }
 
 /// <summary>

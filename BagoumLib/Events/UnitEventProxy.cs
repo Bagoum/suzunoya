@@ -18,7 +18,7 @@ public class UnitEventProxy<T> : IObservable<Unit> {
 }
 
 /// <summary>
-/// A wrapper that sends typed observations to a Unit-type observer;
+/// A wrapper that sends typed observations to a Unit-type observer.
 /// </summary>
 /// <typeparam name="T"></typeparam>
 public class UnitObserverProxy<T> : IObserver<T> {

@@ -31,27 +31,27 @@ public class _4SaveLoadLocationTest {
             await vn.Wait(0);
 
             reimu.Alpha = 0;
-            vn.MarkOperation("A");
+            vn.OperationID.OnNext("A");
             await reimu.MoveTo(Vector3.One, 2f).Then(
                 reimu.MoveTo(Vector3.One * 2, 3f).And(
                     reimu.FadeTo(1f, 5f))
             ).C;
-            vn.MarkOperation("B");
+            vn.OperationID.OnNext("B");
             await reimu.RotateTo(Vector3.One, 2f);
-            vn.MarkOperation("C");
+            vn.OperationID.OnNext("C");
             await reimu.MoveTo(Vector3.Zero, 1f);
-            vn.MarkOperation("D");
+            vn.OperationID.OnNext("D");
             await reimu.ScaleTo(Vector3.One * 3, 2f);
-            vn.MarkOperation("E");
+            vn.OperationID.OnNext("E");
             await reimu.RotateTo(Vector3.Zero, 4f);
-            vn.MarkOperation("F");
+            vn.OperationID.OnNext("F");
             return 5;
         });
 
     }
     [Test]
     public void ScriptTest() {
-        var sd = new InstanceData();
+        var sd = new InstanceData(new GlobalData());
         var s = new _TestScript(new VNState(Cancellable.Null, sd));
         var t = s.vn.ExecuteContext(s.Run()).Task;
         s.er.LoggedEvents.Clear();
@@ -68,8 +68,8 @@ public class _4SaveLoadLocationTest {
         }
         s.vn.UpdateSavedata();
         s.vn.DeleteAll();
-        Assert.AreEqual(loc, new VNLocation("B", new string[] { "test4" }));
-        Assert.AreEqual(sd.Location, new VNLocation("C", new string[] { "test4" }));
+        Assert.AreEqual(loc, new VNLocation("B", new List<string>(){ "test4" }));
+        Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>(){ "test4" }));
         Assert.IsTrue(new[]{"A", "B", "C",}.All(sd.GlobalData.IsLineRead));
         Assert.IsFalse(new[]{"D", "E", "F"}.Any(sd.GlobalData.IsLineRead));
         ListEq(s.er.SimpleLoggedEventStrings, stored1);
@@ -89,7 +89,7 @@ public class _4SaveLoadLocationTest {
     private static readonly string[] stored1 = {
         "<VNState>.$UpdateCount ~ 0",
         "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
-        "<VNState>.CurrentOperationID ~ A",
+        "<VNState>.OperationID ~ A",
         "<Reimu>.Location ~ <0, 0, 0>",
         "<Reimu>.Location ~ <0, 0, 0>",
         "<VNState>.$UpdateCount ~ 1",
@@ -117,14 +117,14 @@ public class _4SaveLoadLocationTest {
         "<VNState>.$UpdateCount ~ 8",
         "<VNState>.AwaitingConfirm ~ ", //null
         "<VNState>.$UpdateCount ~ 9",
-        "<VNState>.CurrentOperationID ~ B",
+        "<VNState>.OperationID ~ B",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>", //Location is captured after this command.
         "<VNState>.$UpdateCount ~ 10",
         "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
         "<VNState>.$UpdateCount ~ 11",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
-        "<VNState>.CurrentOperationID ~ C",
+        "<VNState>.OperationID ~ C",
         "<Reimu>.Location ~ <2, 2, 2>",
         "<Reimu>.Location ~ <2, 2, 2>", //The last process is the beginning of the move location from 2 to 0.
         "<TestDialogueBox>.EntityActive ~ False",
@@ -137,33 +137,33 @@ public class _4SaveLoadLocationTest {
     private static readonly string[] stored2 = {
         "<VNState>.$UpdateCount ~ 0",
         "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
-        "<VNState>.CurrentOperationID ~ A",
+        "<VNState>.OperationID ~ A",
         "<Reimu>.Location ~ <0, 0, 0>",
         "<Reimu>.Location ~ <1, 1, 1>",
         "<Reimu>.Location ~ <1, 1, 1>",
         "<Reimu>.Location ~ <2, 2, 2>",
         "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
         "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
-        "<VNState>.CurrentOperationID ~ B",
+        "<VNState>.OperationID ~ B",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
         "<VNState>.$UpdateCount ~ 1",
         "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
         "<VNState>.$UpdateCount ~ 2",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
-        "<VNState>.CurrentOperationID ~ C",
+        "<VNState>.OperationID ~ C",
         "<Reimu>.Location ~ <2, 2, 2>",
         "<Reimu>.Location ~ <2, 2, 2>",
         "<VNState>.$UpdateCount ~ 3",
         "<Reimu>.Location ~ <0, 0, 0>",
-        "<VNState>.CurrentOperationID ~ D",
+        "<VNState>.OperationID ~ D",
         "<Reimu>.Scale ~ <1, 1, 1>",
         "<Reimu>.Scale ~ <1, 1, 1>",
         "<VNState>.$UpdateCount ~ 4",
         "<Reimu>.Scale ~ <2, 2, 2>",
         "<VNState>.$UpdateCount ~ 5",
         "<Reimu>.Scale ~ <3, 3, 3>",
-        "<VNState>.CurrentOperationID ~ E",
+        "<VNState>.OperationID ~ E",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
         "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
         "<VNState>.$UpdateCount ~ 6",
@@ -174,7 +174,7 @@ public class _4SaveLoadLocationTest {
         "<Reimu>.EulerAnglesD ~ <0.14644659, 0.14644659, 0.14644659>",
         "<VNState>.$UpdateCount ~ 9",
         "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-        "<VNState>.CurrentOperationID ~ F",
+        "<VNState>.OperationID ~ F",
         "<VNState>.ContextFinished ~ Context:test4",
     };
 }

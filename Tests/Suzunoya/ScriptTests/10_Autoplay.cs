@@ -37,7 +37,7 @@ public class _10SkipAllTest {
     }
     [Test]
     public void ScriptTest() {
-        var sd = new InstanceData();
+        var sd = new InstanceData(new GlobalData());
         var s = new _TestScript(new VNState(Cancellable.Null, sd));
         var t = s.Run();
         s.er.LoggedEvents.Clear();

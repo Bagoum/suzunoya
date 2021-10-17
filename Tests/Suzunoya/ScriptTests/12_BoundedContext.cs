@@ -56,7 +56,7 @@ public class _12BoundedContextTest {
     }
     [Test]
     public void ScriptTest() {
-        var s = new _TestScript(new VNState(Cancellable.Null, new InstanceData()));
+        var s = new _TestScript(new VNState(Cancellable.Null, new InstanceData(new GlobalData())));
         EventRecord.LogEvent UpdateLog(int ii) => new(s.vn, "$UpdateCount", typeof(int), ii);
         var t = s.Run().Execute().Task;
         s.er.LoggedEvents.Clear();
@@ -95,7 +95,7 @@ public class _12BoundedContextTest {
 
     private static readonly string[] stored = {
 	    "<VNState>.$UpdateCount ~ 0",
-	    "<VNState>.CurrentOperationID ~ 12345",
+	    "<VNState>.OperationID ~ 12345",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
 	    "<TestDialogueBox>.DialogueStarted ~ Reimu:12345",
@@ -110,7 +110,7 @@ public class _12BoundedContextTest {
 	    "<VNState>.$UpdateCount ~ 4",
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
-	    "<VNState>.CurrentOperationID ~ $$__OPEN__$$::l2",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::l2",
 	    "<VNState>.ContextStarted ~ Context:l2",
 	    "<VNState>.EntityCreated ~ Tests.Suzunoya.Yukari",
 	    "<Yukari>.Emotion ~ Neutral",
@@ -127,7 +127,7 @@ public class _12BoundedContextTest {
 	    "<Yukari>.SortingID ~ 20",
 	    "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Yukari",
 	    "<Yukari>.RenderGroup ~ Suzunoya.Display.RenderGroup",
-	    "<VNState>.CurrentOperationID ~ 12345",
+	    "<VNState>.OperationID ~ 12345",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Yukari, Default)",
 	    "<TestDialogueBox>.DialogueStarted ~ Nobody:12345",
@@ -140,8 +140,8 @@ public class _12BoundedContextTest {
     };
     public static readonly string[] stored2 = {
 	    "<VNState>.AwaitingConfirm ~ ",
-	    "<VNState>.CurrentOperationID ~ $$__OPEN__$$",
 	    "<VNState>.InputAllowed ~ True",
+	    "<VNState>.OperationID ~ $$__OPEN__$$",
 	    "<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
 	    "<VNState>.VNStateActive ~ True",
 	    "<RenderGroup>.EntityActive ~ True",
@@ -156,7 +156,7 @@ public class _12BoundedContextTest {
 	    "<RenderGroup>.Zoom ~ 1",
 	    "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
 	    "<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
-	    "<VNState>.CurrentOperationID ~ $$__OPEN__$$::l1",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::l1",
 	    "<VNState>.ContextStarted ~ Context:l1",
 	    "<VNState>.EntityCreated ~ Tests.Suzunoya.TestDialogueBox",
 	    "<TestDialogueBox>.EntityActive ~ True",
@@ -188,7 +188,7 @@ public class _12BoundedContextTest {
 	    "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
 	    "<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
 	    "<VNState>.$UpdateCount ~ 0",
-	    "<VNState>.CurrentOperationID ~ 12345",
+	    "<VNState>.OperationID ~ 12345",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
 	    "<TestDialogueBox>.DialogueStarted ~ Reimu:12345",
@@ -200,7 +200,7 @@ public class _12BoundedContextTest {
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 4 }, 5)",
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
-	    "<VNState>.CurrentOperationID ~ $$__OPEN__$$::l2",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::l2",
 	    "<VNState>.ContextStarted ~ Context:l2",
 	    "<VNState>.EntityCreated ~ Tests.Suzunoya.Yukari",
 	    "<Yukari>.Emotion ~ Neutral",
@@ -217,7 +217,7 @@ public class _12BoundedContextTest {
 	    "<Yukari>.SortingID ~ 20",
 	    "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Yukari",
 	    "<Yukari>.RenderGroup ~ Suzunoya.Display.RenderGroup",
-	    "<VNState>.CurrentOperationID ~ 12345",
+	    "<VNState>.OperationID ~ 12345",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Yukari, Default)",
 	    "<TestDialogueBox>.DialogueStarted ~ Nobody:12345",
@@ -229,7 +229,7 @@ public class _12BoundedContextTest {
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 4 }, 5)",
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
-	    "<VNState>.CurrentOperationID ~ 6789",
+	    "<VNState>.OperationID ~ 6789",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Yukari, Default)",
 	    "<TestDialogueBox>.DialogueStarted ~ Nobody:6789",
@@ -244,7 +244,7 @@ public class _12BoundedContextTest {
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
 	    "<Yukari>.EntityActive ~ False",
 	    "<VNState>.ContextFinished ~ Context:l2",
-	    "<VNState>.CurrentOperationID ~ 67890123",
+	    "<VNState>.OperationID ~ 67890123",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
 	    "<TestDialogueBox>.DialogueStarted ~ Reimu:67890123",
@@ -262,8 +262,8 @@ public class _12BoundedContextTest {
 
     public static readonly string[] stored3 = {
 		"<VNState>.AwaitingConfirm ~ ",
-		"<VNState>.CurrentOperationID ~ $$__OPEN__$$",
 		"<VNState>.InputAllowed ~ True",
+		"<VNState>.OperationID ~ $$__OPEN__$$",
 		"<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
 		"<VNState>.VNStateActive ~ True",
 		"<RenderGroup>.EntityActive ~ True",
@@ -278,7 +278,7 @@ public class _12BoundedContextTest {
 		"<RenderGroup>.Zoom ~ 1",
 		"<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
 		"<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
-		"<VNState>.CurrentOperationID ~ $$__OPEN__$$::l1",
+		"<VNState>.OperationID ~ $$__OPEN__$$::l1",
 		"<VNState>.ContextStarted ~ Context:l1",
 		"<VNState>.EntityCreated ~ Tests.Suzunoya.TestDialogueBox",
 		"<TestDialogueBox>.EntityActive ~ True",
@@ -310,7 +310,7 @@ public class _12BoundedContextTest {
 		"<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
 		"<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
 		"<VNState>.$UpdateCount ~ 0",
-		"<VNState>.CurrentOperationID ~ 12345",
+		"<VNState>.OperationID ~ 12345",
 		"<TestDialogueBox>.DialogueCleared ~ ()",
 		"<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
 		"<TestDialogueBox>.DialogueStarted ~ Reimu:12345",
@@ -324,10 +324,10 @@ public class _12BoundedContextTest {
 		"<TestDialogueBox>.DialogueFinished ~ ()",
 		//The inner context is constructed and immediately destroyed without constructing Yukari.
 		//This is the major computational benefit of bounded contexts w.r.t loading/backlogging.
-		"<VNState>.CurrentOperationID ~ $$__OPEN__$$::l2",
+		"<VNState>.OperationID ~ $$__OPEN__$$::l2",
 		"<VNState>.ContextStarted ~ Context:l2",
 		"<VNState>.ContextFinished ~ Context:l2",
-		"<VNState>.CurrentOperationID ~ 67890123",
+		"<VNState>.OperationID ~ 67890123",
 		"<TestDialogueBox>.DialogueCleared ~ ()",
 		"<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
 		"<TestDialogueBox>.DialogueStarted ~ Reimu:67890123",
@@ -342,7 +342,7 @@ public class _12BoundedContextTest {
 		"<TestDialogueBox>.Dialogue ~ (Char { fragment = 2 }, 3)",
 		"<TestDialogueBox>.Dialogue ~ (Char { fragment = 3 }, )",
 		"<TestDialogueBox>.DialogueFinished ~ ()",
-		"<VNState>.CurrentOperationID ~ 4567",
+		"<VNState>.OperationID ~ 4567",
 		"<TestDialogueBox>.DialogueCleared ~ ()",
 		"<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
 		"<TestDialogueBox>.DialogueStarted ~ Reimu:4567",

@@ -48,8 +48,18 @@ public interface IVNState {
 
     /// <summary>
     /// Set the skip mode. Note that you cannot set the skip mode to LOADING.
+    /// <br/>Some modes may be disabled (eg. autoplay, fastforward may be disabled for replay-safe uses).
+    /// If you try to set the skip mode to a disabled mode, the function will return false. Otherwise,
+    /// it will return true.
     /// </summary>
-    public void SetSkipMode(SkipMode? mode);
+    public bool SetSkipMode(SkipMode? mode);
+    
+    /// <summary>
+    /// If the VNState allows full-skipping, then skips the entire VNState (ie. destroy it).
+    /// <br/>Returns true iff a skip was performed.
+    /// </summary>
+    /// <returns></returns>
+    bool TryFullSkip();
     
     /// <summary>
     /// The amount of time the VNState will wait before executing confirm commands while autoplaying.
@@ -152,7 +162,7 @@ public interface IVNState {
     /// </summary>
     Evented<bool> VNStateActive { get; }
     
-    Evented<string> CurrentOperationID { get; }
+    Evented<string> OperationID { get; }
     ISubject<LogMessage> Logs { get; }
 }
 public class VNState : IVNState, IConfirmationReceiver {
@@ -181,26 +191,40 @@ public class VNState : IVNState, IConfirmationReceiver {
                                     //Skip until the contexts match
                                     (!LoadTo.ContextsMatch(Contexts) ||
                                      //Skip until the operation matches
-                                     LoadTo.LastOperationID != CurrentOperationID.Value);
+                                     LoadTo.LastOperationID != OperationID.Value);
 
     private SkipMode? userSetSkipMode = null;
-    public void SetSkipMode(SkipMode? mode) {
+    public bool AllowFullSkip { get; set; } = false;
+    
+    public bool SetSkipMode(SkipMode? mode) {
         if (mode == SkipMode.LOADING)
             throw new Exception("Cannot set skip mode to LOADING directly. Use LoadToLocation instead.");
+        if (userSetSkipMode == mode)
+            mode = null;
+        if ((mode == SkipMode.AUTOPLAY || mode == SkipMode.FASTFORWARD) && !AutoplayFastforwardAllowed) {
+            Logs.OnNext($"User tried to set skip mode to {mode}, but this is not allowed for this VNState.");
+            return false;
+        }
         userSetSkipMode = mode;
+        if (SkippingMode != null && confirmToken != null)
+            _Confirm();
         Logs.OnNext(new LogMessage($"Set the user skip mode to {mode}", LogLevel.INFO));
+        return true;
     }
     public SkipMode? SkippingMode =>
         IsLoadSkipping ?
             SkipMode.LOADING :
             userSetSkipMode;
+    
+    public bool TryFullSkip() {
+        if (AllowFullSkip) {
+            DeleteAll();
+            return true;
+        }
+        return false;
+    }
 
-    public bool IsPlayerControlledSkipping => SkippingMode switch {
-        SkipMode.AUTOPLAY => true,
-        SkipMode.FASTFORWARD => true,
-        _ => false
-    };
-
+    public bool AutoplayFastforwardAllowed { get; set; } = true;
     public float TimePerAutoplayConfirm { get; set; } = 1f;
     public float TimePerFastforwardConfirm { get; set; } = 0.2f;
     
@@ -232,8 +256,7 @@ public class VNState : IVNState, IConfirmationReceiver {
         Contexts.Count == 1 ? Contexts[0].ID :
         string.Join("::", Contexts.Select(c => c.ID));
 
-    public string OperationKey => ContextsKey + $"||{CurrentOperationID.Value ?? ""}";
-
+    public string OperationKey => ContextsKey + $"||{OperationID.Value}";
     public RenderGroup DefaultRenderGroup { get; }
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
     
@@ -243,11 +266,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     public Evented<IConfirmationReceiver?> AwaitingConfirm { get; } = new(null);
     public Evented<bool> InputAllowed { get; } = new(true);
     private const string OPEN_OPID = "$$__OPEN__$$";
-    public Evented<string> CurrentOperationID { get; } = new(OPEN_OPID);
-    /// <summary>
-    /// Manually mark an operation ID. This effectively creates a possible save location.
-    /// </summary>
-    public void MarkOperation(string id) => CurrentOperationID.OnNext(id);
+    public Evented<string> OperationID { get; } = new(OPEN_OPID);
     public ISubject<LogMessage> Logs { get; } = new Event<LogMessage>();
     public Evented<bool> VNStateActive { get; } = new(true);
     
@@ -261,14 +280,14 @@ public class VNState : IVNState, IConfirmationReceiver {
         lifetimeToken = new Cancellable();
         CToken = new JointCancellee(extCToken, lifetimeToken);
 
-        Tokens.Add(CurrentOperationID.Subscribe(id => { 
+        Tokens.Add(OperationID.Subscribe(id => { 
             //TODO: globalData does not contextualize lineRead with context -- is this a problem?
             saveData?.GlobalData.LineRead(id);
             if (!(LoadTo is null) && LoadTo.ContextsMatch(Contexts) && id == LoadTo.LastOperationID) {
                 StopLoading();
             }
         }));
-        Tokens.Add(ContextStarted.Subscribe(ctx => MarkOperation(OPEN_OPID + "::" + ctx.ID)));
+        Tokens.Add(ContextStarted.Subscribe(ctx => OperationID.OnNext(OPEN_OPID + "::" + ctx.ID)));
 
         // ReSharper disable once VirtualMemberCallInConstructor
         DefaultRenderGroup = MakeDefaultRenderGroup();
@@ -306,7 +325,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     public IDisposable GetOperationCanceller(out ICancellee cT, bool allowUserSkip=true) {
         if (op == null || OperationCTokenDependencies <= 0) {
             op = new OperationCancellation(this, allowUserSkip);
-            if (SkippingMode == SkipMode.LOADING || SkippingMode == SkipMode.FASTFORWARD)
+            if (SkippingMode.SkipsOperations())
                 SkipOperation();
         } else
             op.userSkipAllowed &= allowUserSkip;
@@ -322,11 +341,21 @@ public class VNState : IVNState, IConfirmationReceiver {
         this.AssertActive();
         using var openCtx = new OpenedContext<T>(this, ctx);
         //When load skipping, we can skip the entire context if the current context stack does not match the target
-        if (LoadTo?.ContextsMatch(Contexts) == false && saveData != null && 
-                saveData.TryGetData<T>(ContextsKey, out var res)) {
-            return res;
+        if (LoadTo?.ContextsMatchPrefix(Contexts) == false) {
+            if (saveData != null && saveData.TryGetData<T>(ContextsKey, out var res)) {
+                Logs.OnNext($"Load-skipping section {ContextsKey} with return value {res}");
+                ctx.ShortCircuit?.Invoke();
+                return res;
+            }
+            else if (typeof(T) == typeof(Unit)) {
+                Logs.OnNext($"Load-skipping section {ContextsKey} with default Unit return");
+                ctx.ShortCircuit?.Invoke();
+                return default!;
+            } else
+                throw new Exception($"Requested to load-skip context {ContextsKey}, but save data does not have " +
+                                    $"corresponding information and the type {typeof(T)} is not Unit");
         }
-        var result = await ctx.Task;
+        var result = await ctx._InnerTask;
         openCtx.SaveResult(result);
         return result;
     });
@@ -394,6 +423,26 @@ public class VNState : IVNState, IConfirmationReceiver {
         return dsp;
     }
 
+    public T? FindEntity<T>() where T : class {
+        for (int ii = 0; ii < Entities.Count; ++ii)
+            if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
+                return obj;
+        return null;
+    }
+    public object? FindEntity(Type t) {
+        for (int ii = 0; ii < Entities.Count; ++ii)
+            if (Entities.ExistsAt(ii) && Entities[ii].GetType().IsWeakSubclassOf(t))
+                return Entities[ii];
+        return null;
+    }
+    public List<T> FindEntities<T>() where T : class {
+        var results = new List<T>();
+        for (int ii = 0; ii < Entities.Count; ++ii)
+            if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
+                results.Add(obj);
+        return results;
+    }
+
     /// <summary>
     /// Convenience method for adding entities to the VNState.
     /// Dispatches to ent.AddToVNState and its specialized forms for IRendered.
@@ -429,14 +478,12 @@ public class VNState : IVNState, IConfirmationReceiver {
             new CoroutineOptions(execType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
     }
 
-    public ILazyAwaitable<T[]> Parallel<T>(params ILazyAwaitable<T>[] ops) =>
-        new LazyTask<T[]>(() => Task.WhenAll(ops.Select(la => la.Task)));
+    public ILazyAwaitable Parallel(params ILazyAwaitable[] ops) =>
+        new LazyTask(() => Task.WhenAll(ops.Select(la => la.Task)));
 
-    public ILazyAwaitable<T[]> Sequential<T>(params ILazyAwaitable<T>[] tasks) => new LazyTask<T[]>(async () => {
-        var result = new T[tasks.Length];
+    public ILazyAwaitable Sequential(params ILazyAwaitable[] tasks) => new LazyTask(async () => {
         for (int ii = 0; ii < tasks.Length; ++ii)
-            result[ii] = await tasks[ii];
-        return result;
+            await tasks[ii];
     });
 
     public VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
@@ -448,7 +495,7 @@ public class VNState : IVNState, IConfirmationReceiver {
                 AwaitingConfirm.Value = this;
             confirmToken ??= new Cancellable();
             Run(WaitingUtils.Spin(WaitingUtils.GetCompletionAwaiter(out var t), new JointCancellee(CToken, confirmToken)));
-            if (IsPlayerControlledSkipping && SkippingMode != null)
+            if (SkippingMode.IsPlayerControlled() && SkippingMode != null)
                 Run(AutoconfirmAfterDelay(confirmToken, SkippingMode.Value));
             return t;
         });
@@ -473,7 +520,7 @@ public class VNState : IVNState, IConfirmationReceiver {
         this.AssertActive();
         if (confirmToken != null) {
             //User confirm cancels autoskip
-            if (IsPlayerControlledSkipping) {
+            if (SkippingMode.IsPlayerControlled()) {
                 Logs.OnNext($"Cancelling skip mode {SkippingMode} due to user confirm input.");
                 SetSkipMode(null);
             }
@@ -488,7 +535,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     public bool RequestSkipOperation() {
         this.AssertActive();
         //User skip cancels autoskip
-        if (IsPlayerControlledSkipping) {
+        if (SkippingMode.IsPlayerControlled()) {
             Logs.OnNext($"Cancelling skip mode {SkippingMode} due to user skip input.");
             SetSkipMode(null);
         }
@@ -504,7 +551,7 @@ public class VNState : IVNState, IConfirmationReceiver {
             if (asker.Key == null)
                 throw new Exception("All interrogators operating on a non-null script must have a save key.");
             if (saveData.TryGetData<T>(asker.Key, out var v)) {
-                if (SkippingMode == SkipMode.LOADING || SkippingMode == SkipMode.FASTFORWARD) {
+                if (SkippingMode.SkipsOperations()) {
                     asker.Skip(v);
                     return v;
                 } else if (throwIfExists)
@@ -525,6 +572,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     }
 
     protected virtual void _DeleteAll() {
+        Logs.OnNext($"Deleting all entities within VNState {this}");
         lifetimeToken.Cancel(CancelHelpers.HardCancelLevel);
         foreach (var t in Tokens)
             t.Dispose();
@@ -554,7 +602,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     //This is separate from EntityVNState, which is not set until DeleteAll ends
     private bool deleteStarted = false;
     public void DeleteAll() {
-        if (deleteStarted) return;
+        if (deleteStarted || VNStateActive == false) return;
         deleteStarted = true;
         _DeleteAll();
     }

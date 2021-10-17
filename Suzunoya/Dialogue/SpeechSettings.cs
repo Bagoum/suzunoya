@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using BagoumLib;
 using BagoumLib.Events;
 
@@ -33,7 +34,8 @@ public record SpeechSettings(float opsPerSecond, Func<string, int, float> opsPer
             '!' => 5f,
             '?' => 5f,
             '.' => IsEllipses(s, index) ? 3 : 5f,
-            _ => 1
+            { } when char.GetUnicodeCategory(ch) == UnicodeCategory.OtherLetter => 2.5f,
+            _ => 1,
         };
     }
 

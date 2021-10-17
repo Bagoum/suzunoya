@@ -17,7 +17,7 @@ namespace Suzunoya.Entities {
 //Not inheriting IEntity : ICoroutineRunner in order to provide more protection around
 // always getting BoundedSuboperationToken when running eg. tweens.
 [PublicAPI]
-public interface IEntity {
+public interface IEntity : IDisposable {
     /// <summary>
     /// Plugin libraries generally will try to construct mimics for all entities.
     /// However, some entities may not desire mimics (such as unsprited characters).
@@ -35,6 +35,7 @@ public interface IEntity {
     
     /// <summary>
     /// Destroy the object. This also sets EntityActive to false.
+    /// This should do the same as IDisposable.Dispose.
     /// </summary>
     void Delete();
     
@@ -80,7 +81,7 @@ public abstract class Entity : IEntity {
         tweener.With(this.BindLifetime(ct), () => Container.dT).Run(cors));
 
     public virtual void Delete() {
-        this.AssertActive();
+        if (EntityActive.Value == false) return;
         lifetimeToken.Cancel(CancelHelpers.HardCancelLevel);
         foreach (var t in tokens)
             t.Dispose();
@@ -90,6 +91,7 @@ public abstract class Entity : IEntity {
             throw new Exception($"Some entity coroutines were not closed in the cull process. " +
                                 $"{this} has {cors.Count} remaining.");
         EntityActive.OnNext(false);
+        Container.Logs.OnNext($"The entity {GetType().RName()} has been deleted.");
     }
     
     private Entity AssertActive() {
@@ -98,6 +100,8 @@ public abstract class Entity : IEntity {
                                                "You cannot run any more operations on it.");
         return this;
     }
+
+    public void Dispose() => Delete();
 }
 
 

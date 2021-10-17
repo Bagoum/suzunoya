@@ -40,8 +40,8 @@ public class _1BasicVNStateFunctionalityTest {
             var rg = vn.DefaultRenderGroup;
             ListEq(er.SimpleLoggedEventStrings, new[] {
                 "<VNState>.AwaitingConfirm ~ ",
-                "<VNState>.CurrentOperationID ~ $$__OPEN__$$",
                 "<VNState>.InputAllowed ~ True",
+                "<VNState>.OperationID ~ $$__OPEN__$$",
                 "<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
                 "<VNState>.VNStateActive ~ True",
                 "<RenderGroup>.EntityActive ~ True",
@@ -92,7 +92,7 @@ public class _1BasicVNStateFunctionalityTest {
             //The operation only starts upon "await" or retrieving this property
             var t = t0.Task;
             ListEq(er.SimpleLoggedEventStrings, new [] {
-                "<VNState>.CurrentOperationID ~ hEllO wOrld foo",
+                "<VNState>.OperationID ~ hEllO wOrld foo",
                 "<TestDialogueBox>.DialogueCleared ~ ()",
                 "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
             });

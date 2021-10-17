@@ -75,7 +75,7 @@ public class RenderGroup : Transform, ITinted {
         var m = -1 * DefaultSortingIDStep;
         for (int ii = 0; ii < Contents.Count; ++ii) {
             if (Contents.ExistsAt(ii))
-                m = Math.Max(m, Contents[ii].SortingID);
+                m = Math.Max(m, Contents[ii].SortingID.BaseValue);
         }
         return m + DefaultSortingIDStep;
     }

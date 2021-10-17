@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Reflection {
+[PublicAPI]
 public static class ReflectionUtils {
     public static string NameType(Type t) {
         if (t.IsArray) {

@@ -106,12 +106,23 @@ public static class Helpers {
         value = default!;
         return false;
     }
+    
+    public static bool SkipsOperations(this SkipMode? sm) => sm switch {
+        SkipMode.LOADING => true,
+        SkipMode.FASTFORWARD => true,
+        _ => false
+    };
+    public static bool IsPlayerControlled(this SkipMode? sm) => sm switch {
+        SkipMode.AUTOPLAY => true,
+        SkipMode.FASTFORWARD => true,
+        _ => false
+    };
 
     public static Action? SkipGuard(this IVNState vn, Action? act) => 
             act == null ? 
                 null :
                 () => {
-                    if (vn.SkippingMode != null)
+                    if (!vn.SkippingMode.SkipsOperations())
                         act();
                 };
 

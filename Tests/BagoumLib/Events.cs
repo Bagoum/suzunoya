@@ -124,6 +124,52 @@ public class Events {
             
         });
     }
+
+    private class MyObject {
+        public readonly Event<int> IntEvent = new();
+        public readonly Evented<float> FloatEvented;
+
+        public MyObject(float f) {
+            FloatEvented = new(f);
+        }
+    }
+    [Test]
+    public void TestProxy() {
+        var output = new List<float>();
+        
+        var source = new Evented<MyObject>(new MyObject(5));
+        source.Value.IntEvent.OnNext(100);
+        var proxy = new EventProxy<MyObject>(source);
+        var partialInt = proxy.ProxyEvent(o => o.IntEvent);
+        var t1 = partialInt.Subscribe(i => output.Add(i + 1000));
+        var t2 = proxy.Subscribe(i => i.IntEvent, i => output.Add(i));
+        var t3 = proxy.Subscribe(i => i.FloatEvented, f => output.Add(f));
+        
+        AssertHelpers.ListEq(output, new []{ 5f });
+        source.Value.IntEvent.OnNext(101);
+        AssertHelpers.ListEq(output, new []{ 5f, 1101, 101 });
+        
+        output.Clear();
+        source.Value = new MyObject(8);
+        AssertHelpers.ListEq(output, new []{ 8f });
+        source.Value.IntEvent.OnNext(102);
+        AssertHelpers.ListEq(output, new []{ 8f, 1102, 102 });
+        t1.Dispose();
+        source.Value.IntEvent.OnNext(103);
+        AssertHelpers.ListEq(output, new []{ 8f, 1102, 102, 103 });
+        t2.Dispose();
+        t3.Dispose();
+        source.Value.IntEvent.OnNext(104);
+        source.Value.FloatEvented.OnNext(6);
+        AssertHelpers.ListEq(output, new []{ 8f, 1102, 102, 103 });
+        
+        source.Value = new MyObject(9);
+        source.Value.IntEvent.OnNext(105);
+        source.Value.FloatEvented.OnNext(7);
+        AssertHelpers.ListEq(output, new []{ 8f, 1102, 102, 103 });
+
+
+    }
     
 }
 }

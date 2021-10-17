@@ -37,22 +37,29 @@ public class serializeme {
                 "233", "453"
             }
         };
-        var save = new InstanceData() {
+        var save = new InstanceData(global) {
             Data = new Dictionary<string, object>() {
                 {"hello", new[] {"w", "orld"}},
                 {"foo", 433}
             },
-            Location = new VNLocation("l_25", new[] {"dec20"}) {
-            },
-            GlobalData = global
+            Location = new VNLocation("l_25", new List<string>(){"dec20"}) {
+            }
         };
+        global.Settings.TextSpeed = 2;
+        Assert.AreEqual(save.FrozenGlobalData.Settings.TextSpeed, 1.5f);
+        Assert.AreEqual(save.GlobalData.Settings.TextSpeed, 2f);
 
         var typs = new JsonSerializerSettings() {TypeNameHandling = TypeNameHandling.Auto};
-        string s_save = JsonConvert.SerializeObject(save, Formatting.Indented, typs);
-        //Note that the loaded "Global" prop will be default-- this is intentional and you should reassign it after deserialization.
-        var r_save = JsonConvert.DeserializeObject<InstanceData>(s_save, typs);
+        //pretend save
         string s_global = JsonConvert.SerializeObject(global, Formatting.Indented, typs);
-        var r_global = JsonConvert.DeserializeObject<GlobalData>(s_global, typs);
+        string s_save = JsonConvert.SerializeObject(save, Formatting.Indented, typs);
+        //pretend load
+        var r_global = JsonConvert.DeserializeObject<GlobalData>(s_global, typs) ?? throw new Exception();
+        var r_save = InstanceData.Deserialize(s_save, r_global);
+        Assert.AreEqual(r_save.FrozenGlobalData.Settings.TextSpeed, 1.5f);
+        Assert.AreEqual(r_global.Settings.TextSpeed, 2f);
+        Assert.AreEqual(r_save.GlobalData, r_global);
+
         int k = 5;
     }
 }
