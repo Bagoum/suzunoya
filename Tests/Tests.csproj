@@ -19,6 +19,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\BagoumLib\BagoumLib.csproj" />
+      <ProjectReference Include="..\Mizuhashi\Mizuhashi.csproj" />
       <ProjectReference Include="..\Suzunoya\Suzunoya.csproj" />
     </ItemGroup>
 

@@ -14,11 +14,15 @@ public readonly struct Maybe<T> {
         this.Valid = valid;
         this.Value = val;
     }
+    public Maybe(T val) {
+        this.Valid = true;
+        this.Value = val;
+    }
 
-    public static Maybe<T> Of(T val) => new Maybe<T>(true, val);
-    public static readonly Maybe<T> None = new Maybe<T>(false, default!);
+    public static Maybe<T> Of(T val) => new (val);
+    public static readonly Maybe<T> None = new (false, default!);
 
-    public Maybe<U> FMap<U>(Func<T, U> f) => Valid ? Maybe<U>.Of(f(Value)) : Maybe<U>.None;
+    public Maybe<U> FMap<U>(Func<T, U> f) => Valid ? new(f(Value)) : Maybe<U>.None;
     public T Or(T dflt) => Valid ? Value : dflt;
 
     public bool Try(out T val) {

@@ -23,6 +23,14 @@ public static class Extensions {
         if (ii >= 0 && ii < s.Length) return s[ii];
         return null;
     }
+    public static bool TryIndex(this string s, int ii, out char c) {
+        if (ii >= 0 && ii < s.Length) {
+            c = s[ii];
+            return true;
+        }
+        c = default;
+        return false;
+    }
 
     public static string ToLiteral(this string s) {
         var sb = new StringBuilder(s.Length + 10);

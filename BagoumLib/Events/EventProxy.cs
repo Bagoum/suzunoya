@@ -30,7 +30,7 @@ public class EventProxy<T> {
     public IDisposable Subscribe<E>(Func<T, IObservable<E>> evGetter, Action<E> listener) {
         var subscription = new IndirectEventSubscription<E>(evGetter, listener);
         if (lastRead.Try(out var obj))
-            subscription.SubscribeTo(obj);
+            subscription.GenerateSubscriptions(obj);
         //The token should do two things: remove the subscription from the resubscribers list,
         // and also detach any existing event listeners within the subscription (EventProxySubscription.Dispose).
         return new JointDisposable(null, subscription, resubscribers.Add(subscription));
@@ -39,7 +39,7 @@ public class EventProxy<T> {
     public IObservable<E> ProxyEvent<E>(Func<T, IObservable<E>> evGetter) {
         var partialEv = new ProxiedEvent<E>(evGetter);
         if (lastRead.Try(out var obj))
-            partialEv.SubscribeTo(obj);
+            partialEv.GenerateSubscriptions(obj);
         //This token does not need to be tracked, as proxied events can be considered as simple redirection
         // pointers with no significant behavior of their own (and therefore they never need to be deleted).
         _ = resubscribers.Add(partialEv);
@@ -49,11 +49,11 @@ public class EventProxy<T> {
     private void ResubscribeAll(T obj) {
         resubscribers.Compact();
         for (int ii = 0; ii < resubscribers.Count; ++ii)
-            resubscribers[ii].SubscribeTo(obj);
+            resubscribers[ii].GenerateSubscriptions(obj);
     }
 
     private interface IEventProxySubscription {
-        void SubscribeTo(T obj);
+        void GenerateSubscriptions(T target);
     }
 
     private class ProxiedEvent<E> : IObservable<E>, IEventProxySubscription {
@@ -68,8 +68,8 @@ public class EventProxy<T> {
             return ev.Subscribe(observer);
         }
 
-        public void SubscribeTo(T obj) {
-            _ = evGetter(obj).Subscribe(ev.OnNext);
+        public void GenerateSubscriptions(T target) {
+            _ = evGetter(target).Subscribe(ev.OnNext);
         }
     }
     private class IndirectEventSubscription<E> : IEventProxySubscription, IDisposable {
@@ -81,8 +81,8 @@ public class EventProxy<T> {
             this.listener = listener;
         }
 
-        public void SubscribeTo(T obj) {
-            tokens.Add(getter(obj).Subscribe(listener));
+        public void GenerateSubscriptions(T target) {
+            tokens.Add(getter(target).Subscribe(listener));
         }
 
         public void Dispose() {
