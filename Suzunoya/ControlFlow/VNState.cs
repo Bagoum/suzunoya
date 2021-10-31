@@ -142,7 +142,7 @@ public interface IVNState {
     /// </summary>
     AccEvent<DialogueOp> DialogueLog { get; }
     Event<IEntity> EntityCreated { get; }
-    ReplayEvent<RenderGroup> RenderGroupCreated { get; }
+    IObservable<RenderGroup> RenderGroupCreated { get; }
     /// <summary>
     /// Called immediately before an interrogator is started (but not if it is skipped).
     /// </summary>
@@ -261,7 +261,10 @@ public class VNState : IVNState, IConfirmationReceiver {
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
     
     public Event<IEntity> EntityCreated { get; } = new();
-    public ReplayEvent<RenderGroup> RenderGroupCreated { get; } = new(1);
+    
+    //Use a replay event because the first render group will usually be created before any listeners are attached
+    private ReplayEvent<RenderGroup> _RenderGroupCreated { get; } = new(1);
+    public IObservable<RenderGroup> RenderGroupCreated => _RenderGroupCreated;
     public IInterrogatorSubject InterrogatorCreated { get; } = new InterrogatorEvent();
     public Evented<IConfirmationReceiver?> AwaitingConfirm { get; } = new(null);
     public Evented<bool> InputAllowed { get; } = new(true);
@@ -458,7 +461,7 @@ public class VNState : IVNState, IConfirmationReceiver {
         if (RenderGroups.Any(x => x.Priority == rg.Priority.Value))
             throw new Exception("Cannot have multiple render groups with the same priority");
         var dsp = RenderGroups.Add(rg);
-        RenderGroupCreated.OnNext(rg);
+        _RenderGroupCreated.OnNext(rg);
         return dsp;
     }
         

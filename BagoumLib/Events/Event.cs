@@ -66,7 +66,6 @@ public class Event<T, U> : IBSubject<T, U> {
     /// </summary>
     public virtual IDisposable Subscribe(IObserver<U> observer) => callbacks.Add(observer);
 
-    
     /// <summary>
     /// Same as OnNext.
     /// </summary>

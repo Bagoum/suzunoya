@@ -5,10 +5,10 @@ using JetBrains.Annotations;
 namespace BagoumLib.Tasks {
 [PublicAPI]
 public static class Utilities {
-    private static Action<Task> WrapRethrow(Action cb) => t => {
+    private static Action<Task> WrapRethrow(Action? cb) => t => {
         Exception? exc = t.Exception;
         try {
-            cb();
+            cb?.Invoke();
         } catch (Exception e) {
             exc = new Exception(e.Message, exc);
         }
@@ -20,7 +20,7 @@ public static class Utilities {
         }
     };
 
-    public static Task ContinueWithSync(this Task t, Action done) =>
+    public static Task ContinueWithSync(this Task t, Action? done) =>
         t.ContinueWith(WrapRethrow(done), TaskContinuationOptions.ExecuteSynchronously);
 
     /// <summary>

@@ -27,6 +27,10 @@ public class EventProxy<T> {
         });
     }
 
+    /// <summary>
+    /// Subscribe to an observable defined by evGetter on the value of the sourcer.
+    /// When the sourcer changes, this observable will also report values from the new value of the sourcer.
+    /// </summary>
     public IDisposable Subscribe<E>(Func<T, IObservable<E>> evGetter, Action<E> listener) {
         var subscription = new IndirectEventSubscription<E>(evGetter, listener);
         if (lastRead.Try(out var obj))
@@ -36,6 +40,11 @@ public class EventProxy<T> {
         return new JointDisposable(null, subscription, resubscribers.Add(subscription));
     }
 
+    /// <summary>
+    /// Create an observable that reports the value of an observable defined by evGetter
+    ///  on the value of the sourcer. When the sourcer changes, this observable will
+    ///  also report values from the new value of the sourcer.
+    /// </summary>
     public IObservable<E> ProxyEvent<E>(Func<T, IObservable<E>> evGetter) {
         var partialEv = new ProxiedEvent<E>(evGetter);
         if (lastRead.Try(out var obj))

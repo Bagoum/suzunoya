@@ -7,11 +7,12 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.Events {
 /// <summary>
-/// A ComputedEvented is a representation of a function that depends on multiple input values.
-/// When any of those input values are updated, the value of this will be updated with an event.
+/// An event wrapper around a zero-argument function whose value may change unpredictably.
+/// <br/>This wrapper will only publish return values of the wrapped function when
+///  one of the provided triggers is updated.
 /// </summary>
 [PublicAPI]
-public class ComputedEvented<T> : IBSubject<T> {
+public class LazyEvented<T> : IBSubject<T> {
     private T _value;
     private readonly Func<T> getter;
     
@@ -27,7 +28,9 @@ public class ComputedEvented<T> : IBSubject<T> {
     /// <summary>
     /// The initial value is published to onSet.
     /// </summary>
-    public ComputedEvented(Func<T> val, params IObservable<Unit>[] triggers) {
+    /// <param name="val">Function to lazily evaluate to obtain a value</param>
+    /// <param name="triggers">Observables to use as triggers for function reealuation</param>
+    public LazyEvented(Func<T> val, params IObservable<Unit>[] triggers) {
         _value = (this.getter = val)();
         onSet = new Event<T>();
         foreach (var t in triggers)
@@ -35,13 +38,16 @@ public class ComputedEvented<T> : IBSubject<T> {
         Recompute();
     }
 
-    public static implicit operator T(ComputedEvented<T> evo) => evo._value;
+    public static implicit operator T(LazyEvented<T> evo) => evo._value;
 
     public IDisposable Subscribe(IObserver<T> observer) {
         observer.OnNext(_value);
         return (onSet ?? throw new Exception("Computed event not initialized")).Subscribe(observer);
     }
 
+    /// <summary>
+    /// Explicitly recompute the value of the function.
+    /// </summary>
     public void Recompute() {
         var nv = getter();
         if (!Equals(nv, _value))

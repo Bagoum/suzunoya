@@ -90,12 +90,21 @@ public static class Bezier {
         return guessT;
     }
 
-    public static Easer CBezier(double x1, double y1, double x2, double y2) {
+    /// <summary>
+    /// Create a bezier easing function given two time-progression pairs.
+    /// <br/>Works like cubic-bezier in CSS.
+    /// </summary>
+    /// <param name="t1">Time of first control point</param>
+    /// <param name="p1">Progression of first control point</param>
+    /// <param name="t2">Time of second control point</param>
+    /// <param name="p2">Progression of second control point</param>
+    /// <returns></returns>
+    public static Easer CBezier(double t1, double p1, double t2, double p2) {
         var samples = new double[kSplineTableSize];
         for (int ii = 0; ii < kSplineTableSize; ++ii) {
-            samples[ii] = CalcBezier(ii * kSampleStepSize, x1, x2);
+            samples[ii] = CalcBezier(ii * kSampleStepSize, t1, t2);
         }
-        return x => (float)CalcBezier(GetTForX(x, samples, x1, x2), y1, y2);
+        return x => (float)CalcBezier(GetTForX(x, samples, t1, t2), p1, p2);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

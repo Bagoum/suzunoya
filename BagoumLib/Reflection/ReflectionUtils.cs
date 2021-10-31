@@ -59,12 +59,22 @@ public static class ReflectionUtils {
     }
 
 
-    public static T CreateInstance<T>(params object[] args) => (T) Activator.CreateInstance(typeof(T), args);
+    public static T CreateInstance<T>(params object[] args) => ((T) Activator.CreateInstance(typeof(T), args))!;
     
+    public static MethodInfo MethodInfo(this Type t, string method, bool instance=true) =>
+        t.GetMethod(method, (instance ? BindingFlags.Instance : BindingFlags.Static) 
+                            | BindingFlags.NonPublic | BindingFlags.Public) ??
+        throw new Exception($"Method {t.Name}.{method} not found");
     
-    public static PropertyInfo _PropertyInfo(this object obj, string prop) =>
-        obj.GetType().GetProperty(prop, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public) ??
-        throw new Exception($"{prop} not found");
+    public static PropertyInfo PropertyInfo(this Type t, string prop, bool instance=true) =>
+        t.GetProperty(prop, (instance ? BindingFlags.Instance : BindingFlags.Static) 
+                            | BindingFlags.NonPublic | BindingFlags.Public) ??
+        throw new Exception($"Property {t.Name}.{prop} not found");
+    
+    public static FieldInfo FieldInfo(this Type t, string prop, bool instance=true) =>
+        t.GetField(prop, (instance ? BindingFlags.Instance : BindingFlags.Static) 
+                            | BindingFlags.NonPublic | BindingFlags.Public) ??
+        throw new Exception($"Field {t.Name}.{prop} not found");
     
     public static T _Property<T>(this object obj, string prop) => (T) (obj.GetType()
         .GetProperty(prop, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(obj)

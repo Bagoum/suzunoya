@@ -13,7 +13,7 @@ public static partial class Combinators {
                 $"Expected state variable of type {typeof(S)}, but received {inp.Stative.State.GetType()}"), inp.Index);
 
     /// <summary>
-    /// FParsec updateUserState
+    /// FParsec setUserState
     /// </summary>
     public static Parser<S> SetState<S>(S state) =>
         inp => {

@@ -18,7 +18,7 @@ public static class EventRecordHelpers {
     private static HashSet<string> ignoreKeys = new() {"onupdate", "logs"};
     public static void Record(this EventRecord er, object obj) {
         foreach (var prop in obj.GetType().GetProperties().OrderBy(p => p.Name)) {
-            foreach (var intf in prop.PropertyType.GetInterfaces()) {
+            foreach (var intf in prop.PropertyType.GetInterfaces().Append(prop.PropertyType)) {
                 if (intf.IsConstructedGenericType && intf.GetGenericTypeDefinition() == tobs) {
                     if (ignoreKeys.Contains(prop.Name.ToLower())) continue;
                     var genType = intf.GenericTypeArguments[0];

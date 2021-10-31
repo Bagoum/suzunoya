@@ -34,7 +34,7 @@ public class CircularList<T> : IEnumerable<T> {
         for (int ii = 0; ii < arr.Length; ++ii) arr[ii] = default!;
     }
     
-    public ref T this[int index] => ref arr[BMath.Mod(arr.Length, pointer + index)];
+    public ref T this[int index] => ref arr[BMath.Mod(arr.Length, pointer - Count + index)];
 
     public IEnumerator<T> GetEnumerator() {
         for (int ii = 0; ii < Count; ++ii) {

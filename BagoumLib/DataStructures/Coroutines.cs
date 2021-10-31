@@ -54,7 +54,7 @@ public class Coroutines : ICoroutineRunner {
         }
     }
 
-    private readonly Node<RCoroutine>.LinkedList coroutines = new Node<RCoroutine>.LinkedList();
+    private readonly Node<RCoroutine>.LinkedList coroutines = new();
 
     public IEnumerator AsIEnum() {
         while (coroutines.Count > 0) {
@@ -147,7 +147,7 @@ public class Coroutines : ICoroutineRunner {
             case (CoroutineType.StepPrepend, null):
                 throw new Exception("Cannot prepend when not iterating coroutines");
             case (CoroutineType.StepPrepend or CoroutineType.StepTryPrepend or CoroutineType.TryStepPrepend, not null):
-                StepInPlace(coroutines.AddBefore(itrNode, new RCoroutine(ienum, null, itrNode.obj.droppable || opts.droppable)));
+                StepInPlace(coroutines.AddBefore(itrNode!, new RCoroutine(ienum, null, itrNode!.obj.droppable || opts.droppable)));
                 break;
             case (CoroutineType.StepTryPrepend, null):
                 StepInPlace(coroutines.Add(new RCoroutine(ienum, null, opts.droppable)));

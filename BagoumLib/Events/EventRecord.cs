@@ -15,7 +15,7 @@ public class EventRecord {
         
 
         public LogEvent(object controller, string prop, object value) : 
-            this(controller, prop, controller._PropertyInfo(prop).PropertyType.GenericTypeArguments[0], value) { }
+            this(controller, prop, controller.GetType().PropertyInfo(prop).PropertyType.GenericTypeArguments[0], value) { }
     }
     
     private readonly List<IDisposable> tokens = new();

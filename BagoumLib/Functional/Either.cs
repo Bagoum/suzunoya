@@ -11,6 +11,11 @@ public readonly struct Either<L, R> {
     public L Left { get; }
     public R Right { get; }
 
+    public Either(bool isLeft, L left, R right) {
+        IsLeft = isLeft;
+        Left = left;
+        Right = right;
+    }
     public Either(L left) {
         IsLeft = true;
         Left = left;

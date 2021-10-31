@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using BagoumLib;
 using BagoumLib.DataStructures;
+using BagoumLib.Events;
 using NUnit.Framework;
 
 namespace Tests.BagoumLib {
@@ -23,6 +26,8 @@ public class DataStructures {
         Assert.AreEqual(cl.SafeIndexFromBack(1), 11);
         Assert.AreEqual(cl.SafeIndexFromBack(2), 10);
         Assert.AreEqual(cl.SafeIndexFromBack(15), 10);
+        Assert.AreEqual(cl[0], 10);
+        Assert.AreEqual(cl[1], 11);
         cl.Add(12);
         cl.Add(13);
         cl.Add(14);
@@ -31,6 +36,11 @@ public class DataStructures {
         Assert.AreEqual(cl.SafeIndexFromBack(3), 13);
         Assert.AreEqual(cl.SafeIndexFromBack(4), 12);
         Assert.AreEqual(cl.SafeIndexFromBack(5), 12);
+        //the first element gets pushed forwards
+        Assert.AreEqual(cl[0], 12);
+        Assert.AreEqual(cl[1], 13);
+        Assert.AreEqual(cl[2], 14);
+        Assert.AreEqual(cl[3], 15);
     }
 
     [Test]
@@ -143,7 +153,9 @@ public class DataStructures {
         dmi[1].MarkForDeletion();
         dmi[2].MarkForDeletion();
         dmi[4].MarkForDeletion();
+        Assert.AreEqual(((IEnumerable<I>)ca).Select(x => x.x).ToList(), new List<int>(){3,5,6,7});
         ca.Compact();
+        Assert.AreEqual(((IEnumerable<I>)ca).Select(x => x.x).ToList(), new List<int>(){3,5,6,7});
         Assert.AreEqual(ca.Count, 4);
         Assert.AreEqual(ca[0].x, 3);
         Assert.AreEqual(ca[1].x, 5);
@@ -156,6 +168,7 @@ public class DataStructures {
         dmi[11].MarkForDeletion();
         dmi[8].MarkForDeletion();
         dmi[3].MarkForDeletion(); //ca[0]
+        Assert.AreEqual(((IEnumerable<I>)ca).Select(x => x.x).ToList(), new List<int>(){5,6,7,30,40});
         ca.Compact();
         Assert.AreEqual(ca[1].x, 6);
         Assert.AreEqual(ca[3].x, 30);
@@ -225,5 +238,6 @@ public class DataStructures {
         ca.Empty();
         Assert.AreEqual(ca.Count, 0);
     }
+    
 }
 }

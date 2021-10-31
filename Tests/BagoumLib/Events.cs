@@ -103,6 +103,23 @@ public class Events {
         ListEq(ladd, new float[]{43, 23});
         ListEq(lmul, new float[]{6000, -600, 300});
     }
+    
+    [Test]
+    public void TestDisturbed2() {
+        var od = new DisturbedFold<int>(4, Math.Max);
+        var vals = new List<int>();
+        od.Subscribe(vals.Add);
+        Assert.AreEqual(od.Value, 4);
+        var dc1 = od.AddConst(8);
+        var dc2 = od.AddConst(6);
+        Assert.AreEqual(od.Value, 8);
+        dc1.Dispose();
+        var dc3 = od.AddConst(7);
+        dc2.Dispose();
+        dc3.Dispose();
+        Assert.AreEqual(vals, new List<int>(){4,8,6,7,4});
+
+    }
 
     [Test]
     public void TestPushLerpF() {

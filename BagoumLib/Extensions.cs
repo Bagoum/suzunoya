@@ -138,6 +138,9 @@ public interface IUnrollable<T> {
 public static class IEnumExtensions {
     public static IEnumerable<(int idx, T val)> Enumerate<T>(this IEnumerable<T> arr) => arr.Select((x, i) => (i, x));
 
+    public static IDisposable SelectDisposable<T>(this IEnumerable<T> arr, Func<T, IDisposable> disposer) =>
+        ListDisposable.From(arr, disposer);
+
     public static void ForEach<T>(this IEnumerable<T> arr, Action<T> act) {
         foreach (var ele in arr) {
             act(ele);
@@ -153,7 +156,8 @@ public static class IEnumExtensions {
     public static IEnumerable<T> Unroll<T>(this IEnumerable<T> arr) {
         foreach (var p in arr) {
             if (p is IUnrollable<T> ur) {
-                foreach (var res in ur.Values.Unroll()) yield return res;
+                foreach (var res in ur.Values.Unroll()) 
+                    yield return res;
             } else {
                 yield return p;
             }
@@ -209,7 +213,8 @@ public static class IEnumExtensions {
         }
     }
 
-    public static IEnumerable<(K key, V value)> Items<K, V>(this Dictionary<K, V> dict) => dict.Keys.Select(k => (k, dict[k]));
+    public static IEnumerable<(K key, V value)> Items<K, V>(this Dictionary<K, V> dict) where K : notnull
+        => dict.Keys.Select(k => (k, dict[k]));
 
     public static IEnumerable<(K key, V[] values)> GroupToArray<K, V>(this IEnumerable<IGrouping<K, V>> grp) =>
         grp.Select(g => (g.Key, g.ToArray()));
@@ -274,7 +279,7 @@ public static class IEnumExtensions {
         }
     }
 
-    public static Dictionary<K, V> ToDict<K, V>(this IEnumerable<(K, V)> arr) {
+    public static Dictionary<K, V> ToDict<K, V>(this IEnumerable<(K, V)> arr) where K : notnull {
         var dict = new Dictionary<K, V>();
         foreach (var (k, v) in arr) dict[k] = v;
         return dict;

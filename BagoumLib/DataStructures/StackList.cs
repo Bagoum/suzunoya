@@ -4,9 +4,6 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
 
-public interface IStackList<T> : IReadOnlyList<T> {
-    
-}
 
 [PublicAPI]
 public class StackList<T> : IEnumerable<T> {

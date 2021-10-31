@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using BagoumLib.Functional;
-using LanguageExt;
-using LanguageExt.Parsec;
-using static LanguageExt.Prelude;
-using static LanguageExt.Parsec.Prim;
-using static LanguageExt.Parsec.Char;
+using Mizuhashi;
+using static Mizuhashi.Combinators;
 
 namespace Suzunoya.Dialogue {
 public abstract record TextUnit {
@@ -24,15 +21,15 @@ public static partial class SpeechParser {
     private static bool NotTagOrEscapeChar(char c) => !TagChar(c) && c != ESCAPER;
 
     private static readonly Parser<TextUnit> escapedFragment =
-        Sequential(ch(ESCAPER), satisfy(TagChar), (_, c) => 
+        Sequential(Char(ESCAPER), Satisfy(TagChar), (_, c) => 
             (TextUnit)new TextUnit.String(c.ToString()));
 
     private static readonly Parser<TextUnit> normalFragment =
-        from s in many1String(satisfy(NotTagOrEscapeChar))
+        from s in Many1Satisfy(NotTagOrEscapeChar)
         select (TextUnit) new TextUnit.String(s);
 
     private static readonly Parser<TextUnit> tagFragment =
-        BetweenChars(TAG_OPEN, TAG_CLOSE, many1String(satisfy(NotTagChar))).Map(s => {
+        Between(TAG_OPEN, Many1Satisfy(NotTagChar), TAG_CLOSE).FMap(s => {
             var contInd = -1;
             if (s[0] == TAG_CLOSE_PREFIX)
                 return (TextUnit)new TextUnit.CloseTag(s.Substring(1));
@@ -43,17 +40,17 @@ public static partial class SpeechParser {
         });
         
 
-    private static readonly Parser<List<TextUnit>> speechParser = many1(choice(
+    private static readonly Parser<List<TextUnit>> speechParser = Choice(
         tagFragment,
         normalFragment,
         escapedFragment
-    ));
+    ).Many1();
 
     public static Errorable<List<TextUnit>> Parse(string raw) {
-        var res = parse(speechParser, raw);
-        return res.IsFaulted ?
-            Errorable<List<TextUnit>>.Fail(res.Reply.Error.ToString()) :
-            Errorable<List<TextUnit>>.OK(res.Reply.Result);
+        var res = speechParser(new InputStream("Dialogue text", raw, null!));
+        return res.Result.Try(out var v) ?
+            Errorable<List<TextUnit>>.OK(v) :
+            Errorable<List<TextUnit>>.Fail(res.Error?.Show(raw) ?? "Parsing failed, but no error string is present.");
     }
 }
 }

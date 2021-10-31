@@ -47,7 +47,7 @@ public class RenderGroup : Transform, ITinted {
 
     public Evented<float> Zoom { get; } = new(1);
     public Evented<Vector3> ZoomTarget { get; } = new(Vector3.Zero);
-    public ComputedEvented<Vector3> ZoomTransformOffset { get; }
+    public LazyEvented<Vector3> ZoomTransformOffset { get; }
     
     public DMCompactingArray<IRendered> Contents { get; } = new();
     public Event<IRendered> RendererAdded { get; } = new();

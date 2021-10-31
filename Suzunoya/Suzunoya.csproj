@@ -8,15 +8,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\BagoumLib\BagoumLib.csproj" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Reference Include="LanguageExt.CoreReduced, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\libs\LanguageExt.CoreReduced.dll</HintPath>
-      </Reference>
-      <Reference Include="LanguageExt.Parsec, Version=3.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\libs\LanguageExt.Parsec.dll</HintPath>
-      </Reference>
+      <ProjectReference Include="..\Mizuhashi\Mizuhashi.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -7,6 +7,11 @@ using NUnit.Framework;
 
 namespace Tests {
 public static class AssertHelpers {
+    public static void StringsApproxEqual(string expected, string observed) {
+        expected = expected.Trim().Replace("\r", "");
+        observed = observed.Trim().Replace("\r", "");
+        Assert.AreEqual(expected, observed);
+    }
     public static void ListEq<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) {
         string extraFail = (left.Count == right.Count) ? "" : $"Lengths are mismatched: {left.Count}, {right.Count}. ";
         for (int ii = 0; ii < left.Count && ii < right.Count; ++ii) {

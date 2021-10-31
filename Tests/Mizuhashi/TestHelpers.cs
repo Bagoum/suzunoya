@@ -7,31 +7,34 @@ using NUnit.Framework;
 
 namespace Tests.Mizuhashi {
 public static class TestHelpers {
-    public static void AssertSuccess<R, S>(this Parser<R, S> p, string s, R expect) {
+    public static void AssertSuccess<R>(this Parser<R> p, string s, R expect) {
         var res = p.Run(s);
         if (res.Status != ResultStatus.OK)
-            Assert.Fail(res.Errors?.Show(s));
+            Assert.Fail(res.Error?.Show(s));
         Assert.AreEqual(expect, res.Result.Value);
     }
 
-    public static void AssertFail<R, S>(this Parser<R, S> p, string s, ParserError e, Position? pos=null) {
+    public static void AssertFail<R>(this Parser<R> p, string s, ParserError e, int? pos=null) {
         if (pos.Try(out var position)) {
             var exp = new LocatedParserError(position, e);
-            var merrs = p.Run(s).Errors;
+            var merrs = p.Run(s).Error;
             if (!merrs.Try(out var errs))
                 Assert.Fail("Did not receive an error from execution.");
-            errs = new LocatedParserError(errs.Location, errs.Error.Flatten());
+            errs = new LocatedParserError(errs.Index, errs.Error.Flatten());
             if (!Equals(exp, errs))
                 Assert.Fail($"Expecting\n{exp.Show(s)}\n~~~\n but instead received\n~~~\n{errs.Show(s)}");
             else
                 Console.WriteLine($"\nSuccessfully tested error case:\n{exp.Show(s)}");
-                
+        } else {
+            var resultErr = p.Run(s).Error;
+            if (!Equals(e, resultErr?.Error)) {
+                Assert.Fail($"Expecting\n{e.Show(s)}\n~~~\n but instead received\n~~~\n{resultErr?.Error.Show(s)}");
+            } else
+                Console.WriteLine($"\nSuccessfully tested error case:\n{resultErr?.Show(s)}");
         }
-        else
-            Assert.AreEqual(e, p.Run(s).Errors?.Error);
     }
-    public static void AssertFail<R, S>(this Parser<R, S> p, string s, string exp) {
-        var res = p.Run(s).Errors?.Show(s);
+    public static void AssertFail<R>(this Parser<R> p, string s, string exp) {
+        var res = p.Run(s).Error?.Show(s);
         if (res == null)
             Assert.Fail("Did not receive an error from execution.");
         if (res != exp) {
@@ -46,9 +49,7 @@ public static class TestHelpers {
             Console.WriteLine($"\nSuccessfully tested error case:\n{exp}");
     }
 
-    public static ParseResult<R, Unit> Run<R>(this Parser<R, Unit> p, string s) => 
-        p(new("test parser", s, Unit.Default));
-    public static ParseResult<R, S> Run<R, S>(this Parser<R, S> p, string s) => 
+    public static ParseResult<R> Run<R>(this Parser<R> p, string s) => 
         p(new("test parser", s, default!));
 }
 }
