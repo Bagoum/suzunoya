@@ -164,5 +164,13 @@ if (x > default(int)) {
     x = y;
 }");
     }
+
+    [Test]
+    public void ObjectPrinterEdgeCases() {
+        var p = new CSharpObjectPrinter();
+        Assert.AreEqual(p.Print('"'), "'\\\"'");
+        Assert.AreEqual(p.Print("hello\"world"), "\"hello\\\"world\"");
+        Assert.AreEqual(p.Print("hello\nworld"), "\"hello\\nworld\"");
+    }
 }
 }

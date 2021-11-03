@@ -12,6 +12,7 @@ public class ExpressionLinearizer {
     private static Expression ExC<T>(T obj) => Ex.Constant(obj, typeof(T));
     
     private static readonly ExpressionPrinter ExPrinter = new();
+    private static readonly ExpressionPrinter SafeExPrinter = new() { SafeLinearize = true };
     
         private static float Compile(Ex ex) => Expression.Lambda<Func<float>>(ex).Compile()();
     private static T Compile<T>(Ex ex) => Expression.Lambda<Func<T>>(ex).Compile()();
@@ -24,6 +25,8 @@ public class ExpressionLinearizer {
 
     private static void LinPrints(Expression ex, string expected) =>
         StringsApproxEqual(expected.Replace("\r\n", "\n"), ExPrinter.LinearizePrint(ex));
+    private static void SafeLinPrints(Expression ex, string expected) =>
+        StringsApproxEqual(expected.Replace("\r\n", "\n"), SafeExPrinter.LinearizePrint(ex));
 
     [Test]
     public void TestAssign() {
@@ -42,7 +45,7 @@ public class ExpressionLinearizer {
 float y = 5f;
 x = (y + x);");
 
-        AreEqual(11f, Compile1(ex.Linearize(), x)(6));
+        AreEqual(11f, Compile1(new LinearizeVisitor().Visit(ex), x)(6));
 
         var ex2 = Ex.Block(
             x.Is(Ex.Block(new[] {yi},
@@ -117,6 +120,60 @@ true ?
     }
 
     [Test]
+    public void TestSwitch() {
+        var x = Prm<int>("x");
+        var typedSwitch = x.Is(Ex.Switch(typeof(int), x, Ex.Constant(3), null, Ex.SwitchCase(Ex.Constant(4), Ex.Constant(5))));
+        var untypedSwitch = Ex.Switch(typeof(void), x, Ex.Constant(3), null, Ex.SwitchCase(Ex.Constant(4), Ex.Constant(5)));
+        LinPrints(typedSwitch, @"
+int flatSwitch0;
+switch (x) {
+    case (5):
+        flatSwitch0 = 4;
+        break;
+    default:
+        flatSwitch0 = 3;
+        break;
+}
+x = flatSwitch0;
+");
+        LinPrints(untypedSwitch, @"
+switch (x) {
+    case (5):
+        4;
+        break;
+    default:
+        3;
+        break;
+}
+");
+    }
+
+    [Test]
+    public void TestNested() {
+        var x = Prm<int>("x");
+        var y = Prm<int>("y");
+        var z = Prm<int>("z");
+        var a = Prm<int>("a");
+        LinPrints(Ex.Block(new[]{a, y}, 
+            y.Is(ExC(2)),
+            a.Is(ExC(1).Add(Ex.Block(new[]{z}, 
+                z.Is(ExC(4).Add(Ex.Block(new[]{x}, 
+                    x.Is(ExC(-1)),
+                    x.Is(x.Add(ExC(6))),
+                    y.Is(x.Add(ExC(2)))
+                    ))),
+                z.Add(ExC(3))
+                )))
+            ), @"
+int y = 2;
+int x = -1;
+x = (x + 6);
+int z = (4 + (y = (x + 2)));
+int a = (1 + (z + 3));
+");
+    }
+
+    [Test]
     public void TestTry() {
         var x = Prm<int>("x");
         var y = Prm<int>("y");
@@ -144,6 +201,72 @@ true ?
     }
     return x + flatTry0;
 })");
+        SafeLinPrints(Ex.Lambda<Func<int, int, int>>(x.Add(tryBlock), x, y), @"
+(Func<int, int, int>) ((int x, int y) => {
+    int flatTry0;
+    try {
+        throw new Exception();
+    } catch (InvalidOperationException ioExc) when (ioExc.Message == ""hello"") {
+        int z = y;
+        flatTry0 = y;
+    } catch (InvalidCastException castExc) {
+        flatTry0 = y;
+    } finally {
+        x = 5;
+    }
+    return x + flatTry0;
+})");
+    }
+
+    [Test]
+    public void TestSafeExec() {
+        var x = Prm<int>("x");
+        var ex = x.Is(Ex.Block(ExC(3), ExC(2).Add(ExC(5))).Add(Ex.Block(ExC(6), ExC(7).Sub(ExC(2)))));
+        LinPrints(ex, @"
+3;
+6;
+x = ((2 + 5) + (7 - 2));
+");
+        SafeLinPrints(ex, @"
+3;
+int blockTmp0 = (2 + 5);
+6;
+int blockTmp1 = (7 - 2);
+x = (blockTmp0 + blockTmp1);
+");
+        var tex = x.Is(Ex.Block(ExC(3), ExC(2).Add(ExC(5))).Add(Ex.Block(ExC(6), 
+            Ex.Throw(Ex.New(typeof(Exception)), typeof(int)))));
+        LinPrints(tex, @"
+3;
+int blockTmp0 = (2 + 5);
+6;
+int blockTmp1 = (throw new Exception());
+x = (blockTmp0 + blockTmp1);
+");
+    }
+
+    [Test]
+    public void TestAndOr() {
+        var x = Prm<bool>("x");
+        var y = Prm<bool>("y");
+        var exAnd = Ex.AndAlso(x, Ex.Block(ExC(5), y));
+        var exOr = Ex.OrElse(Ex.Block(ExC(7), x), y);
+        LinPrints(exAnd, @"
+bool flatTernary0;
+if (x) {
+    5;
+    flatTernary0 = y;
+} else {
+    flatTernary0 = false;
+}
+flatTernary0;
+");
+        LinPrints(exOr, @"
+7;
+x ?
+    true :
+    y;
+");
     }
 }
 }

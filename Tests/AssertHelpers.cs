@@ -10,6 +10,9 @@ public static class AssertHelpers {
     public static void StringsApproxEqual(string expected, string observed) {
         expected = expected.Trim().Replace("\r", "");
         observed = observed.Trim().Replace("\r", "");
+        if (expected != observed) {
+            Console.WriteLine($"Expected:\n~~~\n{expected}\n~~~\nbut observed:\n~~~\n{observed}");
+        }
         Assert.AreEqual(expected, observed);
     }
     public static void ListEq<T>(IReadOnlyList<T> left, IReadOnlyList<T> right) {

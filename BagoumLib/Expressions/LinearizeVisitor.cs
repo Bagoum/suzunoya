@@ -8,40 +8,71 @@ namespace BagoumLib.Expressions {
 /// <summary>
 /// Linearizes expressions.
 /// <br/>A linearized expression is one of:
-/// <br/>(1) an expression that can participate in basic C# operations (eg. can be the X in `return 2 + X;`),
-/// <br/>(2) a BlockExpression whose component statements are linearized, and whose last statement satisfies (1),
-/// <br/>(3) an expression with a return type of void (such as if/try/switch), whose children are linearized expressions.
+/// <br/>(1) an expression that can participate in basic C# value operations (eg. can be the X in `return 2 + X;`),
+/// <br/>(2) a BlockExpression whose statements satisfy (1) or (3) but are *not* BlockExpressions,
+///  and whose last statement only satisfies (1).
+/// <br/>(3) an expression with a return type of void (such as if/try/switch, or the elusive void BlockExpression),
+///  whose children are all linearized expressions.
 /// <br/>Linearized expressions can be converted to source code without too much difficulty. See <see cref="PrintVisitor"/>.
 /// </summary>
 public class LinearizeVisitor : ExpressionVisitor {
 
     private int counter = 0;
 
-    private Expression Linearize(Func<Expression[], Expression> combiner, params Expression?[] pieces) {
+    /// <summary>
+    /// If true, will assume that any expression can throw an exception,
+    ///  and as a result will always assign block results to temporary variables.
+    /// </summary>
+    public bool SafeExecution { get; set; } = false;
+
+    private static bool MightThrow(Expression? ex) => ex switch {
+        null => false,
+        ConstantExpression => false,
+        ParameterExpression => false,
+        DefaultExpression => false,
+        _ => true
+    };
+    private Expression Linearize(Func<Expression, Expression> combiner, Expression? piece) =>
+        Linearize(exprs => combiner(exprs[0]), new[] {piece}, false);
+    private Expression Linearize(Func<Expression[], Expression> combiner, Expression?[] pieces, bool allowTempAssign=true) {
         Expression?[] linearized = pieces.Select(Visit).ToArray();
         if (!linearized.Any(ex => ex is BlockExpression))
             return combiner(linearized!);
-        var prms = new List<ParameterExpression>();
-        var stmts = new List<Expression>();
-        var reduced_args = new Expression?[linearized.Length];
-        linearized.ForEachI((i, ex) => {
-            if (ex is BlockExpression bex) {
-                prms.AddRange(bex.Variables);
-                stmts.AddRange(bex.Expressions.Take(bex.Expressions.Count - 1));
-                reduced_args[i] = bex.Expressions[bex.Expressions.Count - 1];
-            } else {
-                reduced_args[i] = ex;
+        var parameters = new List<ParameterExpression>();
+        var statements = new List<Expression>();
+        var lastStatements = new Expression?[linearized.Length];
+        var consumes = new EnumerateVisitor();
+
+        var useTemp = allowTempAssign && (SafeExecution || linearized.Any(l => {
+            if (l == null) return false;
+            var checkForThrow = l is BlockExpression bex ? bex.Expressions[bex.Expressions.Count - 1] : l;
+            return consumes.Enumerate(checkForThrow).Any(e => e is UnaryExpression {NodeType: ExpressionType.Throw});
+        }));
+
+        for (int i = 0; i < linearized.Length; ++i) {
+            if (linearized[i] is BlockExpression bex) {
+                parameters.AddRange(bex.Variables);
+                statements.AddRange(bex.Expressions.Take(bex.Expressions.Count - 1));
+                lastStatements[i] = bex.Expressions[bex.Expressions.Count - 1];
+            } else
+                lastStatements[i] = linearized[i];
+            if (useTemp && linearized[i] != null && MightThrow(lastStatements[i])) {
+                var tmp = Expression.Parameter(linearized[i]!.Type, $"blockTmp{counter++}");
+                parameters.Add(tmp);
+                statements.Add(Ex.Assign(tmp, lastStatements[i]!));
+                lastStatements[i] = tmp;
             }
-        });
-        stmts.Add(combiner(reduced_args!));
-        return Ex.Block(prms, stmts);
+        }
+
+        statements.Add(combiner(lastStatements!));
+        return Ex.Block(parameters, statements);
     }
 
 
     /// <summary>
-    /// Invariant: expr is linearized.
-    /// <br/>Returns a linearized expression equivalent to expr that, as a side effect,
-    ///  assigns the value of expr to dst.
+    /// Invariant: expr is linearized under (1) or (2).
+    /// <br/>Returns a linearized expression under (1) or (2) equivalent to expr that,
+    ///  as a side effect, assigns the value of expr to dst.
     /// </summary>
     private Ex WithAssign(Ex expr, ParameterExpression dst) {
         if (expr is BlockExpression bex) {
@@ -58,8 +89,19 @@ public class LinearizeVisitor : ExpressionVisitor {
         }
     }
 
-    protected override Expression VisitBinary(BinaryExpression node) =>
-        Linearize(exs => Ex.MakeBinary(node.NodeType, exs[0], exs[1]), node.Left, node.Right);
+    protected override Expression VisitBinary(BinaryExpression node) {
+        return node.NodeType switch {
+            // A && B
+            // A ? B : false;
+            ExpressionType.AndAlso => Visit(Ex.Condition(node.Left, node.Right, Ex.Constant(false))),
+            // A || B
+            // A ? true : B;
+            ExpressionType.OrElse => Visit(Ex.Condition(node.Left, Ex.Constant(true), node.Right)),
+            _ => Linearize(exs => Ex.MakeBinary(node.NodeType, exs[0], exs[1]), new[] {node.Left, node.Right},
+                !node.NodeType.IsAssign())
+        };
+    }
+
     protected override Expression VisitBlock(BlockExpression node) {
         if (node.Expressions.Count == 1 && node.Variables.Count == 0)
             return Visit(node.Expressions[0]);
@@ -82,31 +124,29 @@ public class LinearizeVisitor : ExpressionVisitor {
         Expression? filter = null;
         if (node.Filter != null)
             filter = Visit(node.Filter);
-        if (filter is BlockExpression)
-            throw new Exception("Cannot have a block expression in catch filter");
+        if (filter?.IsBlockishExpression() is true)
+            throw new Exception("Cannot have a block-like expression in catch filter");
         return Ex.MakeCatchBlock(node.Test, node.Variable, Visit(node.Body), filter);
     }
 
     protected override Expression VisitConditional(ConditionalExpression node) {
         if (node.Type == typeof(void))
             //If/then statements only require fixing the condition, since if statements can take blocks as children
-            return Linearize(cond => Ex.Condition(cond[0], Visit(node.IfTrue), Visit(node.IfFalse), node.Type), node.Test);
+            return Linearize(cond => Ex.Condition(cond, Visit(node.IfTrue), Visit(node.IfFalse), node.Type), node.Test);
         
         var ifT = Visit(node.IfTrue);
         var ifF = Visit(node.IfFalse);
-        //Don't need to worry about loop/switch since the linearization invariant
-        // guarantees that those expressions can never be typed
         if (ifF is BlockExpression || ifT is BlockExpression) {
             //This handling is more complex than the standard handling since it'd be incorrect
             // to just evaluate both branches and return the correct one.
             //Instead, we declare a variable outside an if statement, and write to it in the branches.
             var prm = Ex.Parameter(node.Type, $"flatTernary{counter++}");
             return Ex.Block(new[] {prm},
-                Linearize(cond => Ex.Condition(cond[0], WithAssign(ifT, prm), WithAssign(ifF, prm), typeof(void)), node.Test),
+                Linearize(cond => Ex.Condition(cond, WithAssign(ifT, prm), WithAssign(ifF, prm), typeof(void)), node.Test),
                 prm
             );
         } else
-            return Linearize(cond => Ex.Condition(cond[0], ifT, ifF, node.Type), node.Test);
+            return Linearize(cond => Ex.Condition(cond, ifT, ifF, node.Type), node.Test);
     }
     
     //Constant, default, dynamic, elementInit, extension, goto: no changes
@@ -127,7 +167,7 @@ public class LinearizeVisitor : ExpressionVisitor {
     //loop: no changes. TODO: is it possible for loops to have values in C#?
 
     protected override Expression VisitMember(MemberExpression node) =>
-        Linearize(args => Ex.MakeMemberAccess(args[0], node.Member), node.Expression);
+        Linearize(expr => Ex.MakeMemberAccess(expr, node.Member), node.Expression);
 
     private (MemberBinding binding, BlockExpression? block) LinearizeMemberBinding(MemberBinding m) {
         if (m is MemberAssignment ma) {
@@ -151,12 +191,12 @@ public class LinearizeVisitor : ExpressionVisitor {
             stmts.AddRange(b.Expressions.Take(b.Expressions.Count - 1));
             newExprLast = b.Expressions[b.Expressions.Count - 1];
         }
-        bindings.ForEachI((i, ex) => {
-            if (ex.block != null) {
-                prms.AddRange(ex.block.Variables);
-                stmts.AddRange(ex.block.Expressions.Take(ex.block.Expressions.Count - 1));
+        foreach (var (_, block) in bindings)
+            if (block != null) {
+                prms.AddRange(block.Variables);
+                stmts.AddRange(block.Expressions.Take(block.Expressions.Count - 1));
             }
-        });
+        
         stmts.Add(Ex.MemberInit((newExprLast as NewExpression)!, bindings.Select(bd => bd.binding)));
         return Ex.Block(prms, stmts);
     }
@@ -179,12 +219,12 @@ public class LinearizeVisitor : ExpressionVisitor {
         //Largely the same structure as VisitConditional
         var cases = node.Cases.Select(VisitSwitchCase).ToArray();
         if (node.Type == typeof(void))
-            return Linearize(cond => Ex.Switch(node.Type, cond[0], 
+            return Linearize(cond => Ex.Switch(node.Type, cond, 
                 Visit(node.DefaultBody), node.Comparison, cases), node.SwitchValue);
         
         var prm = Ex.Parameter(node.Type, $"flatSwitch{counter++}");
         return Ex.Block(new[] {prm},
-            Linearize(cond => Ex.Switch(typeof(void), cond[0],
+            Linearize(cond => Ex.Switch(typeof(void), cond,
                 WithAssign(Visit(node.DefaultBody), prm), node.Comparison,
                 cases.Select(c => Ex.SwitchCase(WithAssign(c.Body, prm), c.TestValues))
             ), node.SwitchValue),
@@ -214,11 +254,11 @@ public class LinearizeVisitor : ExpressionVisitor {
 
     protected override Expression VisitTypeBinary(TypeBinaryExpression node) =>
         Linearize(ex => node.NodeType == ExpressionType.TypeEqual ? 
-            Ex.TypeEqual(ex[0], node.Type) :
-            Ex.TypeIs(ex[0], node.Type), node.Expression);
+            Ex.TypeEqual(ex, node.Type) :
+            Ex.TypeIs(ex, node.Type), node.Expression);
 
     protected override Expression VisitUnary(UnaryExpression node) =>
-        Linearize(exs => Ex.MakeUnary(node.NodeType, exs[0], node.Type), node.Operand);
+        Linearize(ex => Ex.MakeUnary(node.NodeType, ex, node.Type), node.Operand);
 
 }
 }

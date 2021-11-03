@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Linq.Expressions;
 
 namespace BagoumLib.Expressions {
 public interface IObjectPrinter {
@@ -17,6 +18,21 @@ public class CSharpObjectPrinter : IObjectPrinter {
 
     private static readonly HashSet<Type> CastTypes = new() {
         typeof(byte), typeof(sbyte), typeof(short), typeof(ushort)
+    };
+
+    private static string PrintChar(char c) => c switch {
+        '\0' => "\\0",
+        '\a' => "\\a",
+        '\b' => "\\b",
+        '\f' => "\\f",
+        '\n' => "\\n",
+        '\r' => "\\r",
+        '\t' => "\\t",
+        '\v' => "\\v",
+        '\\' => "\\\\",
+        '"' => "\\\"",
+        '\'' => "\\\'",
+        _ => $"{c}",
     };
     public string Print(object? o) {
         if (o == null)
@@ -38,8 +54,8 @@ public class CSharpObjectPrinter : IObjectPrinter {
             long l => $"{l}L",
             ulong ul => $"{ul}uL",
             decimal dec => $"{dec}m",
-            char c => $"'{c}'",
-            string s => $"\"{s.Replace("\"", "\\\"")}\"",
+            char c => $"'{PrintChar(c)}'",
+            string s => $"\"{string.Join("", s.Select(PrintChar))}\"",
             Exception e => $"new {TypePrinter.Print(e.GetType())}({Print(e.Message)})",
             Type t => $"typeof({TypePrinter.Print(t)})",
             { } obj => throw new Exception($"Couldn't print object {obj} of type {typ}")

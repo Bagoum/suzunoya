@@ -3,14 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using JetBrains.Annotations;
 using static BagoumLib.Expressions.VisitorHelpers;
 
 namespace BagoumLib.Expressions {
+[PublicAPI]
 public class ExpressionPrinter {
     public int InitialIndent { get; set; } = 0;
     public int TabToSpace { get; set; } = 4;
     public ITypePrinter TypePrinter { get; set; } = new CSharpTypePrinter();
     public IObjectPrinter ObjectPrinter { get; set; } = new CSharpObjectPrinter();
+    public bool SafeLinearize { get; set; } = false;
     
     /// <summary>
     /// Linearizes an expression and then converts it into C# source code.
@@ -20,7 +23,9 @@ public class ExpressionPrinter {
     /// <summary>
     /// Linearizes an expression using LinearizeVisitor.
     /// </summary>
-    public Expression Linearize(Expression e) => new LinearizeVisitor().Visit(e);
+    public Expression Linearize(Expression e) => new LinearizeVisitor() {
+        SafeExecution = SafeLinearize
+    }.Visit(e);
 
     
     /// <summary>

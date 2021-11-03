@@ -43,6 +43,11 @@ public class PushLerper<T> : IBObservable<T> {
         set = true;
     }
 
+    public void PushIfNotSame(T targetValue, float initTime = 0) {
+        if (!set || !Equals(nextValue, targetValue))
+            Push(targetValue, initTime);
+    }
+
     public void Update(float dT) {
         if (elapsed < lerpTime) {
             elapsed += dT;

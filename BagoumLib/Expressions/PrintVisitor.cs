@@ -66,23 +66,6 @@ public class DerivativePrintVisitor : PrintVisitorAbs {
     }
 }
 
-internal class ConsumesVisitor : ExpressionVisitor {
-    private ParameterExpression prm;
-    private bool visited = false;
-
-    public bool ConsumesParameter(ParameterExpression parameter, Expression e) {
-        prm = parameter;
-        visited = false;
-        Visit(e);
-        return visited;
-    }
-    protected override Expression VisitParameter(ParameterExpression node) {
-        if (node == prm)
-            visited = true;
-        return base.VisitParameter(node);
-    }
-}
-
 /// <summary>
 /// Converts an expression into an array of <see cref="PrintToken"/>s that can be trivially printed.
 /// <br/>If the expression is linearized, then the output of this will construct valid C# source code,
@@ -107,7 +90,7 @@ public class PrintVisitor : PrintVisitorAbs {
 
     public override Expression Visit(Expression node) {
         if (node == null) return null;
-        if (IsChecked(node.NodeType)) {
+        if (node.NodeType.IsChecked()) {
             Add("checked(");
             base.Visit(node);
             Add(")");
@@ -131,7 +114,7 @@ public class PrintVisitor : PrintVisitorAbs {
 
     protected override Expression VisitBlock(BlockExpression node) {
         var TypeAssigns = new Dictionary<Expression, ParameterExpression>();
-        var consumes = new ConsumesVisitor();
+        var consumes = new EnumerateVisitor();
         foreach (var prm in node.Variables) {
             //If there are no right-hand assignments of PRM preceding the first left-hand assignment,
             // then we can join its declaration with its first left-hand assignment.
@@ -139,12 +122,12 @@ public class PrintVisitor : PrintVisitorAbs {
             //     int x; int y; x = 5; y = (x = 0); //Can join both X and Y -> int x = 5; int y = (x = 0);
             foreach (var expr in node.Expressions) {
                 if (expr is BinaryExpression {NodeType: ExpressionType.Assign} be && be.Left == prm) {
-                    if (consumes.ConsumesParameter(prm, be.Right))
+                    if (consumes.Enumerate(be.Right).Any(e => e == prm))
                         break;
                     TypeAssigns[expr] = prm;
                     goto prmDone;
                 }
-                if (consumes.ConsumesParameter(prm, expr))
+                if (consumes.Enumerate(expr).Any(e => e == prm))
                     break;
             }
             VisitTypedParameter(prm);
@@ -185,7 +168,7 @@ public class PrintVisitor : PrintVisitorAbs {
             if (node.IfFalse is not DefaultExpression) {
                 Add(" else {", indent, newline);
                 Stmter.Visit(node.IfFalse);
-                Add(undoNewline, dedent, newline, "}", newline);
+                Add(undoNewline, dedent, newline, "}");
             }
         } else {
             //ternary handling
@@ -266,7 +249,7 @@ public class PrintVisitor : PrintVisitorAbs {
                 Add(pref, " ");
             VisitTypedParameter(node.Parameters[ii]);
         }
-        if (node.Body is not BlockExpression) {
+        if (!node.Body.IsBlockishExpression()) {
             Add(") => ");
             Visit(node.Body);
             Add(")");
@@ -402,10 +385,10 @@ public class PrintVisitor : PrintVisitorAbs {
         Add(") {", indent, newline);
         var visitor = node.Type == typeof(void) ? Stmter : (PrintVisitorAbs)Returner;
         foreach (var cas in node.Cases)
-            VisitSwitchCase(cas);
+            VisitSwitchCase(cas, visitor);
         Add("default:", indent, newline);
         visitor.Visit(node.DefaultBody);
-        Add("break;", dedent, newline);
+        Add("break;", dedent, dedent, newline, "}");
         return node;
     }
 

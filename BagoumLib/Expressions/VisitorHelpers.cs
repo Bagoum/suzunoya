@@ -9,8 +9,14 @@ using BagoumLib.Functional;
 namespace BagoumLib.Expressions {
 
 public static class VisitorHelpers {
-    
-    public static Expression Linearize(this Expression ex) => new LinearizeVisitor().Visit(ex);
+
+    public static bool IsBlockishExpression(this Expression e) => e switch {
+        BlockExpression => true,
+        ConditionalExpression cond => cond.Type == typeof(void),
+        TryExpression => true,
+        SwitchExpression => true,
+        _ => false
+    };
 
     public static string? ParameterByRefPrefix(ParameterInfo p) => p.ParameterType.IsByRef ?
         p.IsIn ? "in" :
@@ -49,8 +55,20 @@ public static class VisitorHelpers {
         ExpressionType.MultiplyChecked, ExpressionType.MultiplyAssignChecked, ExpressionType.NegateChecked,
         ExpressionType.SubtractChecked, ExpressionType.SubtractAssignChecked
     };
-    public static bool IsChecked(ExpressionType e) => CheckedTypes.Contains(e);
+    public static bool IsChecked(this ExpressionType e) => CheckedTypes.Contains(e);
     
+    private static readonly HashSet<ExpressionType> AssignTypes = new() {
+        ExpressionType.AddAssign, ExpressionType.AddAssignChecked, 
+        ExpressionType.MultiplyAssign, ExpressionType.MultiplyAssignChecked,
+        ExpressionType.SubtractAssign, ExpressionType.SubtractAssignChecked,
+        ExpressionType.DivideAssign,
+        ExpressionType.Assign,
+        ExpressionType.ExclusiveOrAssign, ExpressionType.ModuloAssign,
+        ExpressionType.AndAssign, ExpressionType.OrAssign, 
+        ExpressionType.LeftShiftAssign, ExpressionType.RightShiftAssign
+    };
+    public static bool IsAssign(this ExpressionType e) => AssignTypes.Contains(e);
+
 
     private static Either<string, string> Left(string s) => new(true, s, null!);
     private static Either<string, string> Right(string s) => new(false, null!, s);
@@ -100,8 +118,8 @@ public static class VisitorHelpers {
         ExpressionType.ArrayLength => Right(".Length"),
         ExpressionType.Decrement => Right(" - 1"),
         ExpressionType.Increment => Right(" + 1"),
-        ExpressionType.IsFalse => Left("!"), //TODO??
-        ExpressionType.IsTrue => Left(""), //TODO??
+        ExpressionType.IsFalse => Right(" is false"), //TODO??
+        ExpressionType.IsTrue => Right(" is true"), //TODO??
         ExpressionType.Negate => Left("-"),
         ExpressionType.NegateChecked => Left("-"),
         ExpressionType.Not => Left(operand == typeof(bool) ? "!" : "~"),
