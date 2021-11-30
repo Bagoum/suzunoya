@@ -1,15 +1,15 @@
-## Suzunoya License
+# Suzunoya License
 
 ## About
 
 Copyright (c) 2021 Bagoum <reneedebatz@gmail.com>
 
 Suzunoya is a visual novel engine built in C#, designed to be portable between game engines. 
-It is free (as in free speech) software. The source code is on Github: https://github.com/Bagoum/suzunoya
+It is free (as in free speech) software. The source code is on Github at [Bagoum/suzunoya](https://github.com/Bagoum/suzunoya).
 
 
 
-All source code in the BagoumLib, Mizuhashi, and Suzunoya projects is distributed under the MIT license.
+All source code in the BagoumLib, Mizuhashi, and Suzunoya subprojects is distributed under the MIT license.
 
 
 
@@ -21,10 +21,6 @@ With the exception of the testing subproject, this project consumes the followin
 The project incorporates code from the following projects:
 - [bezier-easing](https://github.com/gre/bezier-easing/)
 - [FParsec](http://www.quanttec.com/fparsec/about/)
-
-
-
-License details are provided below.
 
 ## Licenses
 
@@ -42,7 +38,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ### JetBrains.Annotations: Generic MIT license
 
- ```
+```
 MIT License _____
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of _____ (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -50,7 +46,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice (including the next paragraph) shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL _____ BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- ```
+```
 
 ### System.*: MIT
 

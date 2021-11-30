@@ -19,8 +19,6 @@ using Suzunoya.Entities;
 
 namespace Suzunoya {
 public static class Helpers {
-    //Default interface implementations when?
-
     public static T AssertActive<T>(this T vn) where T : IVNState {
         if (vn.VNStateActive.Value == false)
             throw new DestroyedObjectException("The VNState has been destroyed. " +

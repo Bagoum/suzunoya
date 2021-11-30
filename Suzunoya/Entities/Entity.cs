@@ -82,7 +82,7 @@ public abstract class Entity : IEntity {
 
     public virtual void Delete() {
         if (EntityActive.Value == false) return;
-        lifetimeToken.Cancel(CancelHelpers.HardCancelLevel);
+        lifetimeToken.Cancel(ICancellee.HardCancelLevel);
         foreach (var t in tokens)
             t.Dispose();
         tokens.Clear();

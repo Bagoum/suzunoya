@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Numerics;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
@@ -24,6 +25,8 @@ public static class AssertHelpers {
         }
         if (extraFail.Length > 0) Assert.Fail(extraFail);
     }
+
+    public static void IEnumEq<T>(IEnumerable<T> left, IEnumerable<T> right) => ListEq(left.ToList(), right.ToList());
     
     public static void ThrowsAny(Action code) {
         try {

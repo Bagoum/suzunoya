@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using BagoumLib.Reflection;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Functional {
@@ -43,12 +41,12 @@ public readonly struct Either<L, R> {
         new(Left) : 
         f(Right);
 
-    public Either<L2, R> ApplyL<L2>(Either<Func<L, L2>, R> f) => f.IsLeft ?
+    public Either<L2, R> ApplyL<L2>(in Either<Func<L, L2>, R> f) => f.IsLeft ?
         IsLeft ?
             new(f.Left(Left)) :
             new(Right) :
         new(f.Right);
-    public Either<L, R2> ApplyR<R2>(Either<L, Func<R, R2>> f) => f.IsLeft ?
+    public Either<L, R2> ApplyR<R2>(in Either<L, Func<R, R2>> f) => f.IsLeft ?
         new(f.Left) :
         IsLeft ?
             new(Left) :
@@ -61,11 +59,11 @@ public readonly struct Either<L, R> {
 
     public override int GetHashCode() => IsLeft ? (true, Left).GetHashCode() : (false, Right).GetHashCode();
     
-    public static bool operator ==(Either<L, R> a, Either<L, R> b) =>
+    public static bool operator ==(in Either<L, R> a, in Either<L, R> b) =>
         (a.IsLeft && b.IsLeft && Equals(a.Left, b.Left)) ||
         (!a.IsLeft && !b.IsLeft && Equals(a.Right, b.Right));
 
-    public static bool operator !=(Either<L, R> a, Either<L, R> b) => !(a == b);
+    public static bool operator !=(in Either<L, R> a, in Either<L, R> b) => !(a == b);
 
     public override string ToString() => IsLeft ? $"Left<{Left}>" : $"Right<{Right}>";
 

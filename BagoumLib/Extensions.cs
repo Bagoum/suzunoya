@@ -61,6 +61,20 @@ public static class Extensions {
     /// If x is null or empty, return y. Else return x.
     /// </summary>
     public static string Or(this string? x, string y) => string.IsNullOrEmpty(x) ? y : x!;
+
+    public static IDisposable SubscribeOnce<T>(this IObservable<T> ev, Action<T> listener) {
+        bool disposed = false;
+        IDisposable? token = null;
+        token = ev.Subscribe(x => {
+            disposed = true;
+            // ReSharper disable once AccessToModifiedClosure
+            token?.Dispose();
+            listener(x);
+        });
+        if (disposed)
+            token.Dispose();
+        return token;
+    }
 }
 
 [PublicAPI]
@@ -79,7 +93,7 @@ public static class ArrayExtensions {
         return ret;
     }
 
-    public static T ModIndex<T>(this T[] arr, int index) => arr[BMath.Mod(arr.Length, index)];
+    public static T ModIndex<T>(this IList<T> arr, int index) => arr[BMath.Mod(arr.Count, index)];
 
     public static T? Try<T>(this IList<T> arr, int index) where T : class {
         if (index >= 0 && index < arr.Count) return arr[index];
@@ -136,6 +150,17 @@ public interface IUnrollable<T> {
 
 [PublicAPI]
 public static class IEnumExtensions {
+    public static IEnumerable<(T, T)> PairSuccessive<T>(this IEnumerable<T> arr, T last) {
+        T prev = default!;
+        int ct = 0;
+        foreach (var x in arr) {
+            if (ct++ > 0)
+                yield return (prev, x);
+            prev = x;
+        }
+        if (ct > 0)
+            yield return (prev, last);
+    }
     public static IEnumerable<(int idx, T val)> Enumerate<T>(this IEnumerable<T> arr) => arr.Select((x, i) => (i, x));
 
     public static IDisposable SelectDisposable<T>(this IEnumerable<T> arr, Func<T, IDisposable> disposer) =>
@@ -191,12 +216,22 @@ public static class IEnumExtensions {
     public static IEnumerable<T> NotNull<T>(this IEnumerable<T?> arr) where T : class => arr.Where(x => x != null)!;
 
     public static int IndexOf<T>(this IEnumerable<T> arr, Func<T, bool> pred) {
-        foreach (var (i, x) in arr.Enumerate()) {
+        int i = 0;
+        foreach (var x in arr) {
             if (pred(x)) return i;
+            ++i;
         }
         return -1;
     }
 
+    public static int IndexOf<T>(this IEnumerable<T> arr, T obj) {
+        int i = 0;
+        foreach (var x in arr) {
+            if (Equals(obj, x)) return i;
+            ++i;
+        }
+        return -1;
+    }
     public static T? FirstOrNull<T>(this IEnumerable<T> arr) where T : struct {
         foreach (var x in arr) return x;
         return null;
@@ -310,6 +345,14 @@ public static class IEnumExtensions {
 
 [PublicAPI]
 public static class ListExtensions {
+    public static bool ContainsSame<T>(this IList<T> a, IList<T> b) {
+        if (a.Count != b.Count)
+            return false;
+        for (int ii = 0; ii < a.Count; ++ii)
+            if (!Equals(a[ii], b[ii]))
+                return false;
+        return true;
+    }
     public static void AssignOrExtend<T>(this List<T> from, ref List<T>? into) {
         if (into == null) into = from;
         else into.AddRange(from);

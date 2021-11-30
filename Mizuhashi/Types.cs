@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using BagoumLib;
 using BagoumLib.Functional;
 
@@ -93,6 +95,7 @@ public class InputStream {
     /// but that's more expensive.
     /// </summary>
     public InputStreamState Stative { get; private set; }
+    public List<LocatedParserError?> Rollbacks { get; } = new();
 
     public int Index => Stative.Position.Index;
     public int Remaining => Source.Length - Index;
@@ -100,6 +103,7 @@ public class InputStream {
     public char Next => Source[Index];
     public char? MaybeNext => Index < Source.Length ? Source[Index] : null;
     public string Substring(int len) => Source.Substring(Index, len);
+    public string Substring(int offset, int len) => Source.Substring(Index + offset, len);
     public char CharAt(int lookahead) => Source[Index + lookahead];
     public bool TryCharAt(int lookahead, out char chr) => Source.TryIndex(Index + lookahead, out chr);
     
@@ -114,11 +118,13 @@ public class InputStream {
         Stative = new (Stative.Position, newState);
     }
 
-    public void Rollback(InputStreamState ss) {
+    public void Rollback(InputStreamState ss, LocatedParserError? error) {
+        Rollbacks.Add(error);
         Stative = ss;
     }
 
     public int Step(int step = 1) {
+        if (step == 0) return Index;
         if (Index + step > Source.Length)
             throw new Exception($"Step was called on {Description} without enough content in the source." +
                                 "This means the caller provided an incorrect step value.");
@@ -136,6 +142,18 @@ public class InputStream {
     }
 
     public LocatedParserError? MakeError(ParserError? p) => p == null ? null : new(Index, p);
+
+    /// <summary>
+    /// Returns an error string containing all rollback information and the final error.
+    /// </summary>
+    public string ShowAllFailures(LocatedParserError final) {
+        var errs = new List<string> {final.Show(Source)};
+        errs.AddRange(Rollbacks
+            .FilterNone()
+            .Select(err => 
+                $"The parser backtracked after the following error:\n\t{err.Show(Source).Replace("\n", "\n\t")}"));
+        return string.Join("\n\n", errs);
+    }
 }
 
 /// <summary>
@@ -165,9 +183,10 @@ public readonly struct ParseResult<R> {
     /// Errors may be present even if the parsing was successful, specifically during no-consume successes.
     ///  Consider the example: \(A(,B)?\) which parses either (A) or (A,B). If we provide (AB) then the
     ///  error should print "expected ',' or ')'", the first part of which is provided by the optional parser.
-    /// Also, errors may *not* be present even if parsing fails. This is an uncommon case but it is possible.
+    /// <br/>Errors are always present if parsing fails.
     /// </summary>
     public LocatedParserError? Error { get; }
+    public LocatedParserError ErrorOrThrow => Error ?? throw new Exception("Missing error");
     public int Start { get; }
     public int End { get; }
 
@@ -190,7 +209,7 @@ public readonly struct ParseResult<R> {
         this(new LocatedParserError(start, errors), start, end) { }
     public ParseResult(LocatedParserError? err, int start, int? end = null) {
         Result = Maybe<R>.None;
-        Error = err;
+        Error = err ?? throw new Exception("Missing error");
         Start = start;
         End = end ?? start;
     }

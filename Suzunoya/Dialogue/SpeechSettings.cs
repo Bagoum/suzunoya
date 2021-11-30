@@ -5,9 +5,6 @@ using BagoumLib.Events;
 
 namespace Suzunoya.Dialogue {
 public record SpeechSettings(float opsPerSecond, Func<string, int, float> opsPerChar, float opsPerRollEvent, Func<string, int, bool> rollEventAllowed, Action? rollEvent) {
-    public static readonly DisturbedProduct<float> SpeedMultiplier = new(1);
-
-    public float EffectiveOpsPerSecond => opsPerSecond * SpeedMultiplier;
 
     //For consumers without with expressions :(
     public SpeechSettings(SpeechSettings copy) {
@@ -23,18 +20,21 @@ public record SpeechSettings(float opsPerSecond, Func<string, int, float> opsPer
                (s.TryIndex(index + 1) == '.' || s.TryIndex(index - 1) == '.');
     }
 
+    private static bool IsSequentialQE(string s, int index) =>
+        s[index] is '!' or '?' && s.TryIndex(index - 1) is '!' or '?';
+
     public static float DefaultOpsPerChar(string s, int index) {
         var ch = s[index];
         return ch switch {
-            '\n' => 3,
-            { } when char.IsWhiteSpace(ch) => 1.5f,
-            ',' => 3,
-            ';' => 3.5f,
-            ':' => 3.5f,
-            '!' => 5f,
-            '?' => 5f,
-            '.' => IsEllipses(s, index) ? 3 : 5f,
-            { } when char.GetUnicodeCategory(ch) == UnicodeCategory.OtherLetter => 2.5f,
+            '\n' => 8,
+            { } when char.IsWhiteSpace(ch) => 2f,
+            ',' => 5,
+            ';' => 8f,
+            ':' => 8f,
+            '!' => IsSequentialQE(s, index) ? 5f : 10f,
+            '?' => IsSequentialQE(s, index) ? 5f : 10f,
+            '.' => IsEllipses(s, index) ? 7 : 10f,
+            { } when char.GetUnicodeCategory(ch) == UnicodeCategory.OtherLetter => 3f,
             _ => 1,
         };
     }
@@ -54,7 +54,7 @@ public record SpeechSettings(float opsPerSecond, Func<string, int, float> opsPer
     }
 
     public static readonly SpeechSettings Default =
-        new SpeechSettings(30, DefaultOpsPerChar, 8, DefaultRollEventAllowed, null);
+        new SpeechSettings(60, DefaultOpsPerChar, 8, DefaultRollEventAllowed, null);
 
 }
 }

@@ -47,7 +47,7 @@ public class CSharpObjectPrinter : IObjectPrinter {
             return $"(({TypePrinter.Print(typ)}){o})";
         return FormattableString.Invariant(o switch {
             int i => $"{i}",
-            bool b => b ? $"true" : $"false",
+            bool b => b ? (FormattableString)$"true" : $"false",
             double d => $"{d}d",
             float f => $"{f}f",
             uint u => $"{u}u",

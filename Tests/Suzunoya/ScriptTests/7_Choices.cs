@@ -48,13 +48,10 @@ public class _6ChoicesTest {
             vn.OperationID.OnNext("A");
             vn.InterrogatorCreated.Subscribe(new AskRecvr(this));
 
-            Assert.ThrowsAsync<Exception>(async () => 
-                await vn.Ask(new ChoiceInterrogator<int>((1, "hello"), (2, "world"))));
-
-            var choice = new ChoiceInterrogator<float>("v1", (4.2f, "hello"), (6.9f, "<color=red>world</color>"));
+            var choice = new ChoiceInterrogator<float>((4.2f, "hello"), (6.9f, "<color=red>world</color>"));
             er.Record(choice);
             vn.OperationID.OnNext("B");
-            var f = await vn.Ask(choice);
+            var f = await vn.Ask(choice, "key2", true);
             vn.OperationID.OnNext("C");
             er.LoggedEvents.OnNext(new EventRecord.LogEvent(vn, "$CHOICE1", typeof(float), f));
 
@@ -76,10 +73,12 @@ public class _6ChoicesTest {
             s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
             s.vn.Update(1f);
             if (ii == 3)
-                ((ChoiceInterrogator<float>) s.asker)!.AwaitingResponse.Value!(4.2f);
+                ((ChoiceInterrogator<float>) s.asker!).AwaitingResponse.Value!(4.2f);
         }
         s.vn.UpdateSavedata();
         Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>()));
+        Assert.AreEqual(sd.Data["$$__ctxResult__$$::key2"], 4.2f);
+        Assert.AreEqual(sd.Data["key2"], 4.2f);
         ListEq(s.er.SimpleLoggedEventStrings, stored1);
         //Then we load again
         s = new _TestScript(new VNState(Cancellable.Null, sd));
@@ -103,12 +102,15 @@ public class _6ChoicesTest {
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ ",
         "<ChoiceInterrogator<Single>>.EntityActive ~ True",
         "<VNState>.OperationID ~ B",
+        "<VNState>.OperationID ~ $$__OPEN__$$::key2",
+        "<VNState>.ContextStarted ~ Context:key2",
         "<VNState>.Interrogator ~ Suzunoya.ControlFlow.ChoiceInterrogator`1[System.Single]",
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ System.Action`1[System.Single]",
         "<VNState>.$UpdateCount ~ 2",
         "<VNState>.$UpdateCount ~ 3",
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ ",
         "<ChoiceInterrogator<Single>>.EntityActive ~ False",
+        "<VNState>.ContextFinished ~ Context:key2",
         "<VNState>.OperationID ~ C",
         "<VNState>.$CHOICE1 ~ 4.2",
         "<Reimu>.Location ~ <1, 1, 1>",
@@ -128,10 +130,13 @@ public class _6ChoicesTest {
         "<VNState>.OperationID ~ A",
         //The VN does not send an InterrogatorCreated event, 
         // and interrogator.AwaitingResponse is never changed from null.
+        // The interrogator is created, but that's fine-- it's just data.
         "<ChoiceInterrogator<Single>>.AwaitingResponse ~ ",
         "<ChoiceInterrogator<Single>>.EntityActive ~ True",
         "<VNState>.OperationID ~ B",
-        "<ChoiceInterrogator<Single>>.EntityActive ~ False",
+        "<VNState>.OperationID ~ $$__OPEN__$$::key2",
+        "<VNState>.ContextStarted ~ Context:key2",
+        "<VNState>.ContextFinished ~ Context:key2",
         "<VNState>.OperationID ~ C",
         "<VNState>.$CHOICE1 ~ 4.2",
         "<Reimu>.Location ~ <1, 1, 1>",

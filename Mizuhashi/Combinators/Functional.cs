@@ -41,6 +41,17 @@ public static partial class Combinators {
             return rx.CastFailure<B>();
     };
     
+    /// <summary>
+    /// Parses an object of type A, then returns a result of type B depending on the value of A.
+    /// </summary>
+    public static Parser<B> Bind<A, B>(this Parser<A> p, Func<A, ParseResult<B>> b) => input => {
+        var rx = p(input);
+        if (rx.Result.Try(out var x)) {
+            return b(x);
+        } else
+            return rx.CastFailure<B>();
+    };
+    
     
     /// <summary>
     /// Parses an object of type A, then parses an object of type B depending on the value of A,

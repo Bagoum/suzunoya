@@ -3,6 +3,40 @@ using BagoumLib.Functional;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Cancellation {
+/// <summary>
+/// A source of cancellation information.
+/// Similar to CancellationTokenSource, but allocates minimal garbage, does not require disposal,
+/// and *is not thread-safe*.
+/// <br/>NB: This implements IDisposable, but does not generally require disposal;
+///  Dispose is an alias for Cancel.
+/// </summary>
+[PublicAPI]
+public interface ICancellable : IDisposable {
+    /// <summary>
+    /// Mark a cancellable as cancelled.
+    /// </summary>
+    /// <param name="level">Numerical level of cancellation. 0 = no cancellation.</param>
+    public void Cancel(int level);
+    
+    /// <summary>
+    /// Cancel with a level of HardCancelLevel.
+    /// </summary>
+    public void Cancel() => Cancel(ICancellee.HardCancelLevel);
+    
+    /// <summary>
+    /// Cancel with a level of SoftSkipLevel.
+    /// </summary>
+    public void SoftCancel() => Cancel(ICancellee.SoftSkipLevel);
+    
+    void IDisposable.Dispose() => Cancel();
+    
+    /// <summary>
+    /// Get a token that reflects the cancellation status of this cancellable.
+    /// </summary>
+    public ICancellee Token { get; }
+
+}
+
 
 /// <summary>
 /// A token passed into tasks to track cancellation.
@@ -11,6 +45,23 @@ namespace BagoumLib.Cancellation {
 /// </summary>
 [PublicAPI]
 public interface ICancellee {
+    /// <summary>
+    /// When a supported process (such as tweening) is cancelled, it will set the final value and exit without
+    /// throwing an exception by default. However, if the cancel level is GEQ
+    /// this value, it will not set a final value and instead throw OperationCancelledException.
+    /// Make sure this is greater than SoftSkipLevel.
+    /// <br/>Note that consumers are not required to distinguish skip levels.
+    /// </summary>
+    public static int HardCancelLevel { get; set; } = 2;
+    /// <summary>
+    /// Cancelling with this value on a supported process will set the final value and exit without
+    /// throwing an exception.
+    /// Make sure this is greater than zero and less than HardCancelLevel.
+    /// <br/>Note that cancelling with this value may result in the continuation of the process. It is a "recommendation" to skip.
+    /// <br/>Note that consumers are not required to distinguish skip levels.
+    /// </summary>
+    public static int SoftSkipLevel { get; set; } = 1;
+    
     /// <summary>
     /// Used to mark the significance of cancellation client-side.
     /// A value LEQ 0 (default 0) indicates that the operation has not been cancelled.
@@ -24,14 +75,18 @@ public interface ICancellee {
 }
 
 [PublicAPI]
-public class Cancellable : ICancellee {
+public class Cancellable : ICancellable, ICancellee {
     public static readonly ICancellee Null = new Cancellable();
     public int CancelLevel { get; private set; }
     public bool Cancelled => CancelLevel > 0;
     public ICancellee Root => this;
     public void Cancel(int level) => CancelLevel = Math.Max(level, CancelLevel);
-    public void Cancel() => Cancel(CancelHelpers.HardCancelLevel);
-    public void SoftCancel() => Cancel(CancelHelpers.SoftSkipLevel);
+
+    //i love traits
+    public void Cancel() => Cancel(ICancellee.HardCancelLevel);
+    public void SoftCancel() => Cancel(ICancellee.SoftSkipLevel);
+    
+    public ICancellee Token => this;
 }
 
 /// <summary>

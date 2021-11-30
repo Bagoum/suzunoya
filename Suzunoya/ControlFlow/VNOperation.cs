@@ -14,7 +14,7 @@ namespace Suzunoya.ControlFlow {
 
 public interface ILazyAwaitable {
     public Task Task { get; }
-    public TaskAwaiter GetAwaiter(); //=> Task.GetAwaiter();
+    public TaskAwaiter GetAwaiter() => Task.GetAwaiter();
 }
 
 /// <summary>
@@ -24,7 +24,7 @@ public interface ILazyAwaitable {
 /// <typeparam name="T"></typeparam>
 public interface ILazyAwaitable<T> {
     public Task<T> Task { get; }
-    public TaskAwaiter<T> GetAwaiter(); // => Task.GetAwaiter();
+    public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
 }
 
 /// <summary>
@@ -44,19 +44,17 @@ public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T>, ILazyAwaitable 
     public static implicit operator LazyFunc<T>(Func<T> op) => new(op);
 
     Task ILazyAwaitable.Task => Task;
-    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
+    public VNOperation AsVnOp(IVNState vn) => new(vn, _ => Task);
 }
 
 /// <summary>
 /// An action predenting to be a task.
 /// </summary>
 public record LazyAction : LazyFunc<Unit> {
-
     public LazyAction(Action lazyOp) : base(() => {
         lazyOp();
         return Unit.Default;
-    }) {
-    }
+    }) { }
     
     public static implicit operator LazyAction(Action op) => new(op);
     
@@ -69,9 +67,7 @@ public record LazyTask<T>(Func<Task<T>> lazyTask) : ILazyAwaitable<T>, ILazyAwai
     private Task<T>? loadedTask;
     public Task<T> Task => loadedTask ??= lazyTask();
     
-    public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
     Task ILazyAwaitable.Task => Task;
-    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 public record LazyTask : LazyTask<Unit> {
     public LazyTask(Func<Task> lazyTask) : base(async () => {
@@ -98,7 +94,6 @@ public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : 
     [UsedImplicitly]
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
     Task ILazyAwaitable.Task => Task;
-    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 
 /// <summary>
@@ -144,17 +139,17 @@ public record VNOperation : ILazyAwaitable<Completion>, ILazyAwaitable {
     private static void CheckUniformity(VNOperation[] vnos) {
         for (int ii = 1; ii < vnos.Length; ++ii) {
             if (vnos[ii].VN != vnos[0].VN)
-                throw new Exception(
-                    $"Cannot join VNOperations across different VNStates: {vnos[0].VN}, {vnos[ii].VN}");
+                throw new Exception($"Cannot join VNOperations across different VNStates: {vnos[0].VN}, {vnos[ii].VN}");
         }
     }
 
     public VNOperation And(params VNOperation[] nxt) => Parallel(nxt.Prepend(this).ToArray());
 
     public VNOperation Then(params VNOperation[] nxt) {
-        nxt = nxt.Prepend(this).ToArray();
         CheckUniformity(nxt);
-        return new VNOperation(nxt[0].VN, nxt.SelectMany(vno => vno.Suboperations).ToArray()) {
+        if (VN != nxt[0].VN)
+            throw new Exception($"Cannot join VNOperations across different VNStates: {VN}, {nxt[0].VN}");
+        return new VNOperation(VN, nxt.Prepend(this).SelectMany(vno => vno.Suboperations).ToArray()) {
             AllowUserSkip = nxt.All(v => v.AllowUserSkip)
         };
     }
@@ -181,9 +176,7 @@ public record VNOperation : ILazyAwaitable<Completion>, ILazyAwaitable {
 
     public override string ToString() => $"VNOp (Len: {Suboperations.Length})";
 
-    [UsedImplicitly]
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
     Task ILazyAwaitable.Task => Task;
-    TaskAwaiter ILazyAwaitable.GetAwaiter() => ((Task)Task).GetAwaiter();
 }
 }

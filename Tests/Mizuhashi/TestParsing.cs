@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Reactive;
+using BagoumLib.Functional;
 using Mizuhashi;
 using NUnit.Framework;
 using static Mizuhashi.Combinators;
@@ -40,6 +41,10 @@ public class TestParsing1 {
         Char('a').IgThen(Char('b')).AssertSuccess("ab", 'b');
         Char('a').Then(Char('b')).AssertSuccess("ab", ('a', 'b'));
     }
+    [Test]
+    public void TestFunctionalErrs() {
+        Char('a').ThenIg(Char('b')).AssertFail("ac", new ExpectedChar('b'));
+    }
     
     [Test]
     public void TestEOF() {
@@ -54,7 +59,7 @@ public class TestParsing1 {
         var oneOrTwo = Char('(')
             .IgThen(ParseInt.Then(Char(',').IgThen(Whitespace).IgThen(ParseInt).Opt()))
             .ThenIg(Char(')'));
-        oneOrTwo.AssertSuccess("(1)", (1, null));
+        oneOrTwo.AssertSuccess("(1)", (1, Maybe<int>.None));
         oneOrTwo.AssertSuccess("(1, 6)", (1, 6));
         oneOrTwo.AssertFail("(1 6)", new OneOf(new() {
             new ExpectedChar(','),
@@ -97,8 +102,7 @@ public class TestParsing1 {
         parseEmails1.AssertFail("!!!", new IncorrectNumber(1, 0, null,
             new LocatedParserError(0, new Labelled("Email name", new(
                 new LocatedParserError(0, new Expected("at least one letter or digit")))))));
-        parseEmails.AssertFail("a@b.net\nb@c.com", new Labelled("Email name", new(
-            new LocatedParserError(15, new Expected("at least one letter or digit")))), 15);
+        parseEmails.AssertFail("a@b.net\nb@c.com", new Expected("newline"), 15);
         parseEmails.AssertSuccess("a@b.net\nb@c.com\n", new() {new("a", "b", "net"), new("b", "c", "com")});
         parseEmails1.AssertSuccess("a@b.net\nb@c.com\n", new() {new("a", "b", "net"), new("b", "c", "com")});
         parse3Emails.AssertFail("a@b.net\nb@c.com\n", new IncorrectNumber(3, 2, null, 

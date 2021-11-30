@@ -14,30 +14,38 @@ public abstract record PrintToken {
     /// <summary>
     /// A parameter.
     /// </summary>
-    public record Parameter(ParameterExpression ex) : PrintToken { }
+    public record Parameter(ParameterExpression ex) : PrintToken;
+
     /// <summary>
     /// Any constant value.
     /// </summary>
-    public record Constant(object value) : PrintToken { }
-    public record TypeName(Type t) : PrintToken { }
-    public record Label(LabelTarget label) : PrintToken { }
-    public record Newline : PrintToken { }
-    
+    public record Constant(object value) : PrintToken;
+
+    public record TypeName(Type t) : PrintToken;
+
+    public record Label(LabelTarget label) : PrintToken;
+
+    public record Newline : PrintToken;
+
     /// <summary>
     /// If the previous token is a newline, then cancel it out.
     /// </summary>
-    public record UndoNewline : PrintToken { }
+    public record UndoNewline : PrintToken;
+
     /// <summary>
     /// Indents/dedents take effect on the next line, so place them before newlines.
     /// </summary>
-    public record Indent : PrintToken { }
-    public record Dedent : PrintToken { }
-    public record Semicolon : PrintToken { }
+    public record Indent : PrintToken;
+
+    public record Dedent : PrintToken;
+
+    public record Semicolon : PrintToken;
+
     /// <summary>
     /// Any plain text to be printed.
     /// <br/>Do not put newlines/indents/dedents here, use the dedicated tokens instead.
     /// </summary>
-    public record Text(string String) : PrintToken { }
+    public record Text(string String) : PrintToken;
 
     public static implicit operator PrintToken(string s) => new Text(s);
     public static readonly PrintToken newline = new Newline();

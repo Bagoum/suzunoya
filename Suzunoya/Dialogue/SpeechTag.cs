@@ -1,6 +1,6 @@
 ﻿namespace Suzunoya.Dialogue {
 
-public abstract class SpeechTag {
+public abstract record SpeechTag {
     /// <summary>
     /// Apply modifications to the text unrolling settings.
     /// </summary>
@@ -13,24 +13,12 @@ public abstract class SpeechTag {
     /// <summary>
     /// A speech tag not handled by Suzunoya.
     /// </summary>
-    public class Unknown : SpeechTag {
-        public readonly string name;
-        public readonly string? content;
-        public Unknown(string name, string? content) {
-            this.name = name;
-            this.content = content;
-        }
-    }
+    public record Unknown(string name, string? content) : SpeechTag { }
     
     /// <summary>
     /// Changes the speed of text unrolling.
     /// </summary>
-    public class Speed: SpeechTag {
-        public readonly float multiplier;
-        public Speed(float multiplier) {
-            this.multiplier = multiplier;
-        }
-
+    public record Speed(float multiplier) : SpeechTag {
         public override SpeechSettings ModifySettings(SpeechSettings src) =>
             src with {opsPerSecond = src.opsPerSecond * multiplier};
 
@@ -40,7 +28,7 @@ public abstract class SpeechTag {
     /// <summary>
     /// Disables rolling events.
     /// </summary>
-    public class Silent : SpeechTag {
+    public record Silent : SpeechTag {
         public override SpeechSettings ModifySettings(SpeechSettings src) =>
             src with {rollEventAllowed = (_, __) => false};
 
@@ -52,23 +40,13 @@ public abstract class SpeechTag {
     /// <summary>
     /// Changes text color.
     /// </summary>
-    public class Color : SpeechTag {
-        public readonly string color;
-        public Color(string color) {
-            this.color = color;
-        }
-
+    public record Color(string color) : SpeechTag {
         public override string ToString() => $"Color {{ color = {color} }}";
     }
 
     /// <summary>
     /// Shows furigana (ruby) next to the main text.
     /// </summary>
-    public class Furigana : SpeechTag {
-        public readonly string furigana;
-        public Furigana(string furigana) {
-            this.furigana = furigana;
-        }
-    }
+    public record Furigana(string furigana) : SpeechTag { }
 }
 }

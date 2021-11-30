@@ -53,7 +53,7 @@ public class _4SaveLoadLocationTest {
     public void ScriptTest() {
         var sd = new InstanceData(new GlobalData());
         var s = new _TestScript(new VNState(Cancellable.Null, sd));
-        var t = s.vn.ExecuteContext(s.Run()).Task;
+        var t = s.Run().Execute().Task;
         s.er.LoggedEvents.Clear();
         VNLocation loc = null!;
         //We play a few lines, then "quit"
@@ -76,7 +76,7 @@ public class _4SaveLoadLocationTest {
         sd.Location = loc;
         //Then we load again
         s = new _TestScript(new VNState(Cancellable.Null, sd));
-        t = s.vn.ExecuteContext(s.Run()).Task;
+        t = s.Run().Execute().Task;
         s.er.LoggedEvents.Clear();
         for (int ii = 0; !t.IsCompleted; ++ii) {
             s.er.LoggedEvents.OnNext(s.UpdateLog(ii));

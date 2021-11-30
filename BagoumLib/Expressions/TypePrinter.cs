@@ -14,22 +14,23 @@ public class CSharpTypePrinter : ITypePrinter {
     public string Print(Type t) {
         if (SimpleTypeNameMap.TryGetValue(t, out var v))
             return v;
-        var ns = t.DeclaringType != null ?
-            Print(t.DeclaringType) + "." :
-            PrintTypeNamespace(t) ?
-                t.Namespace + "." :
-                "";
+        string PrependEnclosure(string s) => 
+            t.DeclaringType != null ?
+                $"{Print(t.DeclaringType)}.{s}" :
+                PrintTypeNamespace(t) && (t.Namespace?.Length > 0) ?
+                    $"{t.Namespace}.{s}" :
+                    s;
         if (t.IsArray)
-            return $"{ns}{Print(t.GetElementType()!)}[]";
+            return PrependEnclosure($"{Print(t.GetElementType()!)}[]");
         if (t.IsConstructedGenericType)
-            return $"{ns}{Print(t.GetGenericTypeDefinition())}" +
-                   $"{ns}<{string.Join(", ", t.GenericTypeArguments.Select(Print))}>";
+            return PrependEnclosure(
+                $"{Print(t.GetGenericTypeDefinition())}<{string.Join(", ", t.GenericTypeArguments.Select(Print))}>");
         if (t.IsGenericType) {
             int cutFrom = t.Name.IndexOf('`');
             if (cutFrom > 0)
-                return ns + t.Name.Substring(0, cutFrom);
+                return PrependEnclosure(t.Name[..cutFrom]);
         }
-        return ns + t.Name;
+        return PrependEnclosure(t.Name);
     }
     
     public static readonly Dictionary<Type, string> SimpleTypeNameMap = new() {

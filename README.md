@@ -9,7 +9,7 @@ The engine name may be abbreviated as **szy**.
 
 Each supported game engine (such as Unity) has its own adapter that maps the objects in the core engine to engine-specific game-objects. SuzunoyaUnity (https://github.com/Bagoum/suzunoya-unity) is the only one under current development. 
 
-All code is written in C#9 and compiled against Framework 4.7.2 for compatibility with Unity. This means that some really useful features, like default interface implementations, cannot presently be used.
+All code is written in C#9 and compiled against Standard 2.1 for compatibility with Unity 2021.2. This version of Unity allows all C#8 features.
 
 # Subprojects
 

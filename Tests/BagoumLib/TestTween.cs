@@ -132,7 +132,7 @@ public class TestTween {
             Vector2.One * 0.5f,
             Vector2.Zero, 
         }, VecEq, false);
-        ct.Cancel(CancelHelpers.SoftSkipLevel);
+        ct.Cancel(ICancellee.SoftSkipLevel);
         //Cancellation requires one step before it is processed
         Assert.IsFalse(tw.IsCanceled);
         cors.Step();

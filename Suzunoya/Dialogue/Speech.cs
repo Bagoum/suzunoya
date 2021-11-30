@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using BagoumLib;
 using BagoumLib.Culture;
+using Suzunoya.Data;
 using static Suzunoya.Dialogue.SpeechTag;
 
 namespace Suzunoya.Dialogue {
@@ -18,9 +19,11 @@ public class Speech {
     private string? readable;
     public string Readable => readable ??= ComputeReadable();
 
-    public Speech(LString raw, SpeechSettings? cfg = null) {
+    public Speech(LString raw, ISettings? settings, SpeechSettings? cfg = null) {
         this.raw = raw;
-        this.cfg = cfg ?? SpeechSettings.Default;
+        this.cfg = (cfg ??= SpeechSettings.Default) with {
+            opsPerSecond = cfg.opsPerSecond * (settings?.TextSpeed ?? 1)
+        };
     }
     
     //Note for tag parsing: 
@@ -56,7 +59,7 @@ public class Speech {
                         opsUntilNextRollEvent = cfg.opsPerRollEvent;
                     }
                     frags.Add(new SpeechFragment.Char(s.fragment[ic]));
-                    var waitTime = cfg.opsPerChar(s.fragment, ic) / cfg.EffectiveOpsPerSecond;
+                    var waitTime = cfg.opsPerChar(s.fragment, ic) / cfg.opsPerSecond;
                     if (waitTime > 0)
                         frags.Add(new SpeechFragment.Wait(waitTime));
                 }

@@ -83,7 +83,7 @@ public class RenderGroup : Transform, ITinted {
     private Cancellable? transitionToken;
 
     public ICancellee GetTransitionToken() {
-        transitionToken?.Cancel();
+        transitionToken?.Cancel(ICancellee.HardCancelLevel);
         transitionToken = new Cancellable();
         return new JointCancellee(LifetimeToken, transitionToken);
     }

@@ -2,6 +2,7 @@
 
 namespace Mizuhashi {
 public static partial class Combinators {
+    public static Parser<InputStream> GetStream() => inp => new(inp, null, inp.Index, inp.Index);
 
     /// <summary>
     /// FParsec getUserState

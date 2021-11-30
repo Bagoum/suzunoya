@@ -12,6 +12,7 @@ using BagoumLib.Events;
 using BagoumLib.Functional;
 using BagoumLib.Tasks;
 using BagoumLib.Tweening;
+using JetBrains.Annotations;
 using Suzunoya.ControlFlow;
 using Suzunoya.Data;
 using Suzunoya.Display;
@@ -20,12 +21,14 @@ using Suzunoya.Entities;
 namespace Suzunoya.ControlFlow {
 
 public interface IVNState {
+    IInstanceData InstanceData { get; }
+    IGlobalData GlobalData => InstanceData.GlobalData;
     ICancellee CToken { get; }
     /// <summary>
     /// Within the update loop, this is set to the delta-time of the frame.
     /// </summary>
     float dT { get; }
-    
+
     IDialogueBox? MainDialogue { get; }
     IDialogueBox MainDialogueOrThrow { get; }
 
@@ -104,8 +107,9 @@ public interface IVNState {
 
     /// <summary>
     /// Use this to proceed operations that require confirmation via SpinUntilConfirm.
+    /// <returns>True iff a confirmation occurred.</returns>
     /// </summary>
-    void UserConfirm();
+    bool UserConfirm();
     
     /// <summary>
     /// Get a cToken that indicates when a task has been cancelled via skip.
@@ -123,6 +127,12 @@ public interface IVNState {
     /// <br/>Returns true if a skip occurred.
     /// </summary>
     bool RequestSkipOperation();
+
+    /// <summary>
+    /// Executes the bounded context, saves the output value in instance save data, and returns the output value.
+    /// </summary>
+    /// <returns></returns>
+    ILazyAwaitable<T> ExecuteContext<T>(BoundedContext<T> ctx, ILazyAwaitable<T> innerTask);
     
 
     void RecordCG(IGalleryable cg);
@@ -165,6 +175,7 @@ public interface IVNState {
     Evented<string> OperationID { get; }
     ISubject<LogMessage> Logs { get; }
 }
+[PublicAPI]
 public class VNState : IVNState, IConfirmationReceiver {
     public float dT { get; private set; }
     
@@ -206,6 +217,8 @@ public class VNState : IVNState, IConfirmationReceiver {
             return false;
         }
         userSetSkipMode = mode;
+        if (mode == SkipMode.FASTFORWARD)
+            SkipOperation();
         if (SkippingMode != null && confirmToken != null)
             _Confirm();
         Logs.OnNext(new LogMessage($"Set the user skip mode to {mode}", LogLevel.INFO));
@@ -227,8 +240,13 @@ public class VNState : IVNState, IConfirmationReceiver {
     public bool AutoplayFastforwardAllowed { get; set; } = true;
     public float TimePerAutoplayConfirm { get; set; } = 1f;
     public float TimePerFastforwardConfirm { get; set; } = 0.2f;
+    /// <summary>
+    /// True iff bounded contexts with Unit return type can be skipped
+    /// even if they have no save data.
+    /// </summary>
+    public bool DefaultLoadSkipUnit { get; set; } = false;
     
-    private readonly IInstanceData? saveData;
+    private readonly IInstanceData saveData;
     private bool vnUpdated = false;
     private readonly Coroutines cors = new();
     private DMCompactingArray<IEntity> Entities { get; } = new();
@@ -255,8 +273,6 @@ public class VNState : IVNState, IConfirmationReceiver {
     public string ContextsKey =>
         Contexts.Count == 1 ? Contexts[0].ID :
         string.Join("::", Contexts.Select(c => c.ID));
-
-    public string OperationKey => ContextsKey + $"||{OperationID.Value}";
     public RenderGroup DefaultRenderGroup { get; }
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
     
@@ -273,11 +289,12 @@ public class VNState : IVNState, IConfirmationReceiver {
     public ISubject<LogMessage> Logs { get; } = new Event<LogMessage>();
     public Evented<bool> VNStateActive { get; } = new(true);
     
+    public IInstanceData InstanceData => saveData;
     public IDialogueBox MainDialogueOrThrow =>
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
-    public IBoundedContext LowestContext => Contexts[Contexts.Count - 1];
+    public IBoundedContext LowestContext => Contexts[^1];
 
-    public VNState(ICancellee extCToken, IInstanceData? save=null) {
+    public VNState(ICancellee extCToken, IInstanceData save) {
         this.extCToken = extCToken;
         this.saveData = save;
         lifetimeToken = new Cancellable();
@@ -285,8 +302,8 @@ public class VNState : IVNState, IConfirmationReceiver {
 
         Tokens.Add(OperationID.Subscribe(id => { 
             //TODO: globalData does not contextualize lineRead with context -- is this a problem?
-            saveData?.GlobalData.LineRead(id);
-            if (!(LoadTo is null) && LoadTo.ContextsMatch(Contexts) && id == LoadTo.LastOperationID) {
+            saveData.GlobalData.LineRead(id);
+            if (LoadTo is not null && LoadTo.ContextsMatch(Contexts) && id == LoadTo.LastOperationID) {
                 StopLoading();
             }
         }));
@@ -295,11 +312,11 @@ public class VNState : IVNState, IConfirmationReceiver {
         // ReSharper disable once VirtualMemberCallInConstructor
         DefaultRenderGroup = MakeDefaultRenderGroup();
         
-        if (!(save?.Location is null))
+        if (save.Location is not null)
             LoadToLocation(save.Location);
     }
 
-    protected virtual RenderGroup MakeDefaultRenderGroup() => new RenderGroup(this, visible: true);
+    protected virtual RenderGroup MakeDefaultRenderGroup() => new(this, visible: true);
 
     private OperationCancellation? op = null;
     public int OperationCTokenDependencies { get; private set; } = 0;
@@ -335,31 +352,37 @@ public class VNState : IVNState, IConfirmationReceiver {
         cT = op.operationCToken!;
         return new SubOpTracker(this);
     }
-    
+
     /// <summary>
-    /// Executes the context, saves the output value in instance save data, and returns the output value.
+    /// Wrap a task in a BoundedContext so its result is stored in the instance save
+    ///  and can be read during the skip-load process.
+    /// <br/>This should be executed for all external tasks that are awaited within VN execution.
+    /// <br/>Note that <see cref="Ask{T}"/> automatically wraps its task in a BoundedContext.
     /// </summary>
-    /// <returns></returns>
-    public ILazyAwaitable<T> ExecuteContext<T>(BoundedContext<T> ctx) => new LazyTask<T>(async () => {
+    public BoundedContext<T> Bound<T>(Func<Task<T>> task, string key, Maybe<T>? deflt = null) =>
+        new(this, key, task) { LoadingDefault = deflt ?? Maybe<T>.None };
+
+    public BoundedContext<T> Bound<T>(Task<T> task, string key, Maybe<T>? deflt = null) =>
+        Bound(() => task, key, deflt);
+    public ILazyAwaitable<T> ExecuteContext<T>(BoundedContext<T> ctx, ILazyAwaitable<T> innerTask) => new LazyTask<T>(async () => {
         this.AssertActive();
         using var openCtx = new OpenedContext<T>(this, ctx);
         //When load skipping, we can skip the entire context if the current context stack does not match the target
         if (LoadTo?.ContextsMatchPrefix(Contexts) == false) {
-            if (saveData != null && saveData.TryGetData<T>(ContextsKey, out var res)) {
+            if (openCtx.TryGetExistingContextResult(out var res) || ctx.LoadingDefault.Try(out res)) {
                 Logs.OnNext($"Load-skipping section {ContextsKey} with return value {res}");
                 ctx.ShortCircuit?.Invoke();
                 return res;
-            }
-            else if (typeof(T) == typeof(Unit)) {
+            } else if (typeof(T) == typeof(Unit) && DefaultLoadSkipUnit) {
                 Logs.OnNext($"Load-skipping section {ContextsKey} with default Unit return");
                 ctx.ShortCircuit?.Invoke();
                 return default!;
             } else
                 throw new Exception($"Requested to load-skip context {ContextsKey}, but save data does not have " +
-                                    $"corresponding information and the type {typeof(T)} is not Unit");
+                                    $"corresponding information");
         }
-        var result = await ctx._InnerTask;
-        openCtx.SaveResult(result);
+        var result = await innerTask;
+        openCtx.SaveContextResult(result);
         return result;
     });
 
@@ -375,21 +398,18 @@ public class VNState : IVNState, IConfirmationReceiver {
         }
 
         /// <summary>
-        /// Saves the value for the current context list in the instance save.
-        /// <br/>Overwrites by default.
-        /// <br/>Returns true iff the value already exists.
+        /// Saves the result value for the current context list in the instance save.
         /// </summary>
-        /// <returns>null if there is no save data, true if the value already exists in save data, false otherwise.</returns>
-        public bool? SaveResult(T value, bool overwrite = true) {
-            if (vn.saveData == null)
-                return null;
-            var key = vn.ContextsKey;
-            bool exists = vn.saveData.HasData(key);
-            if (!exists || overwrite)
-                vn.saveData.SaveData(key, value);
-            return exists;
+        /// <param name="value">Value to save</param>
+        public void SaveContextResult(T value) {
+            vn.saveData.SaveData(SaveContextKey, value);
         }
-        
+
+        private string SaveContextKey => $"$$__ctxResult__$$::{vn.ContextsKey}";
+
+        public bool TryGetExistingContextResult(out T value) =>
+            vn.saveData.TryGetData(SaveContextKey, out value);
+
         public void Dispose() {
             if (vn.LowestContext != ctx)
                 throw new Exception("Contexts closed in wrong order. This is an engine error. Please report this.");
@@ -515,11 +535,11 @@ public class VNState : IVNState, IConfirmationReceiver {
     
     private void _Confirm() {
         AwaitingConfirm.Value = null;
-        confirmToken?.Cancel(CancelHelpers.SoftSkipLevel);
+        confirmToken?.Cancel(ICancellee.SoftSkipLevel);
         confirmToken = null;
     }
 
-    public void UserConfirm() {
+    public bool UserConfirm() {
         this.AssertActive();
         if (confirmToken != null) {
             //User confirm cancels autoskip
@@ -528,11 +548,13 @@ public class VNState : IVNState, IConfirmationReceiver {
                 SetSkipMode(null);
             }
             _Confirm();
-        }
+            return true;
+        } else
+            return false;
     }
 
     public void SkipOperation() {
-        op?.operationCTS.Cancel(CancelHelpers.SoftSkipLevel);
+        op?.operationCTS.Cancel(ICancellee.SoftSkipLevel);
     }
     
     public bool RequestSkipOperation() {
@@ -549,34 +571,22 @@ public class VNState : IVNState, IConfirmationReceiver {
             return false;
     }
 
-    public async Task<T> Ask<T>(IInterrogator<T> asker, bool throwIfExists=true) {
-        if (saveData != null) {
-            if (asker.Key == null)
-                throw new Exception("All interrogators operating on a non-null script must have a save key.");
-            if (saveData.TryGetData<T>(asker.Key, out var v)) {
-                if (SkippingMode.SkipsOperations()) {
-                    asker.Skip(v);
-                    return v;
-                } else if (throwIfExists)
-                    throw new Exception($"KVR key {asker.Key} already exists.");
-            } else if (SkippingMode == SkipMode.LOADING)
-                throw new Exception("Cannot load to location when the save file does not have " +
-                                    $"information for interrogation key {asker.Key}");
-        } else if (SkippingMode == SkipMode.LOADING)
-            throw new Exception("Cannot load to location when there is no save file to provide interrogations.");
-        InterrogatorCreated.OnNext(asker);
-        var nv = await asker.Start(CToken);
-        saveData?.SaveData(asker.Key, nv);
-        return nv;
-    }
+    public BoundedContext<T> Ask<T>(IInterrogator<T> asker, string key, bool saveDirectly = false) => new(this, key,
+        async () => {
+            InterrogatorCreated.OnNext(asker);
+            var nv = await asker.Start(CToken);
+            if (saveDirectly)
+                saveData.SaveData(key, nv);
+            return nv;
+        });
 
     public void RecordCG(IGalleryable cg) {
-        saveData?.GlobalData.GalleryCGViewed(cg.Key);
+        saveData.GlobalData.GalleryCGViewed(cg.Key);
     }
 
     protected virtual void _DeleteAll() {
         Logs.OnNext($"Deleting all entities within VNState {this}");
-        lifetimeToken.Cancel(CancelHelpers.HardCancelLevel);
+        lifetimeToken.Cancel(ICancellee.HardCancelLevel);
         foreach (var t in Tokens)
             t.Dispose();
         for (int ii = 0; ii < RenderGroups.Count; ++ii) {
@@ -611,7 +621,6 @@ public class VNState : IVNState, IConfirmationReceiver {
     }
 
     public IInstanceData UpdateSavedata() {
-        if (saveData == null) throw new Exception("There is no save data to update");
         saveData.Location = VNLocation.Make(this);
         return saveData;
     }

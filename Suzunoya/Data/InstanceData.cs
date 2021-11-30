@@ -10,6 +10,9 @@ public interface IInstanceData : IKeyValueRepository {
     VNLocation? Location { get; set; }
 }
 
+/// <summary>
+/// A barebones implementation of IInstanceData.
+/// </summary>
 [Serializable]
 public class InstanceData : KeyValueRepository, IInstanceData {
     /// <summary>
@@ -17,7 +20,7 @@ public class InstanceData : KeyValueRepository, IInstanceData {
     /// make global switches dependent on an unchanging version of the global data-- specifically, a frozen copy
     /// of the global data constructed on initialization.
     /// </summary>
-    public GlobalData FrozenGlobalData { get; set; }
+    public GlobalData FrozenGlobalData { get; init; }
     [field:NonSerialized] [JsonIgnore]
     public GlobalData GlobalData { get; private set; }
     IGlobalData IInstanceData.GlobalData => GlobalData;
@@ -49,8 +52,8 @@ public class InstanceData : KeyValueRepository, IInstanceData {
     /// <param name="currentGlobal">The current global data information. This will be linked as
     /// <see cref="GlobalData"/>, while <see cref="FrozenGlobalData"/> will be read from the JSON.</param>
     /// <returns></returns>
-    public static InstanceData Deserialize(string serialized, GlobalData currentGlobal) {
-        var id = Serialization.DeserializeJson<InstanceData>(serialized) ?? 
+    public static T Deserialize<T>(string serialized, GlobalData currentGlobal) where T : InstanceData {
+        var id = Serialization.DeserializeJson<T>(serialized) ?? 
                  throw new Exception("Deserialization returned a null InstanceData");
         id.GlobalData = currentGlobal;
         return id;

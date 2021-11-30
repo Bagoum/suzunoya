@@ -26,6 +26,8 @@ public class StackList<T> : IEnumerable<T> {
 
     public T Pop() => arr[--Count];
     public T Peek() => arr[Count - 1];
+    public T Peek(int distance) => arr[Count - distance];
+    public T? MaybePeek() => Count > 0 ? Peek() : default(T?);
 
     public void Clear() {
         Count = 0;

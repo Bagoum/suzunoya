@@ -55,7 +55,7 @@ public class serializeme {
         string s_save = JsonConvert.SerializeObject(save, Formatting.Indented, typs);
         //pretend load
         var r_global = JsonConvert.DeserializeObject<GlobalData>(s_global, typs) ?? throw new Exception();
-        var r_save = InstanceData.Deserialize(s_save, r_global);
+        var r_save = InstanceData.Deserialize<InstanceData>(s_save, r_global);
         Assert.AreEqual(r_save.FrozenGlobalData.Settings.TextSpeed, 1.5f);
         Assert.AreEqual(r_global.Settings.TextSpeed, 2f);
         Assert.AreEqual(r_save.GlobalData, r_global);

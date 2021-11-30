@@ -13,15 +13,38 @@ public static partial class Combinators {
         new ParseResult<R>(new(val), null, input.Index, input.Index);
 
     /// <summary>
+    /// FParsec >>%
+    /// </summary>
+    public static Parser<B> ThenPReturn<A, B>(this Parser<A> p, B val) => input => {
+        var result = p(input);
+        return new(result.Result.Valid ? Maybe<B>.Of(val) : Maybe<B>.None,
+            result.Error, result.Start, result.End);
+    };
+
+    /// <summary>
     /// PReturn(Unit.Default)
     /// </summary>
     public static Parser<Unit> Ignore() => PReturn(Unit.Default);
 
+    public static Parser<Unit> Ignore<R>(this Parser<R> p) => input => {
+        var result = p(input);
+        return new(result.Result.Valid ? Maybe<Unit>.Of(default) : Maybe<Unit>.None,
+            result.Error, result.Start, result.End);
+    };
+
     /// <summary>
     /// Fails with the given failure string.
+    /// <br/>Note: this consumes a character and constructs a fatal error.
     /// </summary>
     public static Parser<R> Fail<R>(string reason) => input => 
         new ParseResult<R>(new ParserError.Failure(reason), input.Index, input.Index + 1);
+    
+    /// <summary>
+    /// Fails with the given failure string.
+    /// <br/>Note: this does not consume, and therefore constructs a non-fatal error.
+    /// </summary>
+    public static Parser<R> Error<R>(string reason) => input => 
+        new ParseResult<R>(new ParserError.Failure(reason), input.Index);
 
     /// <summary>
     /// FParsec .>>
@@ -30,7 +53,7 @@ public static partial class Combinators {
         var rx = first(input);
         if (rx.Result.Valid) {
             var ry = second(input);
-            return new(rx.Result, rx.MergeErrors(in ry), rx.Start, ry.End);
+            return new(ry.Result.Valid ? rx.Result : Maybe<A>.None, rx.MergeErrors(in ry), rx.Start, ry.End);
         } else
             return rx;
     };
@@ -87,19 +110,6 @@ public static partial class Combinators {
     /// </summary>
     public static Parser<R> Label<R>(this Parser<R> p, string label) => input => 
         p(input).WithWrapError(label);
-    
-    /// <summary>
-    /// FParsec attempt
-    /// </summary>
-    public static Parser<R> Attempt<R>(this Parser<R> p) => input => {
-        var state = input.Stative;
-        var result = p(input);
-        if (result.Status == ResultStatus.FATAL) {
-            input.Rollback(state);
-            return new(result.Result, result.Error, result.Start, result.Start);
-        } else
-            return result;
-    };
 
     /// <summary>
     /// FParsec &lt;|&gt;
@@ -182,11 +192,11 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec opt
     /// </summary>
-    public static Parser<R?> Opt<R>(this Parser<R> p) where R: struct => input => {
+    public static Parser<Maybe<R>> Opt<R>(this Parser<R> p) => input => {
         var result = p(input);
         return result.Status == ResultStatus.ERROR ? 
-            new ParseResult<R?>(new(null), result.Error, result.Start, result.End) : 
-            result.FMap<R?>(x => x);
+            new ParseResult<Maybe<R>>(Maybe<R>.None, result.Error, result.Start, result.End) : 
+            result.FMap(Maybe<R>.Of);
     };
     
     /// <summary>

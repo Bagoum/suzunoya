@@ -18,7 +18,7 @@ public class Parsing {
             rollEventAllowed = (s, i) => char.IsUpper(s[i]),
             rollEvent = () => { }
         };
-        ListEq(new Speech(data, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
+        ListEq(new Speech(data, null, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
             new Char('h'),
             new Wait(1),
             new Char('e'),
@@ -56,7 +56,7 @@ public class Parsing {
             rollEvent = null
         };
 
-        var s1 = new Speech(data, cfg);
+        var s1 = new Speech(data, null, cfg);
         ListEq(s1.TextUnits.Select(x => x.ToString()).ToArray(), new TextUnit[] {
             new TextUnit.String("a"),
             new TextUnit.OpenTag("speed", "2"),
@@ -94,7 +94,7 @@ public class Parsing {
         //The parser will prefer to match a closing tag to the last opened tag.
         data = "a<speed=2>b<speed=4>c</speed>d</speed>efg";
         var t3 = new TagOpen("speed", new SpeechTag.Speed(4));
-        ListEq(new Speech(data, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
+        ListEq(new Speech(data, null, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
             new Char('a'),
             new Wait(1),
             t1,

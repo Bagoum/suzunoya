@@ -42,7 +42,8 @@ public static class Tween {
         ICancellee? cT = null) =>
         TweenTo(start, GetMulOp<T>()(start, by), time, apply, ease, cT);
 
-    public static ITweener Then(this ITweener tw, ITweener next) => new SequentialTweener(tw, next);
+    public static ITweener Then(this ITweener tw, ITweener next) => new SequentialTweener(() => tw, () => next);
+    public static ITweener Then(this ITweener tw, Func<ITweener> next) => new SequentialTweener(() => tw, next);
     public static ITweener Parallel(params ITweener[] tws) => new ParallelTweener(tws);
     public static ITweener Loop(this ITweener tw, int? times = null) => new LoopTweener(tw, times);
 }
@@ -248,13 +249,13 @@ public record DeltaTweener<T> : ITweener {
     
 }
 
-public record SequentialTweener(params ITweener[] states) : ITweener {
+public record SequentialTweener(params Func<ITweener>[] states) : ITweener {
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
         var c = Completion.Standard;
         for (int ii = 0; ii < states.Length; ++ii) {
             try {
                 //Report last state
-                c = await states[ii].Run(cors, options);
+                c = await states[ii]().Run(cors, options);
             } catch (OperationCanceledException) {
                 c = Completion.Cancelled;
             }
@@ -264,7 +265,7 @@ public record SequentialTweener(params ITweener[] states) : ITweener {
     }
 
     public ITweener With(ICancellee cT, Func<float> dTProvider) =>
-        new SequentialTweener(states.Select(s => s.With(cT, dTProvider)).ToArray());
+        new SequentialTweener(states.Select<Func<ITweener>, Func<ITweener>>(s => () => s().With(cT, dTProvider)).ToArray());
 }
 
 public record ParallelTweener(params ITweener[] states) : ITweener {

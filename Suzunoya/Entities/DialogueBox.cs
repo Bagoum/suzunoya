@@ -43,7 +43,7 @@ public class DialogueOp {
     public SpeakFlags Flags { get; }
     public VNLocation? Location { get; }
     public DialogueOp(LString line, ICharacter? speaker, SpeakFlags flags, VNLocation? loc) {
-        this.Line = new Speech(line, speaker?.SpeechCfg);
+        this.Line = new Speech(line, speaker?.Container.GlobalData.Settings, speaker?.SpeechCfg);
         this.Speaker = speaker;
         this.Flags = flags;
         this.Location = loc;

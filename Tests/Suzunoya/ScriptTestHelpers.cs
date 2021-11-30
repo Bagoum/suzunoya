@@ -6,6 +6,7 @@ using BagoumLib.Cancellation;
 using BagoumLib.Events;
 using Suzunoya;
 using Suzunoya.ControlFlow;
+using Suzunoya.Data;
 using Suzunoya.Entities;
 using Suzunoya.Dialogue;
 
@@ -30,7 +31,7 @@ public class TestScript {
     protected readonly Cancellable cTs = new Cancellable();
 
     public TestScript(VNState? vn = null) {
-        this.vn = vn ?? new VNState(cTs);
+        this.vn = vn ?? new VNState(cTs, new InstanceData(new GlobalData()));
         er = new EventRecord();
         er.Record(this.vn);
     }

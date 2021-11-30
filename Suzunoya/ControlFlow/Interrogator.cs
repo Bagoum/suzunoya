@@ -12,22 +12,11 @@ using JetBrains.Annotations;
 using Suzunoya.Dialogue;
 
 namespace Suzunoya.ControlFlow {
-//Any processes not directly managed by the VNState should follow an object-delegation pattern. 
-// They have some sort of "Skip" and "Start" methods, and the VNState will decide which of these
-// to call based on internal parameters.
-public interface IInterrogator {
-    /// <summary>
-    /// Key associated with the output value of this question in the save data.
-    /// If the key is null, the output value will not be saved, but only for null scripts.
-    /// </summary>
-    public string? Key { get; }
- }
+/// <summary>
+/// An interface representing a question asked of the player.
+/// </summary>
+public interface IInterrogator { }
 public interface IInterrogator<T> : IInterrogator {
-    /// <summary>
-    /// Called by VNState when a value for the question already exists in the save data.
-    /// </summary>
-    public void Skip(T existing);
-
     /// <summary>
     /// Called by VNState to start the interrogation process.
     /// </summary>
@@ -43,14 +32,10 @@ public interface IInterrogator<T> : IInterrogator {
 }
 
 public class Interrogator<T> : IInterrogator<T> {
-    public string? Key { get; }
     public Evented<Action<T>?> AwaitingResponse { get; } = new(null);
 
     public Evented<bool> EntityActive { get; } = new(true);
 
-    public Interrogator(string? key = null) {
-        Key = key;
-    }
 
     public void Skip(T existing) {
         EntityActive.OnNext(false);
@@ -68,12 +53,17 @@ public class Interrogator<T> : IInterrogator<T> {
 public class ChoiceInterrogator<T> : Interrogator<T> {
     public IReadOnlyList<(T value, string description)> Choices { get; }
     
-    public ChoiceInterrogator(string? key, params (T, string)[] choices) : base(key) {
+    public ChoiceInterrogator(params (T, string)[] choices) {
         Choices = choices.ToArray();
     }
-    public ChoiceInterrogator(params (T, string)[] choices) : this(null, choices) { }
 }
 
+
+/* Would be really nice to have type constructors so I could generically write
+public interface IGenericEvent<T<>> {
+    public void OnNext<B>(T<B> data);
+}
+ */
 public interface IInterrogatorReceiver {
     public void OnNext<T>(IInterrogator<T> data);
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using BagoumLib;
 using BagoumLib.Events;
 using BagoumLib.Mathematics;
 using NUnit.Framework;
@@ -140,6 +141,20 @@ public class Events {
             0, 10, 11, 11, 56.5f, 102, 103, 103, 552.5f, 552.5f, 5276.75f
             
         });
+    }
+
+    [Test]
+    public void TestOnce() {
+        var ev1 = new Event<int>();
+        var vals = new List<int>();
+        ev1.SubscribeOnce(vals.Add);
+        var ev2 = new Evented<int>(5);
+        ev2.SubscribeOnce(vals.Add);
+        ev1.OnNext(1);
+        ev2.OnNext(2);
+        ev1.OnNext(3);
+        ev2.OnNext(4);
+        ListEq(vals, new int[] {5, 1});
     }
 
     private class MyObject {

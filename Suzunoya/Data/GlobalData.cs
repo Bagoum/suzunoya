@@ -23,6 +23,9 @@ public interface IGlobalData {
     IReadOnlyCollection<string> Gallery { get; }
 }
 
+/// <summary>
+/// A barebones implementation of IGlobalData.
+/// </summary>
 [Serializable]
 public class GlobalData : IGlobalData {
     public Settings Settings { get; init; } = new();
