@@ -16,19 +16,37 @@ public interface IBObservable<T> : IObservable<T> {
 }
 
 /// <summary>
-/// A subject that tracks its last published observable value.
+/// An observable that has a "current" value.
 /// </summary>
 [PublicAPI]
-public interface IBSubject<T, U> : ISubject<T, U>, IBObservable<U> {
+public interface ICObservable<T> : IBObservable<T> {
+    Maybe<T> IBObservable<T>.LastPublished => Value;
+    T Value { get; }
 }
 
 /// <summary>
 /// A subject that tracks its last published observable value.
 /// </summary>
 [PublicAPI]
-public interface IBSubject<T> : IBSubject<T, T>, ISubject<T> {
-    
-}
+public interface IBSubject<T, U> : ISubject<T, U>, IBObservable<U> { }
+
+/// <summary>
+/// A subject that has a "current" value.
+/// </summary>
+[PublicAPI]
+public interface ICSubject<T, U> : ISubject<T, U>, ICObservable<U> { }
+
+/// <summary>
+/// A subject that tracks its last published observable value.
+/// </summary>
+[PublicAPI]
+public interface IBSubject<T> : IBSubject<T, T>, ISubject<T> { }
+
+/// <summary>
+/// A subject that has a "current" value.
+/// </summary>
+[PublicAPI]
+public interface ICSubject<T> : ICSubject<T, T>, ISubject<T> { }
 
 /// <summary>
 /// A subject that observes elements of type T, maps them to type U, and publishes mapped elements to observers.
@@ -61,15 +79,8 @@ public class Event<T, U> : IBSubject<T, U> {
         callbacks.Empty();
     }
 
-    /// <summary>
-    /// Register a callback that is invoked whenever this object observes a new element.
-    /// </summary>
     public virtual IDisposable Subscribe(IObserver<U> observer) => callbacks.Add(observer);
 
-    /// <summary>
-    /// Same as OnNext.
-    /// </summary>
-    /// <param name="value"></param>
     public virtual void OnNext(T value) {
         var mvalue = mapper(value);
         LastPublished = Maybe<U>.Of(mvalue);
@@ -85,6 +96,11 @@ public class Event<T, U> : IBSubject<T, U> {
             callbacks.Compact();
     }
 }
+
+
+/// <summary>
+/// A subject that observes elements of type T and publishes them to observers without modification.
+/// </summary>
 [PublicAPI]
 public class Event<T> : Event<T, T>, IBSubject<T> {
     public Event() : base(x => x) { }

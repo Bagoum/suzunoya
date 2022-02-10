@@ -38,11 +38,12 @@ public class RenderGroup : Transform, ITinted {
     /// </summary>
     public Evented<int> Priority { get; }
     public Evented<bool> Visible { get; }
-    public DisturbedProduct<FColor> Tint { get; } = new(new FColor(1, 1, 1, 1));
+    public IdealOverride<FColor> Tint { get; } = new(FColor.White);
+    public DisturbedProduct<FColor> ComputedTint { get; }
     
     public float Alpha {
-        get => Tint.Value.a;
-        set => Tint.Value = Tint.BaseValue.WithA(value);
+        get => ComputedTint.Value.a;
+        set => Tint.Value = Tint.Value.WithA(value);
     }
 
     public Evented<float> Zoom { get; } = new(1);
@@ -53,16 +54,17 @@ public class RenderGroup : Transform, ITinted {
     public Event<IRendered> RendererAdded { get; } = new();
 
     public RenderGroup(IVNState container, string key = DEFAULT_KEY, int priority = 0, bool visible = false) {
-        ZoomTransformOffset = new(() => (Zoom - 1) / Zoom * (ZoomTarget.Value - Location), 
+        ZoomTransformOffset = new(() => (Zoom - 1) / Zoom * (ZoomTarget.Value - ComputedLocation), 
             new UnitEventProxy<float>(Zoom), new UnitEventProxy<Vector3>(ZoomTarget));
         Container = container;
         Key = key;
         Priority = new(priority);
         Visible = new(visible);
+        ComputedTint = new(Tint);
         tokens.Add(Container._AddRenderGroup(this));
     }
 
-    public override void AddToVNState(IVNState container) =>
+    public override void AddToVNState(IVNState container, IDisposable _) =>
         throw new Exception("Do not call RenderGroup.AddToVNState. Provide the VNState in the constructor.");
 
     public IDisposable Add(IRendered rnd) {

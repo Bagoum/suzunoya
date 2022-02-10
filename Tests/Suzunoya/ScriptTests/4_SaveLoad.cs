@@ -26,11 +26,12 @@ public class _4SaveLoadTest {
     /// </summary>
     public class _TestScript : TestScript {
         public _TestScript(VNState vn) : base(vn) { }
-        public async Task Run() {
+
+        public BoundedContext<Unit> Run() => new(vn, "outer", async () => {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
             await vn.Wait(0);
-            
+
             reimu.Alpha = 0;
             vn.OperationID.OnNext("A");
             await reimu.MoveTo(Vector3.One, 2f).Then(
@@ -46,14 +47,15 @@ public class _4SaveLoadTest {
             vn.OperationID.OnNext("E");
             await reimu.RotateTo(Vector3.Zero, 4f);
             vn.OperationID.OnNext("F");
-        }
+            return default;
+        });
 
     }
     [Test]
     public void ScriptTest() {
         var sd = new InstanceData(new GlobalData());
         var s = new _TestScript(new VNState(Cancellable.Null, sd));
-        var t = s.Run();
+        var t = s.Run().Execute();
         s.er.LoggedEvents.Clear();
         //We play a few lines, then "quit"
         for (int ii = 0; ii < 12; ++ii) {
@@ -64,13 +66,13 @@ public class _4SaveLoadTest {
                 s.vn.UserConfirm();
         }
         s.vn.UpdateSavedata();
-        Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>()));
+        Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>{"outer"}));
         Assert.IsTrue(new[]{"A", "B", "C",}.All(sd.GlobalData.IsLineRead));
         Assert.IsFalse(new[]{"D", "E", "F"}.Any(sd.GlobalData.IsLineRead));
         ListEq(s.er.SimpleLoggedEventStrings, stored1);
         //Then we load again
         s = new _TestScript(new VNState(Cancellable.Null, sd));
-        t = s.Run();
+        t = s.Run().Execute();
         s.er.LoggedEvents.Clear();
         for (int ii = 0; !t.IsCompleted; ++ii) {
             s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
@@ -81,88 +83,89 @@ public class _4SaveLoadTest {
 
     private static readonly string[] stored1 = {
         "<VNState>.$UpdateCount ~ 0",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
         "<VNState>.OperationID ~ A",
-        "<Reimu>.Location ~ <0, 0, 0>",
-        "<Reimu>.Location ~ <0, 0, 0>",
+        //"<Reimu>.ComputedLocation ~ <0, 0, 0>",
+        //"<Reimu>.ComputedLocation ~ <0, 0, 0>",
         "<VNState>.$UpdateCount ~ 1",
-        "<Reimu>.Location ~ <0.5, 0.5, 0.5>",
+        "<Reimu>.ComputedLocation ~ <0.5, 0.5, 0.5>",
         "<VNState>.$UpdateCount ~ 2",
-        "<Reimu>.Location ~ <1, 1, 1>",
-        "<Reimu>.Location ~ <1, 1, 1>",
-        "<Reimu>.Location ~ <1, 1, 1>",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+        "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+        //"<Reimu>.ComputedLocation ~ <1, 1, 1>",
+        //"<Reimu>.ComputedLocation ~ <1, 1, 1>",
+        //"<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+        //"<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
         "<VNState>.$UpdateCount ~ 3",
-        "<Reimu>.Location ~ <1.25, 1.25, 1.25>",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.095)",
+        "<Reimu>.ComputedLocation ~ <1.25, 1.25, 1.25>",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.095)",
         "<VNState>.$UpdateCount ~ 4",
-        "<Reimu>.Location ~ <1.75, 1.75, 1.75>",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.345)",
+        "<Reimu>.ComputedLocation ~ <1.75, 1.75, 1.75>",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.345)",
         "<VNState>.$UpdateCount ~ 5",
-        "<Reimu>.Location ~ <2, 2, 2>",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.655)",
+        "<Reimu>.ComputedLocation ~ <2, 2, 2>",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.655)",
         "<VNState>.$UpdateCount ~ 6",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.905)",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.905)",
         "<VNState>.$UpdateCount ~ 7",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
         "<VNState>.AwaitingConfirm ~ Suzunoya.ControlFlow.VNState",
         "<VNState>.$UpdateCount ~ 8",
         "<VNState>.AwaitingConfirm ~ ", //null
         "<VNState>.$UpdateCount ~ 9",
         "<VNState>.OperationID ~ B",
-        "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-        "<Reimu>.EulerAnglesD ~ <0, 0, 0>", //Location is captured after this command.
+        //"<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
+        //"<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>", //Location is captured after this command.
         "<VNState>.$UpdateCount ~ 10",
-        "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
+        "<Reimu>.ComputedEulerAnglesD ~ <0.5, 0.5, 0.5>",
         "<VNState>.$UpdateCount ~ 11",
-        "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
+        "<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>",
         "<VNState>.OperationID ~ C",
-        "<Reimu>.Location ~ <2, 2, 2>",
-        "<Reimu>.Location ~ <2, 2, 2>", //The last process is the beginning of the move location from 2 to 0.
+        //"<Reimu>.ComputedLocation ~ <2, 2, 2>",
+        //"<Reimu>.ComputedLocation ~ <2, 2, 2>", //The last process is the beginning of the move location from 2 to 0.
     };
 
     private static readonly string[] stored2 = {
         "<VNState>.$UpdateCount ~ 0",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
         "<VNState>.OperationID ~ A",
-        "<Reimu>.Location ~ <0, 0, 0>",
-        "<Reimu>.Location ~ <1, 1, 1>",
-        "<Reimu>.Location ~ <1, 1, 1>",
-        "<Reimu>.Location ~ <2, 2, 2>",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
-        "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
+        //"<Reimu>.ComputedLocation ~ <0, 0, 0>",
+        "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+        //"<Reimu>.ComputedLocation ~ <1, 1, 1>",
+        "<Reimu>.ComputedLocation ~ <2, 2, 2>",
+        //"<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+        "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
         "<VNState>.OperationID ~ B",
-        "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-        "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
+        //"<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
+        "<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>",
         "<VNState>.OperationID ~ C",
-        "<Reimu>.Location ~ <2, 2, 2>",
-        "<Reimu>.Location ~ <2, 2, 2>", 
+        //"<Reimu>.ComputedLocation ~ <2, 2, 2>",
+        //"<Reimu>.ComputedLocation ~ <2, 2, 2>", 
         //Everything until the last process (move location from 2 to 0) gets hypersped.
         //Note that it may not always take zero frames. At most, it might take one frame per operation
         // (which is effectively instantaneous in basically all use cases).
         "<VNState>.$UpdateCount ~ 1",
         //From here, everything is normal.
-        "<Reimu>.Location ~ <0, 0, 0>",
+        "<Reimu>.ComputedLocation ~ <0, 0, 0>",
         "<VNState>.OperationID ~ D",
-        "<Reimu>.Scale ~ <1, 1, 1>",
-        "<Reimu>.Scale ~ <1, 1, 1>",
+        //"<Reimu>.ComputedScale ~ <1, 1, 1>",
+        //"<Reimu>.ComputedScale ~ <1, 1, 1>",
         "<VNState>.$UpdateCount ~ 2",
-        "<Reimu>.Scale ~ <2, 2, 2>",
+        "<Reimu>.ComputedScale ~ <2, 2, 2>",
         "<VNState>.$UpdateCount ~ 3",
-        "<Reimu>.Scale ~ <3, 3, 3>",
+        "<Reimu>.ComputedScale ~ <3, 3, 3>",
         "<VNState>.OperationID ~ E",
-        "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
-        "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
+        //"<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>",
+        //"<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>",
         "<VNState>.$UpdateCount ~ 4",
-        "<Reimu>.EulerAnglesD ~ <0.8535534, 0.8535534, 0.8535534>",
+        "<Reimu>.ComputedEulerAnglesD ~ <0.8535534, 0.8535534, 0.8535534>",
         "<VNState>.$UpdateCount ~ 5",
-        "<Reimu>.EulerAnglesD ~ <0.5, 0.5, 0.5>",
+        "<Reimu>.ComputedEulerAnglesD ~ <0.5, 0.5, 0.5>",
         "<VNState>.$UpdateCount ~ 6",
-        "<Reimu>.EulerAnglesD ~ <0.14644659, 0.14644659, 0.14644659>",
+        "<Reimu>.ComputedEulerAnglesD ~ <0.14644659, 0.14644659, 0.14644659>",
         "<VNState>.$UpdateCount ~ 7",
-        "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-        "<VNState>.OperationID ~ F"
+        "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
+        "<VNState>.OperationID ~ F",
+        "<VNState>.ContextFinished ~ Context:outer",
     };
 }
 }

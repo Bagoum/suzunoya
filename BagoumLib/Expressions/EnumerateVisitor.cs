@@ -11,7 +11,7 @@ public class EnumerateVisitor : ExpressionVisitor {
         return exprs;
     }
 
-    public override Expression Visit(Expression node) {
+    public override Expression? Visit(Expression? node) {
         if (node != null)
             exprs.Add(node);
         return base.Visit(node);

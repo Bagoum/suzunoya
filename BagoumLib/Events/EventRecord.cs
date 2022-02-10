@@ -12,7 +12,6 @@ public class EventRecord {
         
         public string ToSimpleString() =>
             $"<{controller.GetType().RName()}>.{prop} ~ {value}";
-        
 
         public LogEvent(object controller, string prop, object value) : 
             this(controller, prop, controller.GetType().PropertyInfo(prop).PropertyType.GenericTypeArguments[0], value) { }

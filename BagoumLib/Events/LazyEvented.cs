@@ -12,7 +12,7 @@ namespace BagoumLib.Events {
 ///  one of the provided triggers is updated.
 /// </summary>
 [PublicAPI]
-public class LazyEvented<T> : IBSubject<T> {
+public class LazyEvented<T> : ICSubject<T> {
     private T _value;
     private readonly Func<T> getter;
     
@@ -20,7 +20,6 @@ public class LazyEvented<T> : IBSubject<T> {
         get => _value;
         set => onSet.OnNext(this._value = value);
     }
-    public Maybe<T> LastPublished => onSet.LastPublished;
     
     private readonly Event<T> onSet;
     private readonly List<IDisposable> tokens = new();

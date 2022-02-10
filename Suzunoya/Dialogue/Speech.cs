@@ -13,7 +13,7 @@ public class Speech {
     private readonly SpeechSettings cfg;
     
     private List<TextUnit>? textUnits;
-    public List<TextUnit> TextUnits => textUnits ??= SpeechParser.Parse(raw).GetOrThrow;
+    internal List<TextUnit> TextUnits => textUnits ??= SpeechParser.Parse(raw);
     private List<SpeechFragment>? fragments;
     public List<SpeechFragment> Fragments => fragments ??= Parse(cfg, TextUnits);
     private string? readable;

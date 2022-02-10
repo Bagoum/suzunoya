@@ -137,7 +137,7 @@ public class Events {
         pl.Update(1); //104, 1001 -> 552.5
         pl.Push(t => 10000 + t); //552.5, 10000 -> 552.5
         pl.Update(1); //552.5, 10001 -> 5276.75
-        ListEq(vals, new float[] {
+        ListEq(vals, new[] {
             0, 10, 11, 11, 56.5f, 102, 103, 103, 552.5f, 552.5f, 5276.75f
             
         });
@@ -154,7 +154,7 @@ public class Events {
         ev2.OnNext(2);
         ev1.OnNext(3);
         ev2.OnNext(4);
-        ListEq(vals, new int[] {5, 1});
+        ListEq(vals, new[] {5, 1});
     }
 
     private class MyObject {

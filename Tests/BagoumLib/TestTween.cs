@@ -7,7 +7,7 @@ using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Mathematics;
-using BagoumLib.Tweening;
+using BagoumLib.Transitions;
 using NUnit.Framework;
 using static Tests.AssertHelpers;
 
@@ -15,10 +15,10 @@ namespace Tests.BagoumLib {
 public class TestTween {
     [SetUp]
     public void Setup() {
-        Tween.DefaultDeltaTimeProvider = () => 1;
+        TransitionHelpers.DefaultDeltaTimeProvider = () => 1;
     }
 
-    private static Task<Completion> TestSteps<T>(ITweener t, Coroutines? cors, Func<T> value, T[] expected, Action<T, T> assertEq, bool lastIsComplete = true) {
+    private static Task<Completion> TestSteps<T>(ITransition t, Coroutines? cors, Func<T> value, T[] expected, Action<T, T> assertEq, bool lastIsComplete = true) {
         cors ??= new Coroutines();
         var tw = t.Run(cors);
         for (int ii = 0; ii < expected.Length; ++ii) {
@@ -40,7 +40,7 @@ public class TestTween {
     [Test]
     public void TestBasic() {
         var v = new Vector2(-2, -2);
-        TestSteps(Tween.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null), 
+        TestSteps(TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null), 
             null, () => v, new [] {
             Vector2.Zero, 
             new Vector2(0.5f, 0.5f), 
@@ -48,7 +48,7 @@ public class TestTween {
         }, VecEq);
 
         v = new Vector2(-2, -2);
-        TestSteps(Tween.TweenDelta(Vector2.One, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null), 
+        TestSteps(TransitionHelpers.TweenDelta(Vector2.One, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null), 
             null, () => v, new [] {
                 Vector2.One, 
                 new Vector2(1.5f, 1.5f), 
@@ -59,7 +59,7 @@ public class TestTween {
     [Test]
     public void TestReverse() {
         var v = new Vector2(-2, -2);
-        TestSteps(Tween.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null).Reverse(), 
+        TestSteps(TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.ELinear, Cancellable.Null).Reverse(), 
             null, () => v, new [] {
             Vector2.One,
             new Vector2(0.5f, 0.5f), 
@@ -72,7 +72,7 @@ public class TestTween {
         var v = new Vector2(-2, -2);
         var cors = new Coroutines();
         var ct = new Cancellable();
-        var tw = (Tween.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct)).Run(cors);
+        var tw = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct)).Run(cors);
         cors.Step();
         cors.Step();
         VecEq(v, Vector2.One / 20f);
@@ -82,7 +82,7 @@ public class TestTween {
         Assert.AreEqual(tw.Result, Completion.SoftSkip);
         
         ct = new Cancellable();
-        tw = (Tween.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct)).Run(cors);
+        tw = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct)).Run(cors);
         cors.Step();
         cors.Step();
         VecEq(v, Vector2.One / 20f);
@@ -93,7 +93,7 @@ public class TestTween {
         
         
         ct = new Cancellable();
-        var t0 = (Tween.TweenTo(Vector2.Zero, Vector2.One, 5, x => v = x, Easers.ELinear, ct));
+        var t0 = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 5, x => v = x, Easers.ELinear, ct));
         tw = t0.Then(t0.Reverse()).Run(cors);
         cors.Step();
         cors.Step();
@@ -104,7 +104,7 @@ public class TestTween {
         Assert.AreEqual(tw.Result, Completion.SoftSkip);
         
         ct = new Cancellable();
-        t0 = (Tween.TweenTo(Vector2.Zero, Vector2.One, 5, x => v = x, Easers.ELinear, ct));
+        t0 = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 5, x => v = x, Easers.ELinear, ct));
         tw = t0.Then(t0.Reverse()).Run(cors);
         cors.Step();
         cors.Step();
@@ -120,7 +120,7 @@ public class TestTween {
         var v = new Vector2(-2, -2);
         var cors = new Coroutines();
         var ct = new Cancellable();
-        var t0 = Tween.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.ELinear, ct);
+        var t0 = TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.ELinear, ct);
         var tw = TestSteps(t0.Then(t0.Reverse()).Loop(), cors, () => v, new[] {
             Vector2.Zero, 
             Vector2.One * 0.5f,
@@ -142,7 +142,7 @@ public class TestTween {
     [Test]
     public void TestEase() {
         var v = new Vector2(-2, -2);
-        TestSteps(Tween.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.EInSine, Cancellable.Null), 
+        TestSteps(TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 2, x => v = x, Easers.EInSine, Cancellable.Null), 
             null, () => v, new [] {
             Vector2.Zero, 
             Vector2.One * Easers.EInSine(0.5f),

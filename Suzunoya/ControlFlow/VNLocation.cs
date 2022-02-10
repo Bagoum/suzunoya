@@ -38,12 +38,13 @@ public class VNLocation {
     }
     
     public static List<string>? GetContexts(IVNState vn) {
-        List<string> lines = new();
+        //Don't save the location if there are no contexts (ie. there is no active script)
+        List<string>? lines = null;
         foreach (var ctx in vn.Contexts) {
             //Can't save the location if any script in the stack is unidentifiable
             if (string.IsNullOrEmpty(ctx.ID))
                 return null;
-            lines.Add(ctx.ID);
+            (lines ??= new()).Add(ctx.ID);
         }
         return lines;
     }
@@ -104,6 +105,8 @@ public record VNOpTracker(IVNState vn, ICancellee cT) : ICancellee {
     public bool Cancelled => cT.Cancelled;
     public ICancellee Root => cT.Root;
     public VNLocation? Location => VNLocation.Make(vn);
+
+    public VNOpTracker BoundCT(ICancellee ncT) => new(vn, new JointCancellee(cT, ncT));
 }
 
 }

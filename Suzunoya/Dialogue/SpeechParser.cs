@@ -5,7 +5,7 @@ using Mizuhashi;
 using static Mizuhashi.Combinators;
 
 namespace Suzunoya.Dialogue {
-public abstract record TextUnit {
+internal abstract record TextUnit {
     public record String(string fragment) : TextUnit;
         
     public record OpenTag(string name, string? content = null) : TextUnit;
@@ -21,16 +21,15 @@ public static partial class SpeechParser {
     private static bool NotTagOrEscapeChar(char c) => !TagChar(c) && c != ESCAPER;
 
     private static readonly Parser<TextUnit> escapedFragment =
-        Sequential(Char(ESCAPER), Satisfy(TagChar), (_, c) => 
+        Sequential(Char(ESCAPER), AnyChar(), (_, c) => 
             (TextUnit)new TextUnit.String(c.ToString()));
 
     private static readonly Parser<TextUnit> normalFragment =
-        from s in Many1Satisfy(NotTagOrEscapeChar)
-        select (TextUnit) new TextUnit.String(s);
+        Many1Satisfy(NotTagOrEscapeChar).FMap(s => (TextUnit)new TextUnit.String(s));
 
     private static readonly Parser<TextUnit> tagFragment =
         Between(TAG_OPEN, Many1Satisfy(NotTagChar), TAG_CLOSE).FMap(s => {
-            var contInd = -1;
+            int contInd;
             if (s[0] == TAG_CLOSE_PREFIX)
                 return (TextUnit)new TextUnit.CloseTag(s.Substring(1));
             else if ((contInd = s.IndexOf(TAG_CONTENT)) > 0)
@@ -46,11 +45,14 @@ public static partial class SpeechParser {
         escapedFragment
     ).Many1();
 
-    public static Errorable<List<TextUnit>> Parse(string raw) {
-        var res = speechParser(new InputStream("Dialogue text", raw, null!));
-        return res.Result.Try(out var v) ?
-            Errorable<List<TextUnit>>.OK(v) :
-            Errorable<List<TextUnit>>.Fail(res.Error?.Show(raw) ?? "Parsing failed, but no error string is present.");
+    /// <summary>
+    /// Parse rich text tags out of a raw string.
+    /// </summary>
+    /// <param name="raw">Raw string</param>
+    /// <returns>Parsed content</returns>
+    /// <exception cref="Exception">Thrown if parsing fails</exception>
+    internal static List<TextUnit> Parse(string raw) => 
+        speechParser.ResultOrErrorString(new InputStream("Dialogue text", raw, null!))
+            .Map(l => l, r => throw new Exception(r));
     }
-}
 }

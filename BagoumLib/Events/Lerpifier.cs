@@ -8,14 +8,13 @@ namespace BagoumLib.Events {
 /// Lerpifier tracks a changing value (targetValue) by smoothly lerping to it.
 /// </summary>
 [PublicAPI]
-public class Lerpifier<T> : IBObservable<T> where T : IComparable<T> {
+public class Lerpifier<T> : ICObservable<T> where T : IComparable<T> {
     private readonly Func<T, T, float, T> lerper;
     private readonly Func<T> targetValue;
     private readonly float lerpTime;
     private T lastSourceValue;
     private T lastTargetValue;
     public T Value => OnChange.Value;
-    public Maybe<T> LastPublished => OnChange.LastPublished;
     private float elapsed;
 
     private Evented<T> OnChange { get; }

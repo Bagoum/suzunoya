@@ -11,7 +11,7 @@ public class MyTestCharacter : Character {
     public SpeechSettings speechCfg = new SpeechSettings(1, (s, i) => 1, 2, (s, i) => char.IsUpper(s[i]), null);
     public override SpeechSettings SpeechCfg => speechCfg;
 
-    public enum Emote {
+    public new enum Emote {
         Happy,
         Angry,
         Neutral,

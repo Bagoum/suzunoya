@@ -10,7 +10,8 @@ namespace BagoumLib.Expressions {
 public class PrintAsReturnVisitor : DerivativePrintVisitor {
     public PrintAsReturnVisitor(PrintVisitor parent) : base(parent) { }
 
-    public override Expression Visit(Expression node) {
+    public override Expression? Visit(Expression? node) {
+        if (node == null) return node;
         if (node.Type == typeof(void))
             return parent.Visit(node);
         switch (node) {

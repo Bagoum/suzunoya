@@ -59,7 +59,7 @@ public static class ReflectionUtils {
     }
 
 
-    public static T CreateInstance<T>(params object[] args) => ((T) Activator.CreateInstance(typeof(T), args))!;
+    public static T CreateInstance<T>(params object[] args) => (T) Activator.CreateInstance(typeof(T), args)!;
     
     public static MethodInfo MethodInfo(this Type t, string method, bool instance=true) =>
         t.GetMethod(method, (instance ? BindingFlags.Instance : BindingFlags.Static) 

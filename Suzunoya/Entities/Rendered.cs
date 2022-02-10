@@ -8,7 +8,8 @@ using Suzunoya.Display;
 
 namespace Suzunoya.Entities {
 public interface ITinted : IEntity {
-    DisturbedProduct<FColor> Tint { get; }
+    IdealOverride<FColor> Tint { get; }
+    DisturbedProduct<FColor> ComputedTint { get; }
 }
 public interface IRendered : ITransform, ITinted {
     /// <summary>
@@ -18,7 +19,7 @@ public interface IRendered : ITransform, ITinted {
     Evented<RenderGroup?> RenderGroup { get; }
     Evented<int> RenderLayer { get; }
     DisturbedSum<int> SortingID { get; }
-    Evented<bool> Visible { get; }
+    DisturbedAnd Visible { get; }
     
     /// <summary>
     /// If the object is already associated with a render group,
@@ -32,12 +33,13 @@ public class Rendered : Transform, IRendered {
     private IDisposable? renderGroupToken;
     public Evented<int> RenderLayer { get; }
     public DisturbedSum<int> SortingID { get; } = new(0);
-    public Evented<bool> Visible { get; }
-    public DisturbedProduct<FColor> Tint { get; }
+    public DisturbedAnd Visible { get; }
+    public IdealOverride<FColor> Tint { get; } = new(FColor.White);
+    public DisturbedProduct<FColor> ComputedTint { get; }
 
     public float Alpha {
-        get => Tint.Value.a;
-        set => Tint.Value = Tint.BaseValue.WithA(value);
+        get => ComputedTint.Value.a;
+        set => Tint.Value = Tint.Value.WithA(value);
     }
 
     /// <summary>
@@ -49,9 +51,8 @@ public class Rendered : Transform, IRendered {
         bool visible = true, FColor? color = null) : base(location, eulerAnglesD, scale) {
         // ReSharper disable once VirtualMemberCallInConstructor
         RenderLayer = new(DefaultRenderLayer);
-        
         Visible = new(visible);
-        Tint = new(color ?? new FColor(1, 1, 1, 0));
+        ComputedTint = new(Tint);
     }
     
     public void AddToRenderGroup(RenderGroup group, int? sortingID = null) {
@@ -63,11 +64,26 @@ public class Rendered : Transform, IRendered {
         RenderGroup.Value = group;
     }
 
+    protected override void BindParent(ITransform nParent) {
+        base.BindParent(nParent);
+        if (nParent is IRendered r)
+            parentTokens.Add(Visible.AddDisturbance(r.Visible));
+    }
+
     public override void Delete() {
         renderGroupToken?.Dispose();
         renderGroupToken = null;
         base.Delete();
     }
+    
+    /// <summary>
+    /// Short for Visible.Value = false
+    /// </summary>
+    public void Hide() => Visible.Value = false;
+    /// <summary>
+    /// Short for Visible.Value = true
+    /// </summary>
+    public void Show() => Visible.Value = true;
 }
 
 }

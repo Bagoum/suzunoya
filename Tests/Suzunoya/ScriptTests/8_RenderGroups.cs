@@ -36,7 +36,7 @@ public class _8RenderGroupTest {
             ListEq(rg2.Contents.ToArray(), new IRendered[] { });
             ListEq(rg3.Contents.ToArray(), new[] { reimu });
             reimu.Location.Value = Vector3.One;
-            rg3.ZoomTarget.Value = reimu.Location;
+            rg3.ZoomTarget.Value = reimu.ComputedLocation;
             await rg3.ZoomTo(2f, 3f);
             return 1337;
         }
@@ -57,39 +57,38 @@ public class _8RenderGroupTest {
 
     private static readonly string[] stored = {
         "<VNState>.$UpdateCount ~ 0",
-        "<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
+        "<VNState>.RenderGroupCreated ~ <RenderGroup>",
         "<RenderGroup>.EntityActive ~ True",
-        "<RenderGroup>.EulerAnglesD ~ <0, 0, 0>",
-        "<RenderGroup>.Location ~ <0, 0, 0>",
+        "<RenderGroup>.ComputedEulerAnglesD ~ <0, 0, 0>",
+        "<RenderGroup>.ComputedLocation ~ <0, 0, 0>",
         "<RenderGroup>.NestedRenderGroup ~ ",
         "<RenderGroup>.Priority ~ 2",
         "<RenderGroup>.RenderLayer ~ 0",
-        "<RenderGroup>.Scale ~ <1, 1, 1>",
-        "<RenderGroup>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
+        "<RenderGroup>.ComputedScale ~ <1, 1, 1>",
+        "<RenderGroup>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
         "<RenderGroup>.Visible ~ False",
         "<RenderGroup>.Zoom ~ 1",
         "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
         "<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
-        "<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
+        "<VNState>.RenderGroupCreated ~ <RenderGroup>",
         "<RenderGroup>.EntityActive ~ True",
-        "<RenderGroup>.EulerAnglesD ~ <0, 0, 0>",
-        "<RenderGroup>.Location ~ <0, 0, 0>",
+        "<RenderGroup>.ComputedEulerAnglesD ~ <0, 0, 0>",
+        "<RenderGroup>.ComputedLocation ~ <0, 0, 0>",
         "<RenderGroup>.NestedRenderGroup ~ ",
         "<RenderGroup>.Priority ~ 3",
         "<RenderGroup>.RenderLayer ~ 0",
-        "<RenderGroup>.Scale ~ <1, 1, 1>",
-        "<RenderGroup>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
+        "<RenderGroup>.ComputedScale ~ <1, 1, 1>",
+        "<RenderGroup>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
         "<RenderGroup>.Visible ~ False",
         "<RenderGroup>.Zoom ~ 1",
         "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
         "<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
         "<Reimu>.SortingID ~ 0",
-        "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
-        "<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
-        "<Reimu>.SortingID ~ 0",
-        "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
-        "<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
-        "<Reimu>.Location ~ <1, 1, 1>",
+        "<RenderGroup>.RendererAdded ~ <Reimu>",
+        "<Reimu>.RenderGroup ~ <RenderGroup>",
+        "<RenderGroup>.RendererAdded ~ <Reimu>",
+        "<Reimu>.RenderGroup ~ <RenderGroup>",
+        "<Reimu>.ComputedLocation ~ <1, 1, 1>",
         "<RenderGroup>.ZoomTarget ~ <1, 1, 1>",
         "<RenderGroup>.Zoom ~ 1",
         "<RenderGroup>.Zoom ~ 1",

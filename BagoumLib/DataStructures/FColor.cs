@@ -45,6 +45,9 @@ public struct FColor {
     public static implicit operator FColor(Vector4 v) => new(v.X, v.Y, v.Z, v.W);
 
     public static implicit operator FColor(Color c) => new(c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
+
+    public static FColor White => new FColor(1, 1, 1, 1);
+    public static FColor Clear => new FColor(0, 0, 0, 0);
 }
 
 }

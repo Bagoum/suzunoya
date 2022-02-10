@@ -7,7 +7,7 @@ using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Functional;
-using BagoumLib.Tweening;
+using BagoumLib.Transitions;
 using NUnit.Framework;
 using Suzunoya;
 using Suzunoya.Entities;
@@ -42,49 +42,46 @@ public class _1BasicVNStateFunctionalityTest {
                 "<VNState>.AwaitingConfirm ~ ",
                 "<VNState>.InputAllowed ~ True",
                 "<VNState>.OperationID ~ $$__OPEN__$$",
-                "<VNState>.RenderGroupCreated ~ Suzunoya.Display.RenderGroup",
+                "<VNState>.RenderGroupCreated ~ <RenderGroup>",
                 "<VNState>.VNStateActive ~ True",
                 "<RenderGroup>.EntityActive ~ True",
-                "<RenderGroup>.EulerAnglesD ~ <0, 0, 0>",
-                "<RenderGroup>.Location ~ <0, 0, 0>",
+                "<RenderGroup>.ComputedEulerAnglesD ~ <0, 0, 0>",
+                "<RenderGroup>.ComputedLocation ~ <0, 0, 0>",
                 "<RenderGroup>.NestedRenderGroup ~ ",
                 "<RenderGroup>.Priority ~ 0",
                 "<RenderGroup>.RenderLayer ~ 0",
-                "<RenderGroup>.Scale ~ <1, 1, 1>",
-                "<RenderGroup>.Tint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
+                "<RenderGroup>.ComputedScale ~ <1, 1, 1>",
+                "<RenderGroup>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
                 "<RenderGroup>.Visible ~ True",
                 "<RenderGroup>.Zoom ~ 1",
                 "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
                 "<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
-                "<VNState>.EntityCreated ~ Tests.Suzunoya.TestDialogueBox",
+                "<RenderGroup>.RendererAdded ~ <TestDialogueBox>",
+                "<VNState>.EntityCreated ~ <TestDialogueBox>",
                 "<TestDialogueBox>.EntityActive ~ True",
-                "<TestDialogueBox>.EulerAnglesD ~ <0, 0, 0>",
-                "<TestDialogueBox>.Location ~ <0, 0, 0>",
-                "<TestDialogueBox>.RenderGroup ~ ",
+                "<TestDialogueBox>.ComputedEulerAnglesD ~ <0, 0, 0>",
+                "<TestDialogueBox>.ComputedLocation ~ <0, 0, 0>",
+                "<TestDialogueBox>.RenderGroup ~ <RenderGroup>",
                 "<TestDialogueBox>.RenderLayer ~ 0",
-                "<TestDialogueBox>.Scale ~ <1, 1, 1>",
+                "<TestDialogueBox>.ComputedScale ~ <1, 1, 1>",
                 "<TestDialogueBox>.SortingID ~ 0",
                 "<TestDialogueBox>.Speaker ~ (, Default)",
-                "<TestDialogueBox>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
+                "<TestDialogueBox>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
                 "<TestDialogueBox>.Visible ~ True",
-                "<TestDialogueBox>.SortingID ~ 0",
-                "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.TestDialogueBox",
-                "<TestDialogueBox>.RenderGroup ~ Suzunoya.Display.RenderGroup",
-                "<VNState>.EntityCreated ~ Tests.Suzunoya.Reimu",
+                "<RenderGroup>.RendererAdded ~ <Reimu>",
+                "<VNState>.EntityCreated ~ <Reimu>",
+                "<Reimu>.Emote ~ ",
                 "<Reimu>.Emotion ~ Neutral",
                 "<Reimu>.EntityActive ~ True",
-                "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
                 "<Reimu>.GoheiLength ~ 14",
-                "<Reimu>.Location ~ <0, 0, 0>",
-                "<Reimu>.RenderGroup ~ ",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
+                "<Reimu>.RenderGroup ~ <RenderGroup>",
                 "<Reimu>.RenderLayer ~ 0",
-                "<Reimu>.Scale ~ <1, 1, 1>",
-                "<Reimu>.SortingID ~ 0",
-                "<Reimu>.Tint ~ RGBA(1.000, 1.000, 1.000, 0.000)",
-                "<Reimu>.Visible ~ True",
+                "<Reimu>.ComputedScale ~ <1, 1, 1>",
                 "<Reimu>.SortingID ~ 1",
-                "<RenderGroup>.RendererAdded ~ Tests.Suzunoya.Reimu",
-                "<Reimu>.RenderGroup ~ Suzunoya.Display.RenderGroup",
+                "<Reimu>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
+                "<Reimu>.Visible ~ True",
                 "<Reimu>.Emotion ~ Angry"
             });
             er.LoggedEvents.Clear();
@@ -94,14 +91,14 @@ public class _1BasicVNStateFunctionalityTest {
             ListEq(er.SimpleLoggedEventStrings, new [] {
                 "<VNState>.OperationID ~ hEllO wOrld foo",
                 "<TestDialogueBox>.DialogueCleared ~ ()",
-                "<TestDialogueBox>.Speaker ~ (Tests.Suzunoya.Reimu, Default)",
+                "<TestDialogueBox>.Speaker ~ (<Reimu>, Default)",
             });
             er.LoggedEvents.Clear();
             //The dT on the first frame doesn't matter since the pattern is "yield then -= dT"
             vn.Update(200f);
             ListEq(er.SimpleLoggedEventStrings, new[] {
-                "<TestDialogueBox>.DialogueStarted ~ Reimu:hEllO wOrld foo",
                 "<VNState>.DialogueLog ~ Reimu:hEllO wOrld foo",
+                "<TestDialogueBox>.DialogueStarted ~ Reimu:hEllO wOrld foo",
                 "<TestDialogueBox>.Dialogue ~ (Char { fragment = h }, EllO)",
                 "<Reimu>.$SPEAK ~ ",
                 "<TestDialogueBox>.Dialogue ~ (Char { fragment = E }, llO)",

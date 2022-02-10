@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using BagoumLib.Events;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using Suzunoya.ControlFlow;
@@ -61,6 +62,29 @@ public class serializeme {
         Assert.AreEqual(r_save.GlobalData, r_global);
 
         int k = 5;
+    }
+
+    [Serializable]
+    public record MyClassWEvented {
+        public Evented<int> X = new(5);
+        public Evented<string> Y = new("hello");
+    }
+    [Test]
+    public void TestCustomEventedSerialize() {
+        var w = new MyClassWEvented();
+        var typs = new JsonSerializerSettings() {TypeNameHandling = TypeNameHandling.Auto};
+        string s1 = JsonConvert.SerializeObject(w, Formatting.None, typs);
+        Assert.AreEqual(s1, "{\"X\":5,\"Y\":\"hello\"}");
+        w.X.Value = 9;
+        w.Y.Value = "world";
+        string s2 = JsonConvert.SerializeObject(w, Formatting.None, typs);
+        Assert.AreEqual(s2, "{\"X\":9,\"Y\":\"world\"}");
+        var wd = JsonConvert.DeserializeObject<MyClassWEvented>(s2);
+        w.X.Value = 12;
+        w.Y.Value = "!!!";
+        Assert.AreEqual(wd.X.Value, 9);
+        Assert.AreEqual(wd.Y.Value, "world");
+
     }
 }
 }

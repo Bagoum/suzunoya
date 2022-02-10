@@ -292,8 +292,8 @@ a
 
     [Test]
     public void TestEmpty() {
-        ParseDocument(s).AssertSuccess("", new () {});
-        ParseDocument(s).AssertSuccess("   ", new() {});
+        ParseDocument(s).AssertSuccess("", new ());
+        ParseDocument(s).AssertSuccess("   ", new());
         ParseDocument(s).AssertSuccess("   \n", new() {new Empty()});
         ParseDocument(s).AssertSuccess("   \n   ", new() {new Empty()});
         ParseDocument(s).AssertSuccess("   \n   \n", new() {new Empty(), new Empty()});
@@ -303,13 +303,14 @@ a
         ParseDocument(s).AssertSuccess("hello   \n   \n  \n  ", new() {P(S("hello   ")), new Empty()});
     }
 
+    /*
     [Test]
     public void TestEXT() {
         Console.WriteLine(Environment.CurrentDirectory);
         var txt = File.ReadAllText("test1.md");
         var md = MarkdownParser.Parse(txt);
         var k = 5;
-    }
+    }*/
 
 }
 }

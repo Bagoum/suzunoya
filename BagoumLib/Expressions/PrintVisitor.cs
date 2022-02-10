@@ -19,7 +19,7 @@ public abstract record PrintToken {
     /// <summary>
     /// Any constant value.
     /// </summary>
-    public record Constant(object value) : PrintToken;
+    public record Constant(object? value) : PrintToken;
 
     public record TypeName(Type t) : PrintToken;
 
@@ -96,7 +96,7 @@ public class PrintVisitor : PrintVisitorAbs {
         return Tokens.ToArray();
     }
 
-    public override Expression Visit(Expression node) {
+    public override Expression? Visit(Expression? node) {
         if (node == null) return null;
         if (node.NodeType.IsChecked()) {
             Add("checked(");
@@ -151,9 +151,12 @@ public class PrintVisitor : PrintVisitorAbs {
     }
 
     protected CatchBlock VisitCatchBlock(CatchBlock node, PrintVisitorAbs innerVisitor) {
-        Add(" catch (");
-        VisitTypedParameter(node.Variable);
-        Add(")");
+        Add(" catch");
+        if (node.Variable != null) {
+            Add(" (");
+            VisitTypedParameter(node.Variable);
+            Add(")");
+        }
         if (node.Filter != null) {
             Add(" when (");
             Visit(node.Filter);
@@ -242,7 +245,7 @@ public class PrintVisitor : PrintVisitorAbs {
         return node;
     }
 
-    protected override LabelTarget VisitLabelTarget(LabelTarget node) {
+    protected override LabelTarget VisitLabelTarget(LabelTarget? node) {
         throw new Exception();
     }
 
@@ -356,7 +359,8 @@ public class PrintVisitor : PrintVisitorAbs {
 
     protected override Expression VisitNew(NewExpression node) {
         Add("new ", new TypeName(node.Type));
-        VisitArguments(node.Arguments, node.Constructor.GetParameters());
+        VisitArguments(node.Arguments, 
+            (node.Constructor ?? throw new Exception("No constructor provided")).GetParameters());
         return node;
     }
 

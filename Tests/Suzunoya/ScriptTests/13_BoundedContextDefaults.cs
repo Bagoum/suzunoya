@@ -1,25 +1,15 @@
-﻿using System.Drawing;
-using System.Linq;
-using System.Numerics;
-using System.Reactive;
-using System.Reactive.Linq;
-using System.Threading.Tasks;
-using BagoumLib.Cancellation;
-using BagoumLib.DataStructures;
-using BagoumLib.Events;
-using BagoumLib.Mathematics;
+﻿using BagoumLib.Cancellation;
 using NUnit.Framework;
 using Suzunoya.ControlFlow;
 using Suzunoya.Data;
 using Suzunoya.Dialogue;
-using Suzunoya.Entities;
-using static Tests.Suzunoya.MyTestCharacter;
-using static Tests.Suzunoya.ScriptTestHelpers;
-using static Tests.AssertHelpers;
-using static Suzunoya.Helpers;
 
 namespace Tests.Suzunoya {
 
+/// <summary>
+/// Tests cases where code is added to the game (eg. new dialogue as a patch).
+/// The new code should be enclosed within a BoundedContext assigned a LoadingDefault.
+/// </summary>
 public class _13BoundedContextDefaultTest {
     public class _TestScript : TestScript {
 	    public _TestScript(VNState? vn = null) : base(vn) { }
@@ -69,19 +59,19 @@ public class _13BoundedContextDefaultTest {
     [Test]
     public void ScriptTest() {
         var s = new _TestScript(new VNState(Cancellable.Null, new InstanceData(new GlobalData())));
-        var t = s.Run().Execute().Task;
+        var t = s.Run().Execute();
         for (int ii = 0; ii < 13; ++ii)
 	        s.vn.Update(1f);
         var sd = s.vn.UpdateSavedata();
         s = new _TestScript(new VNState(Cancellable.Null, sd));
-        t = s.Runv2().Execute().Task;
+        t = s.Runv2().Execute();
         //InnerCtxBad runs even though it shouldn't
         for (int ii = 0; ii < 600; ++ii)
 	        s.vn.Update(1f);
         Assert.IsTrue(t.IsFaulted);
         
         s = new _TestScript(new VNState(Cancellable.Null, sd));
-        t = s.Runv3().Execute().Task;
+        t = s.Runv3().Execute();
         for (int ii = 0; ii < 2; ++ii)
 	        //Still require a few updates to go through cancelled corountines
 	        s.vn.Update(0.01f);

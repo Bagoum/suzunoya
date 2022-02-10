@@ -2,22 +2,23 @@
 using System.Reactive.Subjects;
 using BagoumLib.Functional;
 using JetBrains.Annotations;
+using Newtonsoft.Json;
 
 namespace BagoumLib.Events {
 /// <summary>
 /// A wrapper around a value that publishes an event whenever it is set.
 /// New subscribers are sent the existing value as well as any new values.
-/// <br/>(This is effectively the same as BehaviorSubject.)
+/// <br/>(Same as BehaviorSubject.)
+/// <br/>This class can be serialized and deserialized in Newtonsoft.JSON.
 /// </summary>
-[PublicAPI]
-public class Evented<T> : IBSubject<T> {
+[PublicAPI] [JsonConverter(typeof(EventedSerializer))]
+public class Evented<T> : ICSubject<T> {
     private T _value;
     
     public T Value {
         get => _value;
         set => onSet.OnNext(this._value = value);
     }
-    public Maybe<T> LastPublished => onSet.LastPublished;
     
     private readonly Event<T> onSet;
 

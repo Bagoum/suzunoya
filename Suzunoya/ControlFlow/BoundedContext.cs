@@ -32,28 +32,25 @@ public interface IBoundedContext {
 public class BoundedContext<T> : IBoundedContext {
     public IVNState VN { get; }
     public string ID { get; }
-    private ILazyAwaitable<T> InnerTask { get; }
+    private Func<Task<T>> InnerTask { get; }
     public Action? ShortCircuit { get; init; }
     /// <summary>
     /// Default value to provide for this bounded context if it needs to be skipped during loading,
     ///  but has not saved a result value in the instance save.
-    /// <br/>This only occurs if execution of the context was limited by an if statement/etc, or
-    ///  an update was made to the game.
+    /// <br/>This only occurs if execution of the context was limited by an if statement/etc
+    ///  without a ComputeFlag guard, or if an update was made to the game.
     /// </summary>
     public Maybe<T> LoadingDefault { get; init; } = Maybe<T>.None;
     
-    public BoundedContext(VNState vn, string? id, ILazyAwaitable<T> innerTask, Action? shortCircuit = null) {
+    public BoundedContext(VNState vn, string id, Func<Task<T>> innerTask, Action? shortCircuit = null) {
         VN = vn;
-        ID = id ?? "";
+        ID = id;
         InnerTask = innerTask;
         ShortCircuit = shortCircuit;
     }
 
-    public BoundedContext(VNState vn, string? id, Func<Task<T>> task, Action? shortCircuit = null) : 
-        this(vn, id, new LazyTask<T>(task), shortCircuit) { }
+    internal Task<T> Execute() => VN.ExecuteContext(this, InnerTask);
 
-    public ILazyAwaitable<T> Execute() => VN.ExecuteContext(this, InnerTask);
-    
     [UsedImplicitly]
     public TaskAwaiter<T> GetAwaiter() => Execute().GetAwaiter();
 

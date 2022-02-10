@@ -11,7 +11,7 @@ using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Functional;
 using BagoumLib.Tasks;
-using BagoumLib.Tweening;
+using BagoumLib.Transitions;
 using JetBrains.Annotations;
 using Suzunoya.ControlFlow;
 using Suzunoya.Data;
@@ -65,6 +65,10 @@ public interface IVNState {
     bool TryFullSkip();
     
     /// <summary>
+    /// True if autoplay and fastforward are allowed as operations.
+    /// </summary>
+    bool AutoplayFastforwardAllowed { get; }
+    /// <summary>
     /// The amount of time the VNState will wait before executing confirm commands while autoplaying.
     /// </summary>
     public float TimePerAutoplayConfirm { get; set; }
@@ -84,11 +88,12 @@ public interface IVNState {
     public void OpenLog();
 
     RenderGroup DefaultRenderGroup { get; }
-    
+
     /// <summary>
-    /// This should generally be called by the entity constructor. Script code should use vn.Add or whatever function is provided.
+    /// Add an entity to the VNState.
     /// </summary>
-    IDisposable AddEntity(IEntity ent);
+    public C Add<C>(C ent, RenderGroup? renderGroup = null, int? sortingID = null) where C : IEntity;
+    
     /// <summary>
     /// This is called within the RenderGroup constructor. You do not need to call it explicitly.
     /// </summary>
@@ -132,7 +137,7 @@ public interface IVNState {
     /// Executes the bounded context, saves the output value in instance save data, and returns the output value.
     /// </summary>
     /// <returns></returns>
-    ILazyAwaitable<T> ExecuteContext<T>(BoundedContext<T> ctx, ILazyAwaitable<T> innerTask);
+    Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask);
     
 
     void RecordCG(IGalleryable cg);
@@ -153,10 +158,6 @@ public interface IVNState {
     AccEvent<DialogueOp> DialogueLog { get; }
     Event<IEntity> EntityCreated { get; }
     IObservable<RenderGroup> RenderGroupCreated { get; }
-    /// <summary>
-    /// Called immediately before an interrogator is started (but not if it is skipped).
-    /// </summary>
-    IInterrogatorSubject InterrogatorCreated { get; }
     /// <summary>
     /// Null if no target is waiting for a confirm.
     /// </summary>
@@ -205,6 +206,14 @@ public class VNState : IVNState, IConfirmationReceiver {
                                      LoadTo.LastOperationID != OperationID.Value);
 
     private SkipMode? userSetSkipMode = null;
+    /// <summary>
+    /// True iff only read text can be fast-forwarded. 
+    /// </summary>
+    public bool FastforwardReadTextOnly = true;
+    
+    /// <summary>
+    /// True iff the entire VN sequence can be skipped with a single button.
+    /// </summary>
     public bool AllowFullSkip { get; set; } = false;
     
     public bool SetSkipMode(SkipMode? mode) {
@@ -212,7 +221,7 @@ public class VNState : IVNState, IConfirmationReceiver {
             throw new Exception("Cannot set skip mode to LOADING directly. Use LoadToLocation instead.");
         if (userSetSkipMode == mode)
             mode = null;
-        if ((mode == SkipMode.AUTOPLAY || mode == SkipMode.FASTFORWARD) && !AutoplayFastforwardAllowed) {
+        if (mode is SkipMode.AUTOPLAY or SkipMode.FASTFORWARD && !AutoplayFastforwardAllowed) {
             Logs.OnNext($"User tried to set skip mode to {mode}, but this is not allowed for this VNState.");
             return false;
         }
@@ -246,7 +255,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     /// </summary>
     public bool DefaultLoadSkipUnit { get; set; } = false;
     
-    private readonly IInstanceData saveData;
+    public readonly IInstanceData saveData;
     private bool vnUpdated = false;
     private readonly Coroutines cors = new();
     private DMCompactingArray<IEntity> Entities { get; } = new();
@@ -270,9 +279,25 @@ public class VNState : IVNState, IConfirmationReceiver {
     public List<IBoundedContext> Contexts { get; } = new();
     public Event<IBoundedContext> ContextStarted { get; } = new();
     public Event<IBoundedContext> ContextFinished { get; } = new();
-    public string ContextsKey =>
-        Contexts.Count == 1 ? Contexts[0].ID :
-        string.Join("::", Contexts.Select(c => c.ID));
+
+    //Separate key used for automatically saving BoundedContext results.
+    // The fancy prefix is to avoid collsiion with manually-executed saved data.
+    public static string ComputeContextsResultKey(IEnumerable<string> ctxIds) => 
+        "$$__ctxResult__$$::" + ComputeContextsKey(ctxIds);
+    
+    //Separate key used for saving contingent values within specific contexts.
+    // The fancy prefix is to avoid collsiion with manually-executed saved data.
+    public static string ComputeContextsValueKey(string varName, IEnumerable<string> ctxIds) => 
+        $"$$__ctxValue[{varName}]__$$::" + ComputeContextsKey(ctxIds);
+
+    public static string ComputeContextsKey(IEnumerable<string> ctxIds) =>
+        string.Join("::", ctxIds);
+
+    private IEnumerable<string> ContextIDs => Contexts.Select(c => c.ID);
+    public string ContextsKey => ComputeContextsKey(ContextIDs);
+    private string ContextsResultKey => ComputeContextsResultKey(ContextIDs);
+    private string ContextsValueKey(string key) => ComputeContextsValueKey(key, ContextIDs);
+    
     public RenderGroup DefaultRenderGroup { get; }
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
     
@@ -281,7 +306,6 @@ public class VNState : IVNState, IConfirmationReceiver {
     //Use a replay event because the first render group will usually be created before any listeners are attached
     private ReplayEvent<RenderGroup> _RenderGroupCreated { get; } = new(1);
     public IObservable<RenderGroup> RenderGroupCreated => _RenderGroupCreated;
-    public IInterrogatorSubject InterrogatorCreated { get; } = new InterrogatorEvent();
     public Evented<IConfirmationReceiver?> AwaitingConfirm { get; } = new(null);
     public Evented<bool> InputAllowed { get; } = new(true);
     private const string OPEN_OPID = "$$__OPEN__$$";
@@ -294,6 +318,11 @@ public class VNState : IVNState, IConfirmationReceiver {
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
     public IBoundedContext LowestContext => Contexts[^1];
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="extCToken">Cancellation token bounding the execution of the VN</param>
+    /// <param name="save">Save file for the VN</param>
     public VNState(ICancellee extCToken, IInstanceData save) {
         this.extCToken = extCToken;
         this.saveData = save;
@@ -302,6 +331,8 @@ public class VNState : IVNState, IConfirmationReceiver {
 
         Tokens.Add(OperationID.Subscribe(id => { 
             //TODO: globalData does not contextualize lineRead with context -- is this a problem?
+            if (SkippingMode == SkipMode.FASTFORWARD && FastforwardReadTextOnly && !saveData.GlobalData.IsLineRead(id))
+                SetSkipMode(null);
             saveData.GlobalData.LineRead(id);
             if (LoadTo is not null && LoadTo.ContextsMatch(Contexts) && id == LoadTo.LastOperationID) {
                 StopLoading();
@@ -311,9 +342,6 @@ public class VNState : IVNState, IConfirmationReceiver {
 
         // ReSharper disable once VirtualMemberCallInConstructor
         DefaultRenderGroup = MakeDefaultRenderGroup();
-        
-        if (save.Location is not null)
-            LoadToLocation(save.Location);
     }
 
     protected virtual RenderGroup MakeDefaultRenderGroup() => new(this, visible: true);
@@ -355,8 +383,9 @@ public class VNState : IVNState, IConfirmationReceiver {
 
     /// <summary>
     /// Wrap a task in a BoundedContext so its result is stored in the instance save
-    ///  and can be read during the skip-load process.
-    /// <br/>This should be executed for all external tasks that are awaited within VN execution.
+    ///  and can be read during the skip-load process (or at any future time during execution).
+    /// <br/>This should be executed for all external tasks that are awaited within VN execution, as
+    ///  well as for any computed flags that may change throughout execution (eg. global route flags).
     /// <br/>Note that <see cref="Ask{T}"/> automatically wraps its task in a BoundedContext.
     /// </summary>
     public BoundedContext<T> Bound<T>(Func<Task<T>> task, string key, Maybe<T>? deflt = null) =>
@@ -364,12 +393,23 @@ public class VNState : IVNState, IConfirmationReceiver {
 
     public BoundedContext<T> Bound<T>(Task<T> task, string key, Maybe<T>? deflt = null) =>
         Bound(() => task, key, deflt);
-    public ILazyAwaitable<T> ExecuteContext<T>(BoundedContext<T> ctx, ILazyAwaitable<T> innerTask) => new LazyTask<T>(async () => {
+
+    public BoundedContext<T> Bound<T>(T value, string key, Maybe<T>? deflt = null) =>
+        Bound(Task.FromResult(value), key, deflt);
+
+    /// <summary>
+    /// Alias for <see cref="Bound{T}"/> when computing a boolean flag.
+    /// </summary>
+    public BoundedContext<bool> ComputeFlag(bool value, string key, bool? deflt = null) =>
+        Bound(value, key, deflt.AsMaybe());
+
+
+    public async Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask) {
         this.AssertActive();
         using var openCtx = new OpenedContext<T>(this, ctx);
         //When load skipping, we can skip the entire context if the current context stack does not match the target
         if (LoadTo?.ContextsMatchPrefix(Contexts) == false) {
-            if (openCtx.TryGetExistingContextResult(out var res) || ctx.LoadingDefault.Try(out res)) {
+            if (saveData.TryGetData<T>(ContextsResultKey, out var res) || ctx.LoadingDefault.Try(out res)) {
                 Logs.OnNext($"Load-skipping section {ContextsKey} with return value {res}");
                 ctx.ShortCircuit?.Invoke();
                 return res;
@@ -379,12 +419,73 @@ public class VNState : IVNState, IConfirmationReceiver {
                 return default!;
             } else
                 throw new Exception($"Requested to load-skip context {ContextsKey}, but save data does not have " +
-                                    $"corresponding information");
+                                    "corresponding information");
         }
-        var result = await innerTask;
-        openCtx.SaveContextResult(result);
+        var result = await innerTask();
+        saveData.SaveData(ContextsResultKey, result);
         return result;
-    });
+    }
+
+    public bool TryGetContextResult<T>(out T value, params string[] contextKeys) =>
+        saveData.TryGetData(ComputeContextsResultKey(contextKeys), out value);
+    
+    /// <summary>
+    /// Get the saved result (ie. return value) of the context with the provided ID list.
+    /// <br/>Will throw if the variable is not assigned.
+    /// </summary>
+    public T GetContextResult<T>(params string[] contextKeys) =>
+        saveData.GetData<T>(ComputeContextsResultKey(contextKeys));
+
+    public bool TryGetContextValue<T>(string varName, out T value, params string[] contextKeys) =>
+        saveData.TryGetData(ComputeContextsValueKey(varName, contextKeys), out value);
+    
+    /// <summary>
+    /// Get a saved variable assigned to the context with the provided ID list.
+    /// <br/>Will throw if the variable is not assigned.
+    /// </summary>
+    public T GetContextValue<T>(string varName, params string[] contextIDs) =>
+        saveData.GetData<T>(ComputeContextsValueKey(varName, contextIDs));
+    
+    public bool TryGetLocalValue<T>(string varName, out T value) =>
+        saveData.TryGetData(ContextsValueKey(varName), out value);
+
+    /// <summary>
+    /// Get a saved variable assigned to the current context.
+    /// <br/>Will throw if the variable is not assigned.
+    /// </summary>
+    public T GetLocalValue<T>(string varName) =>
+        saveData.GetData<T>(ContextsValueKey(varName));
+    
+    /// <summary>
+    /// Try to get a saved variable assigned to the current context.
+    /// <br/>If it does not exist, create the variable and assign it a
+    ///  value from the defaulter function.
+    /// </summary>
+    public T GetLocalValueOrDefault<T>(string varName, Func<T> defaulter) {
+        if (!TryGetLocalValue<T>(varName, out var result))
+            SaveLocalValue(varName, result = defaulter());
+        return result;
+    }
+
+    /// <summary>
+    /// Save a variable to the context with the provided ID list. It can be accessed via
+    /// <see cref="GetContextValue{T}"/> or <see cref="GetLocalValue{T}"/>.
+    /// </summary>
+    public void SaveContextValue<T>(string varName, T value, params string[] contextIDs) =>
+        saveData.SaveData(ComputeContextsValueKey(varName, contextIDs), value);
+    
+    /// <summary>
+    /// Save a variable to the current bounded context. It can be accessed via
+    /// <see cref="GetContextValue{T}"/> or <see cref="GetLocalValue{T}"/>.
+    /// </summary>
+    public void SaveLocalValue<T>(string varName, T value) =>
+        saveData.SaveData(ContextsValueKey(varName), value);
+
+    /// <summary>
+    /// Get the boolean result of a bounded context.
+    /// <br/>Alias for <see cref="GetContextValue{T}"/> with T=bool
+    /// </summary>
+    public bool GetFlag(params string[] contextIDs) => GetContextResult<bool>(contextIDs);
 
     private class OpenedContext<T> : IDisposable {
         private readonly VNState vn;
@@ -396,19 +497,6 @@ public class VNState : IVNState, IConfirmationReceiver {
             vn.Contexts.Add(ctx);
             vn.ContextStarted.OnNext(ctx);
         }
-
-        /// <summary>
-        /// Saves the result value for the current context list in the instance save.
-        /// </summary>
-        /// <param name="value">Value to save</param>
-        public void SaveContextResult(T value) {
-            vn.saveData.SaveData(SaveContextKey, value);
-        }
-
-        private string SaveContextKey => $"$$__ctxResult__$$::{vn.ContextsKey}";
-
-        public bool TryGetExistingContextResult(out T value) =>
-            vn.saveData.TryGetData(SaveContextKey, out value);
 
         public void Dispose() {
             if (vn.LowestContext != ctx)
@@ -436,15 +524,6 @@ public class VNState : IVNState, IConfirmationReceiver {
         Entities.Compact();
         vnUpdated = false;
     }
-    public IDisposable AddEntity(IEntity ent) {
-        var dsp = Entities.Add(ent);
-        EntityCreated.OnNext(ent);
-        if (ent is IDialogueBox dlg) {
-            MainDialogue ??= dlg;
-            dlg.DialogueStarted.Subscribe(DialogueLog.OnNext);
-        }
-        return dsp;
-    }
 
     public T? FindEntity<T>() where T : class {
         for (int ii = 0; ii < Entities.Count; ++ii)
@@ -466,14 +545,16 @@ public class VNState : IVNState, IConfirmationReceiver {
         return results;
     }
 
-    /// <summary>
-    /// Convenience method for adding entities to the VNState.
-    /// Dispatches to ent.AddToVNState and its specialized forms for IRendered.
-    /// </summary>
     public C Add<C>(C ent, RenderGroup? renderGroup = null, int? sortingID = null) where C : IEntity {
-        ent.AddToVNState(this);
+        var dsp = Entities.Add(ent);
+        if (ent is IDialogueBox dlg) {
+            MainDialogue ??= dlg;
+            dlg.DialogueStarted.Subscribe(DialogueLog.OnNext);
+        }
+        ent.AddToVNState(this, dsp);
         if (ent is IRendered r)
             r.AddToRenderGroup(renderGroup ?? DefaultRenderGroup, sortingID);
+        EntityCreated.OnNext(ent);
         return ent;
     }
 
@@ -501,23 +582,20 @@ public class VNState : IVNState, IConfirmationReceiver {
             new CoroutineOptions(execType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
     }
 
-    public ILazyAwaitable Parallel(params ILazyAwaitable[] ops) =>
-        new LazyTask(() => Task.WhenAll(ops.Select(la => la.Task)));
+    public ILazyAwaitable Parallel(params ILazyAwaitable[] tasks) => new ParallelLazyAwaitable(tasks);
 
-    public ILazyAwaitable Sequential(params ILazyAwaitable[] tasks) => new LazyTask(async () => {
-        for (int ii = 0; ii < tasks.Length; ++ii)
-            await tasks[ii];
-    });
+    public ILazyAwaitable Sequential(params ILazyAwaitable[] tasks) => new SequentialLazyAwaitable(tasks);
 
     public VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
         this.AssertActive();
-        return new VNConfirmTask(preceding, () => {
+        return new VNConfirmTask(preceding, cT => {
             if (SkippingMode == SkipMode.LOADING)
                 return Task.FromResult(Completion.SoftSkip);
             if (AwaitingConfirm.Value == null)
                 AwaitingConfirm.Value = this;
             confirmToken ??= new Cancellable();
-            Run(WaitingUtils.Spin(WaitingUtils.GetCompletionAwaiter(out var t), new JointCancellee(CToken, confirmToken)));
+            Run(WaitingUtils.Spin(WaitingUtils.GetCompletionAwaiter(out var t), 
+                new JointCancellee(CToken, JointCancellee.From(cT, confirmToken))));
             if (SkippingMode.IsPlayerControlled() && SkippingMode != null)
                 Run(AutoconfirmAfterDelay(confirmToken, SkippingMode.Value));
             return t;
@@ -570,15 +648,6 @@ public class VNState : IVNState, IConfirmationReceiver {
         } else
             return false;
     }
-
-    public BoundedContext<T> Ask<T>(IInterrogator<T> asker, string key, bool saveDirectly = false) => new(this, key,
-        async () => {
-            InterrogatorCreated.OnNext(asker);
-            var nv = await asker.Start(CToken);
-            if (saveDirectly)
-                saveData.SaveData(key, nv);
-            return nv;
-        });
 
     public void RecordCG(IGalleryable cg) {
         saveData.GlobalData.GalleryCGViewed(cg.Key);

@@ -67,7 +67,7 @@ public interface ICancellee {
     /// A value LEQ 0 (default 0) indicates that the operation has not been cancelled.
     /// </summary>
     int CancelLevel { get; }
-    bool Cancelled { get; } // => CancelLevel > 0
+    bool Cancelled => CancelLevel > 0;
     /// <summary>
     /// Get the youngest ancestor cancellee that is not a passthrough.
     /// </summary>
@@ -128,28 +128,42 @@ public class JointCancellee : ICancellee {
         this.c2 = token = new Cancellable();
     }
 
+    public static ICancellee? From(ICancellee? c1, ICancellee? c2) {
+        if (c1 == null) return c2;
+        if (c2 == null) return c1;
+        return new JointCancellee(c1, c2);
+    }
+
 }
 
 /// <summary>
 /// A token passed into tasks to track cancellation.
 /// Similar to ICancellee, but when it is cancelled, it must be provided a value of type T
-/// (for example, a successor task to run).
+/// (for example, a canceller for a state machine passing the next state).
 /// </summary>
 [PublicAPI]
-public interface ICancellee<T> {
-    bool Cancelled(out T value);
+public interface ICancellee<T> : ICancellee {
+    new bool Cancelled(out T value);
 }
 
 [PublicAPI]
 public class GCancellable<T> : ICancellee<T> {
     public static readonly ICancellee<T> Null = new GCancellable<T>();
+    public int CancelLevel { get; private set; }
+    public ICancellee Root => this;
     private Maybe<T> obj = Maybe<T>.None;
 
+    
     public bool Cancelled(out T value) => obj.Try(out value);
 
-    public void Cancel(T value) {
-        obj = Maybe<T>.Of(value);
+    public void Cancel(int level, T value) {
+        if (level >= CancelLevel) {
+            CancelLevel = level;
+            obj = Maybe<T>.Of(value);
+        }
     }
+
+    public void Cancel(T value) => Cancel(ICancellee.HardCancelLevel, value);
 }
 
 }

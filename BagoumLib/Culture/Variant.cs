@@ -10,14 +10,21 @@ public interface IVariant<T> : IVariant {
     T Realize(string? locale);
 }
 
+public interface ILocaleProvider {
+    public Evented<string?> LocaleEv { get; }
+    public string? Locale => LocaleEv.Value;
+}
+
 public class Variant<T> : IVariant<T> {
     public string? ID { get; set; } = null;
     public readonly T defaultValue;
     protected readonly Dictionary<string, T> langToValueMap = new();
+    protected readonly ILocaleProvider? localeP;
     
-    public T Value => Realize(Localization.Locale);
+    public T Value => Realize(localeP?.Locale);
 
-    public Variant(T defaultValue, params (string locale, T value)[] variants) {
+    public Variant(ILocaleProvider? localeP, T defaultValue, params (string locale, T value)[] variants) {
+        this.localeP = localeP;
         this.defaultValue = defaultValue;
         foreach (var (locale, value) in variants) {
             langToValueMap[locale] = value;
@@ -34,8 +41,6 @@ public class Variant<T> : IVariant<T> {
     public static implicit operator T(Variant<T> variant) => variant.Value;
 }
 
-public static class Localization {
-    public static Evented<string?> Locale { get; set; } = new(null);
-}
+public record LocaleProvider(Evented<string?> LocaleEv) : ILocaleProvider;
 
 }

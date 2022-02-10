@@ -30,6 +30,7 @@ public enum CoroutineType {
 
 public record CoroutineOptions(bool droppable = false, CoroutineType execType = CoroutineType.TryStepPrepend) {
     public static readonly CoroutineOptions Default = new();
+    public static readonly CoroutineOptions Droppable = new(true);
 }
 
 [PublicAPI]

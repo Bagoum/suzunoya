@@ -5,10 +5,11 @@ using JetBrains.Annotations;
 namespace BagoumLib.Expressions {
 public class PrintAsParenthesizedVisitor : DerivativePrintVisitor {
     public override PrintAsParenthesizedVisitor Parener => this;
-    public PrintAsParenthesizedVisitor([NotNull] PrintVisitor parent) : base(parent) { }
+    public PrintAsParenthesizedVisitor(PrintVisitor parent) : base(parent) { }
 
     private static readonly Type tvoid = typeof(void);
-    public override Expression Visit(Expression node) {
+    public override Expression? Visit(Expression? node) {
+        if (node == null) return node;
         switch (node) {
             case ConstantExpression:
             case DefaultExpression:

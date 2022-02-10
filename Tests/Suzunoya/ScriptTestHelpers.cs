@@ -32,6 +32,8 @@ public class TestScript {
 
     public TestScript(VNState? vn = null) {
         this.vn = vn ?? new VNState(cTs, new InstanceData(new GlobalData()));
+        if (this.vn.saveData.Location is not null)
+            this.vn.LoadToLocation(this.vn.saveData.Location);
         er = new EventRecord();
         er.Record(this.vn);
     }

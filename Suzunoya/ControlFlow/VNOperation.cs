@@ -10,27 +10,33 @@ using BagoumLib.Tasks;
 using JetBrains.Annotations;
 
 namespace Suzunoya.ControlFlow {
-
-
+/// <summary>
+/// A lazy wrapper around a task that is not started until it is awaited.
+/// This allows chaining in ways that are a bit difficult for tasks.
+/// </summary>
 public interface ILazyAwaitable {
-    public Task Task { get; }
-    public TaskAwaiter GetAwaiter() => Task.GetAwaiter();
+    Task Task { get; }
+    TaskAwaiter GetAwaiter() => Task.GetAwaiter();
+    ILazyAwaitable BoundCT(ICancellee cT);
+
+    public static readonly ILazyAwaitable Null = new LazyAction(() => { });
 }
 
 /// <summary>
-/// A lazy wrappers around a task that is not started until it is awaited.
-/// This allows chaining in ways that are a bit difficult for tasks.
+/// <see cref="ILazyAwaitable"/> with a specified task return type.
 /// </summary>
-/// <typeparam name="T"></typeparam>
-public interface ILazyAwaitable<T> {
-    public Task<T> Task { get; }
-    public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
+public interface ILazyAwaitable<T> : ILazyAwaitable {
+    Task ILazyAwaitable.Task => Task;
+    ILazyAwaitable ILazyAwaitable.BoundCT(ICancellee cT) => BoundCT(cT);
+    new Task<T> Task { get; }
+    new TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
+    new ILazyAwaitable<T> BoundCT(ICancellee cT);
 }
 
 /// <summary>
 /// An function pretending to be a task.
 /// </summary>
-public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T>, ILazyAwaitable {
+public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
     private Task<T>? loadedTask;
     public Task<T> Task => loadedTask ??= LazyTask();
 
@@ -39,11 +45,14 @@ public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T>, ILazyAwaitable 
         return System.Threading.Tasks.Task.FromResult(result);
     }
 
+    public ILazyAwaitable<T> BoundCT(ICancellee cT) => new LazyFunc<T>(() => {
+        if (cT.IsHardCancelled()) throw new OperationCanceledException();
+        return lazyFunc();
+    });
+
     public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
 
     public static implicit operator LazyFunc<T>(Func<T> op) => new(op);
-
-    Task ILazyAwaitable.Task => Task;
     public VNOperation AsVnOp(IVNState vn) => new(vn, _ => Task);
 }
 
@@ -57,43 +66,53 @@ public record LazyAction : LazyFunc<Unit> {
     }) { }
     
     public static implicit operator LazyAction(Action op) => new(op);
-    
 }
 
-/// <summary>
-/// A generic task that is not started until it is awaited.
-/// </summary>
-public record LazyTask<T>(Func<Task<T>> lazyTask) : ILazyAwaitable<T>, ILazyAwaitable {
-    private Task<T>? loadedTask;
-    public Task<T> Task => loadedTask ??= lazyTask();
-    
-    Task ILazyAwaitable.Task => Task;
+
+public record ParallelLazyAwaitable(params ILazyAwaitable[] tasks) : ILazyAwaitable {
+    private Task? loadedTask;
+    public Task Task => loadedTask ??= Task.WhenAll(tasks.Select(t => t.Task));
+    public ILazyAwaitable BoundCT(ICancellee cT) =>
+        new ParallelLazyAwaitable(tasks.Select(t => t.BoundCT(cT)).ToArray());
 }
-public record LazyTask : LazyTask<Unit> {
-    public LazyTask(Func<Task> lazyTask) : base(async () => {
-        await lazyTask();
-        return Unit.Default;
-    }) { }
+
+public record SequentialLazyAwaitable(params ILazyAwaitable?[] tasks) : ILazyAwaitable {
+    private Task? loadedTask;
+    public Task Task => loadedTask ??= LazyTask();
+
+    public ILazyAwaitable BoundCT(ICancellee cT) =>
+        new SequentialLazyAwaitable(tasks.Select(t => t?.BoundCT(cT)).ToArray());
+    
+    private async Task LazyTask() {
+        foreach (var t in tasks)
+            if (t != null)
+                await t;
+    }
 }
 
 /// <summary>
 /// The task that is produced when waiting for a confirmation signal.
 /// This is similar to VNOperation, but is not bounded by an operation canceller.
 /// </summary>
-public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : ILazyAwaitable<Completion>, ILazyAwaitable {
+public record VNConfirmTask(VNOperation? preceding, Func<ICancellee?, Task<Completion>> t) : ILazyAwaitable<Completion> {
     private Task<Completion>? loadedTask;
     public Task<Completion> Task => loadedTask ??= _AsTask();
 
     private async Task<Completion> _AsTask() {
         if (preceding != null)
             await preceding;
-        return await t();
+        return await t(null);
     }
-    
     
     [UsedImplicitly]
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
-    Task ILazyAwaitable.Task => Task;
+
+
+    /// <summary>
+    /// Create a copy of this awaitable that can be cancelled by the provided cancellation token.
+    /// </summary>
+    public VNConfirmTask BoundCT(ICancellee cT) => new(preceding?.BoundCT(cT), c => t(JointCancellee.From(c, cT)));
+    ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);
 }
 
 /// <summary>
@@ -101,7 +120,7 @@ public record VNConfirmTask(VNOperation? preceding, Func<Task<Completion>> t) : 
 /// If multiple VNOperations are run at the same time, they may end up sharing the same operation token.
 /// Tasks batched under a VNOperation do not need to check cancellation at their start or end.
 /// </summary>
-public record VNOperation : ILazyAwaitable<Completion>, ILazyAwaitable {
+public record VNOperation : ILazyAwaitable<Completion> {
     public IVNState VN { get; }
     public Func<VNOpTracker, Task>[] Suboperations { get; init; }
 
@@ -129,8 +148,8 @@ public record VNOperation : ILazyAwaitable<Completion>, ILazyAwaitable {
 
     public VNOperation Then(Action nxt) {
         var nsubops = Suboperations.ToArray();
-        var ft = nsubops[nsubops.Length - 1];
-        nsubops[nsubops.Length - 1] = ct => ft(ct).ContinueWithSync(nxt);
+        var ft = nsubops[^1];
+        nsubops[^1] = ct => ft(ct).ContinueWithSync(nxt);
         return this with {Suboperations = nsubops};
     }
     public VNOperation Then(params Func<ICancellee, Task>[] nxt) =>
@@ -177,6 +196,13 @@ public record VNOperation : ILazyAwaitable<Completion>, ILazyAwaitable {
     public override string ToString() => $"VNOp (Len: {Suboperations.Length})";
 
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
-    Task ILazyAwaitable.Task => Task;
+
+    /// <summary>
+    /// Create a copy of this awaitable that can be cancelled by the provided cancellation token.
+    /// </summary>
+    public VNOperation BoundCT(ICancellee cT) => this with {
+        Suboperations = Suboperations.Select(f => (Func<VNOpTracker, Task>)(o => f(o.BoundCT(cT)))).ToArray()
+    };
+    ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);
 }
 }

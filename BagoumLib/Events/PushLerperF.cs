@@ -11,7 +11,7 @@ namespace BagoumLib.Events {
 /// </summary>
 /// <typeparam name="T"></typeparam>
 [PublicAPI]
-public class PushLerperF<T> : IBObservable<T> {
+public class PushLerperF<T> : ICObservable<T> {
     private readonly Func<T, T, float, T> lerper;
     private readonly float lerpTime;
 
@@ -26,7 +26,6 @@ public class PushLerperF<T> : IBObservable<T> {
 
     private Evented<T> OnChange { get; }
     public T Value => OnChange.Value;
-    public Maybe<T> LastPublished => OnChange.LastPublished;
     
     public PushLerperF(float lerpTime, Func<T, T, float, T> lerper) {
         this.lerpTime = lerpTime;

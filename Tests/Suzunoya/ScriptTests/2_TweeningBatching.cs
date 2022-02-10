@@ -35,20 +35,20 @@ public class _2TweeningBatchingTest {
             
             ListEq(er.SimpleLoggedEventStrings, new [] {
                 "<VNState>.$UpdateCount ~ 0",
-                "<Reimu>.Location ~ <0, 0, 0>",
-                "<Reimu>.Location ~ <1, 1, 1>",
-                "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-                "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
+                "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
                 "<VNState>.$UpdateCount ~ 1",
-                "<Reimu>.EulerAnglesD ~ <0.0954915, 0.0954915, 0.0954915>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0.0954915, 0.0954915, 0.0954915>",
                 "<VNState>.$UpdateCount ~ 2",
-                "<Reimu>.EulerAnglesD ~ <0.34549153, 0.34549153, 0.34549153>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0.34549153, 0.34549153, 0.34549153>",
                 "<VNState>.$UpdateCount ~ 3",
-                "<Reimu>.EulerAnglesD ~ <0.6545086, 0.6545086, 0.6545086>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0.6545086, 0.6545086, 0.6545086>",
                 "<VNState>.$UpdateCount ~ 4",
-                "<Reimu>.EulerAnglesD ~ <0.90450853, 0.90450853, 0.90450853>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0.90450853, 0.90450853, 0.90450853>",
                 "<VNState>.$UpdateCount ~ 5",
-                "<Reimu>.EulerAnglesD ~ <1, 1, 1>"
+                "<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>"
             });
             er.LoggedEvents.Clear();
 
@@ -63,12 +63,12 @@ public class _2TweeningBatchingTest {
             
             
             ListEq(er.SimpleLoggedEventStrings, new [] {
-                "<Reimu>.Location ~ <1, 1, 1>",
-                "<Reimu>.Location ~ <1, 1, 1>",
+                "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+                "<Reimu>.ComputedLocation ~ <1, 1, 1>",
                 "<VNState>.$UpdateCount ~ 6",
-                "<Reimu>.Location ~ <0, 0, 0>",
-                "<Reimu>.EulerAnglesD ~ <1, 1, 1>",
-                "<Reimu>.EulerAnglesD ~ <0, 0, 0>"
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
+                "<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>"
             });
             er.LoggedEvents.Clear();
             
@@ -79,12 +79,12 @@ public class _2TweeningBatchingTest {
             await t;
             
             ListEq(er.SimpleLoggedEventStrings, new[] {
-                "<Reimu>.Location ~ <0, 0, 0>",
-                "<Reimu>.Location ~ <0, 0, 0>",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
                 "<VNState>.$UpdateCount ~ 7",
-                "<Reimu>.Location ~ <1, 1, 1>",
-                "<Reimu>.Location ~ <1, 1, 1>",
-                "<Reimu>.Location ~ <0, 0, 0>"
+                "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+                "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>"
             });
             er.LoggedEvents.Clear();
             
@@ -97,13 +97,13 @@ public class _2TweeningBatchingTest {
             await t;
 
             ListEq(er.SimpleLoggedEventStrings, new[] {
-                "<Reimu>.Location ~ <0, 0, 0>",
-                "<Reimu>.Location ~ <0, 0, 0>",
-                "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
-                "<Reimu>.EulerAnglesD ~ <0, 0, 0>",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
+                "<Reimu>.ComputedLocation ~ <0, 0, 0>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
+                "<Reimu>.ComputedEulerAnglesD ~ <0, 0, 0>",
                 "<VNState>.$UpdateCount ~ 8",
-                "<Reimu>.Location ~ <1, 1, 1>",
-                "<Reimu>.EulerAnglesD ~ <1, 1, 1>"
+                "<Reimu>.ComputedLocation ~ <1, 1, 1>",
+                "<Reimu>.ComputedEulerAnglesD ~ <1, 1, 1>"
             });
         }
 

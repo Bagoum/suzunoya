@@ -27,27 +27,28 @@ public class _2TweeningSkipCancelScriptTest {
             //First update dT not counted
             vn.Update(200f);
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.Zero)
+                //not published since location is unchanged
+                //new(reimu, "ComputedLocation", Vector3.Zero)
             });
             vn.Update(0.5f);
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", 0.5f * Vector3.One)
+                new(reimu, "ComputedLocation", 0.5f * Vector3.One)
             });
             vn.Update(0.5f);
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.One)
+                new(reimu, "ComputedLocation", Vector3.One)
             });
             Assert.IsTrue(t.IsCompletedSuccessfully);
             t = reimu.MoveTo(Vector3.Zero, 100f, Easers.ELinear).Task;
             vn.SkipOperation();
-            //No immediate change
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.One)
+                //No immediate change
+                //new(reimu, "ComputedLocation", Vector3.One)
             });
             //Skips take effect on next step
             vn.Update(0.01f);
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.Zero)
+                new(reimu, "ComputedLocation", Vector3.Zero)
             });
             Assert.IsTrue(t.IsCompletedSuccessfully);
             
@@ -58,14 +59,14 @@ public class _2TweeningSkipCancelScriptTest {
             // so this task is batched under the same operation
             var t2 = reimu.RotateTo(Vector3.One, 100f).Task;
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.Zero),
-                new(reimu, "EulerAnglesD", Vector3.Zero)
+                //new(reimu, "Location", Vector3.Zero),
+                //new(reimu, "EulerAnglesD", Vector3.Zero)
             });
             vn.Update(0.01f);
             //Both tasks are immediately sent to the ending point.
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.One),
-                new(reimu, "EulerAnglesD", Vector3.One)
+                new(reimu, "ComputedLocation", Vector3.One),
+                new(reimu, "ComputedEulerAnglesD", Vector3.One)
             });
             Assert.IsTrue(t.IsCompletedSuccessfully && t2.IsCompletedSuccessfully);
             
@@ -75,8 +76,8 @@ public class _2TweeningSkipCancelScriptTest {
             vn.DeleteAll();
             Assert.Throws<DestroyedObjectException>(() => reimu.RotateTo(Vector3.Zero, 2f));
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
-                new(reimu, "Location", Vector3.One),
-                new(reimu, "Location", Vector3.One),
+                //new(reimu, "Location", Vector3.One),
+                //new(reimu, "Location", Vector3.One),
                 new(md, "EntityActive", false),
                 new(reimu, "EntityActive", false),
                 new(vn.DefaultRenderGroup, "EntityActive", false),

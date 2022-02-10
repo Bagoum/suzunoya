@@ -9,7 +9,7 @@ using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Reflection;
-using BagoumLib.Tweening;
+using BagoumLib.Transitions;
 using JetBrains.Annotations;
 using Suzunoya.ControlFlow;
 
@@ -24,9 +24,9 @@ public interface IEntity : IDisposable {
     /// </summary>
     bool MimicRequested { get; }
     ICancellee LifetimeToken { get; }
-    VNOperation Tween(ITweener tweener);
+    VNOperation Tween(ITransition tweener);
     IVNState Container { get; }
-    void AddToVNState(IVNState container);
+    void AddToVNState(IVNState container, IDisposable token);
     void Update(float deltaTime);
     /// <summary>
     /// Called after Update is complete. Mimics may listen to this.
@@ -34,16 +34,19 @@ public interface IEntity : IDisposable {
     Event<float> OnUpdate { get; }
     
     /// <summary>
-    /// Destroy the object. This also sets EntityActive to false.
-    /// This should do the same as IDisposable.Dispose.
+    /// Destroy the object and sets EntityActive to false.
+    /// Same as <see cref="IDisposable.Dispose"/>.
     /// </summary>
+    /// <exception cref="Exception">Thrown if any running coroutines cannot be closed.</exception>
     void Delete();
+
+    void IDisposable.Dispose() => Delete();
     
     /// <summary>
     /// When this is set to false, the object is destroyed and no further operations can be run.
     /// <br/>Do not modify this externally. To destroy the object, run Delete().
     /// </summary>
-    Evented<bool> EntityActive { get; }
+    ICObservable<bool> EntityActive { get; }
 }
 
 public abstract class Entity : IEntity {
@@ -55,11 +58,12 @@ public abstract class Entity : IEntity {
     private readonly Coroutines cors = new();
     public Event<float> OnUpdate { get; } = new();
 
-    public Evented<bool> EntityActive { get; } = new(true);
+    private Evented<bool> _EntityActive { get; } = new(true);
+    public ICObservable<bool> EntityActive => _EntityActive;
 
-    public virtual void AddToVNState(IVNState container) {
+    public virtual void AddToVNState(IVNState container, IDisposable token) {
         Container = container;
-        tokens.Add(container.AddEntity(this));
+        tokens.Add(token);
     }
 
     public virtual void Update(float deltaTime) {
@@ -77,11 +81,11 @@ public abstract class Entity : IEntity {
     protected void AddToken(IDisposable token) => tokens.Add(token);
     public void Listen<T>(IObservable<T> obs, Action<T> listener) => AddToken(obs.Subscribe(listener));
 
-    public VNOperation Tween(ITweener tweener) => this.AssertActive().MakeVNOp(ct => 
+    public VNOperation Tween(ITransition tweener) => this.AssertActive().MakeVNOp(ct => 
         tweener.With(this.BindLifetime(ct), () => Container.dT).Run(cors));
 
     public virtual void Delete() {
-        if (EntityActive.Value == false) return;
+        if (_EntityActive.Value == false) return;
         lifetimeToken.Cancel(ICancellee.HardCancelLevel);
         foreach (var t in tokens)
             t.Dispose();
@@ -90,18 +94,17 @@ public abstract class Entity : IEntity {
         if (cors.Count > 0)
             throw new Exception($"Some entity coroutines were not closed in the cull process. " +
                                 $"{this} has {cors.Count} remaining.");
-        EntityActive.OnNext(false);
+        _EntityActive.OnNext(false);
         Container.Logs.OnNext($"The entity {GetType().RName()} has been deleted.");
     }
     
     private Entity AssertActive() {
-        if (EntityActive.Value == false)
-            throw new DestroyedObjectException($"The entity {GetType().RName()} has been destroyed. " +
-                                               "You cannot run any more operations on it.");
+        if (_EntityActive.Value == false)
+            throw new DestroyedObjectException($"{this} has been destroyed. You cannot run any more operations on it.");
         return this;
     }
-
-    public void Dispose() => Delete();
+    
+    public override string ToString() => $"<{GetType().RName()}>";
 }
 
 

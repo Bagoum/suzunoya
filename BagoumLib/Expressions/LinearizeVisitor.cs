@@ -78,9 +78,9 @@ public class LinearizeVisitor : ExpressionVisitor {
         if (expr is BlockExpression bex) {
             var exprs = bex.Expressions.ToArray();
             //Don't need to assign if throwing
-            if (exprs[exprs.Length - 1] is UnaryExpression {NodeType: ExpressionType.Throw})
+            if (exprs[^1] is UnaryExpression {NodeType: ExpressionType.Throw})
                 return expr;
-            exprs[exprs.Length - 1] = Ex.Assign(dst, exprs[exprs.Length - 1]);
+            exprs[^1] = Ex.Assign(dst, exprs[^1]);
             return Ex.Block(bex.Variables, exprs);
         } else {
             if (expr is UnaryExpression {NodeType: ExpressionType.Throw})
@@ -172,7 +172,7 @@ public class LinearizeVisitor : ExpressionVisitor {
     private (MemberBinding binding, BlockExpression? block) LinearizeMemberBinding(MemberBinding m) {
         if (m is MemberAssignment ma) {
             return Visit(ma.Expression) switch {
-                BlockExpression bex => (Ex.Bind(ma.Member, bex.Expressions[bex.Expressions.Count - 1]), bex),
+                BlockExpression bex => (Ex.Bind(ma.Member, bex.Expressions[^1]), bex),
                 { } ex => (Ex.Bind(ma.Member, ex), null)
             };
         }
@@ -189,7 +189,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         if (newExpr is BlockExpression b) {
             prms.AddRange(b.Variables);
             stmts.AddRange(b.Expressions.Take(b.Expressions.Count - 1));
-            newExprLast = b.Expressions[b.Expressions.Count - 1];
+            newExprLast = b.Expressions[^1];
         }
         foreach (var (_, block) in bindings)
             if (block != null) {
@@ -225,7 +225,8 @@ public class LinearizeVisitor : ExpressionVisitor {
         var prm = Ex.Parameter(node.Type, $"flatSwitch{counter++}");
         return Ex.Block(new[] {prm},
             Linearize(cond => Ex.Switch(typeof(void), cond,
-                WithAssign(Visit(node.DefaultBody), prm), node.Comparison,
+                WithAssign(Visit(node.DefaultBody ?? throw new Exception(
+                    "No default body for typed switch case")), prm), node.Comparison,
                 cases.Select(c => Ex.SwitchCase(WithAssign(c.Body, prm), c.TestValues))
             ), node.SwitchValue),
             prm
@@ -245,7 +246,8 @@ public class LinearizeVisitor : ExpressionVisitor {
                 null,
                 node.Handlers.Select(h => {
                     var vh = VisitCatchBlock(h);
-                    return Ex.MakeCatchBlock(h.Variable.Type, h.Variable, WithAssign(vh.Body, prm), vh.Filter);
+                    return Ex.MakeCatchBlock(h.Variable?.Type ?? typeof(Exception), 
+                        h.Variable, WithAssign(vh.Body, prm), vh.Filter);
                 })),
             prm
         );

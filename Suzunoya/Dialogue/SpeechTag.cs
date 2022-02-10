@@ -47,6 +47,6 @@ public abstract record SpeechTag {
     /// <summary>
     /// Shows furigana (ruby) next to the main text.
     /// </summary>
-    public record Furigana(string furigana) : SpeechTag { }
+    public record Furigana(string furigana) : SpeechTag;
 }
 }

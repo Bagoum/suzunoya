@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using BagoumLib.DataStructures;
+using BagoumLib.Functional;
 using BagoumLib.Mathematics;
 using JetBrains.Annotations;
 
@@ -60,7 +61,7 @@ public static class Extensions {
     /// <summary>
     /// If x is null or empty, return y. Else return x.
     /// </summary>
-    public static string Or(this string? x, string y) => string.IsNullOrEmpty(x) ? y : x!;
+    public static string Or(this string? x, string y) => string.IsNullOrEmpty(x) ? y : x;
 
     public static IDisposable SubscribeOnce<T>(this IObservable<T> ev, Action<T> listener) {
         bool disposed = false;
@@ -74,6 +75,12 @@ public static class Extensions {
         if (disposed)
             token.Dispose();
         return token;
+    }
+
+    public static void DisposeAll(this List<IDisposable> tokens) {
+        for (int ii = 0; ii < tokens.Count; ++ii)
+            tokens[ii].Dispose();
+        tokens.Clear();
     }
 }
 
@@ -122,9 +129,9 @@ public static class ArrayExtensions {
     /// <summary>
     /// Returns -1 if not found
     /// </summary>
-    public static int IndexOf<T>(this T[] arr, T obj) where T : class {
+    public static int IndexOf<T>(this T[] arr, T obj) {
         for (int ii = 0; ii < arr.Length; ++ii) {
-            if (arr[ii] == obj) return ii;
+            if (Equals(arr[ii], obj)) return ii;
         }
         return -1;
     }
@@ -392,6 +399,11 @@ public static class NullableExtensions {
             return false;
         }
     }
+
+    public static Maybe<T> AsMaybe<T>(this T? x) where T : struct =>
+        x.HasValue ? 
+            new Maybe<T>(x.Value) : 
+            Maybe<T>.None;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool Try<T>(this T? x, out T y) where T : class {

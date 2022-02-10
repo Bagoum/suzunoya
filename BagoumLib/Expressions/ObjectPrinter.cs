@@ -6,7 +6,7 @@ using System.Linq.Expressions;
 
 namespace BagoumLib.Expressions {
 public interface IObjectPrinter {
-    public string Print(object o); 
+    public string Print(object? o); 
 }
 
 /// <summary>
@@ -34,7 +34,7 @@ public class CSharpObjectPrinter : IObjectPrinter {
         '\'' => "\\\'",
         _ => $"{c}",
     };
-    public string Print(object? o) {
+    public virtual string Print(object? o) {
         if (o == null)
             return "null";
         var typ = o.GetType();

@@ -16,9 +16,7 @@ public interface IInstanceData : IKeyValueRepository {
 [Serializable]
 public class InstanceData : KeyValueRepository, IInstanceData {
     /// <summary>
-    /// In order to preserve correctness across save/loads, it is generally beneficial to
-    /// make global switches dependent on an unchanging version of the global data-- specifically, a frozen copy
-    /// of the global data constructed on initialization.
+    /// A frozen copy of the global data constructed on initialization.
     /// </summary>
     public GlobalData FrozenGlobalData { get; init; }
     [field:NonSerialized] [JsonIgnore]
@@ -42,6 +40,10 @@ public class InstanceData : KeyValueRepository, IInstanceData {
     public InstanceData(GlobalData global) {
         FrozenGlobalData = Serialization.DeserializeJson<GlobalData>(Serialization.SerializeJson(global))!;
         GlobalData = global;
+    }
+
+    public void _SetGlobalData_OnlyUseForInitialization(GlobalData g) {
+        GlobalData = g;
     }
 
     /// <summary>

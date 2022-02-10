@@ -13,12 +13,12 @@ public static class GenericOps {
         {typeof(FColor), (Func<FColor, FColor, float, FColor>) FColor.LerpU},
     };
     private static readonly Dictionary<Type, object> addOps = new() {
-        {typeof(int), (Func<int, int, int>) ((x, y) => x + y)},
-        {typeof(float), (Func<float, float, float>) ((x, y) => x + y)},
-        {typeof(Vector2), (Func<Vector2, Vector2, Vector2>) ((x, y) => x + y)},
-        {typeof(Vector3), (Func<Vector3, Vector3, Vector3>) ((x, y) => x + y)},
-        {typeof(Vector4), (Func<Vector4, Vector4, Vector4>) ((x, y) => x + y)},
-        {typeof(FColor), (Func<FColor, FColor, FColor>) ((x, y) => x + y)},
+        {typeof(int), (0, (Func<int, int, int>) ((x, y) => x + y))},
+        {typeof(float), (0f, (Func<float, float, float>) ((x, y) => x + y))},
+        {typeof(Vector2), (Vector2.Zero, (Func<Vector2, Vector2, Vector2>) ((x, y) => x + y))},
+        {typeof(Vector3), (Vector3.Zero, (Func<Vector3, Vector3, Vector3>) ((x, y) => x + y))},
+        {typeof(Vector4), (Vector4.Zero, (Func<Vector4, Vector4, Vector4>) ((x, y) => x + y))},
+        {typeof(FColor), (new FColor(0, 0, 0, 0), (Func<FColor, FColor, FColor>) ((x, y) => x + y))},
     };
     private static readonly Dictionary<Type, object> multiplyOps = new() {
         {typeof(int), (Func<int, int, int>) ((x, y) => x * y)},
@@ -29,12 +29,12 @@ public static class GenericOps {
         {typeof(FColor), (Func<FColor, float, FColor>) ((x, y) => x * y)},
     };
     private static readonly Dictionary<Type, object> vecMultiplyOps = new() {
-        {typeof(int), (Func<int, int, int>) ((x, y) => x * y)},
-        {typeof(float), (Func<float, float, float>) ((x, y) => x * y)},
-        {typeof(Vector2), (Func<Vector2, Vector2, Vector2>) ((x, y) => x * y)},
-        {typeof(Vector3), (Func<Vector3, Vector3, Vector3>) ((x, y) => x * y)},
-        {typeof(Vector4), (Func<Vector4, Vector4, Vector4>) ((x, y) => x * y)},
-        {typeof(FColor), (Func<FColor, FColor, FColor>) ((x, y) => x * y)},
+        {typeof(int), (1, (Func<int, int, int>) ((x, y) => x * y))},
+        {typeof(float), (1f, (Func<float, float, float>) ((x, y) => x * y))},
+        {typeof(Vector2), (Vector2.One, (Func<Vector2, Vector2, Vector2>) ((x, y) => x * y))},
+        {typeof(Vector3), (Vector3.One, (Func<Vector3, Vector3, Vector3>) ((x, y) => x * y))},
+        {typeof(Vector4), (Vector4.One, (Func<Vector4, Vector4, Vector4>) ((x, y) => x * y))},
+        {typeof(FColor), (new FColor(1, 1, 1, 1), (Func<FColor, FColor, FColor>) ((x, y) => x * y))},
     };
     public static Func<T, T, float, T> GetLerp<T>() => lerpers.TryGetValue(typeof(T), out var l) ?
         (Func<T, T, float, T>)l :
@@ -43,12 +43,12 @@ public static class GenericOps {
         (Func<T, float, T>)l :
         throw new Exception($"No multiply handling for type {typeof(T)}");
     
-    public static Func<T, T, T> GetAddOp<T>() => addOps.TryGetValue(typeof(T), out var l) ?
-        (Func<T, T, T>)l :
+    public static (T zero, Func<T, T, T> add) GetAddOp<T>() => addOps.TryGetValue(typeof(T), out var l) ?
+        ((T, Func<T, T, T>))l :
         throw new Exception($"No add handling for type {typeof(T)}");
     
-    public static Func<T, T, T> GetVecMulOp<T>() => vecMultiplyOps.TryGetValue(typeof(T), out var l) ?
-        (Func<T, T, T>)l :
+    public static (T zero, Func<T, T, T> add) GetVecMulOp<T>() => vecMultiplyOps.TryGetValue(typeof(T), out var l) ?
+        ((T, Func<T, T, T>))l :
         throw new Exception($"No vec-multiply handling for type {typeof(T)}");
 
     /// <summary>
@@ -56,11 +56,12 @@ public static class GenericOps {
     /// </summary>
     public static void RegisterLerper<T>(Func<T, T, float, T> lerper) => lerpers[typeof(T)] = lerper;
     public static void RegisterMultiplier<T>(Func<T, float, T> mulOp) => multiplyOps[typeof(T)] = mulOp;
-    public static void RegisterAdder<T>(Func<T, T, T> addOp) => addOps[typeof(T)] = addOp;
-    public static void RegisterVecMultiplier<T>(Func<T, T, T> vecMulOp) => vecMultiplyOps[typeof(T)] = vecMulOp;
+    public static void RegisterAdder<T>((T, Func<T, T, T>) addOp) => addOps[typeof(T)] = addOp;
+    public static void RegisterVecMultiplier<T>((T, Func<T, T, T>) vecMulOp) => 
+        vecMultiplyOps[typeof(T)] = vecMulOp;
 
     public static void RegisterType<T>(Func<T, T, float, T> lerper, Func<T, float, T> mulOp, 
-        Func<T, T, T> addOp, Func<T, T, T> vecMulOp) {
+        (T, Func<T, T, T>) addOp, (T, Func<T, T, T>) vecMulOp) {
         RegisterLerper(lerper);
         RegisterMultiplier(mulOp);
         RegisterAdder(addOp);

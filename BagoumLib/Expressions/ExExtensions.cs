@@ -61,7 +61,7 @@ public static class ExExtensions {
     
     private static readonly Dictionary<Type, ExFunction> dictContainsMethodCache = new Dictionary<Type, ExFunction>();
     public static Ex DictContains(this Ex dict, Ex key) {
-        if (!dictContainsMethodCache.TryGetValue(dict.Type, out ExFunction method)) {
+        if (!dictContainsMethodCache.TryGetValue(dict.Type, out var method)) {
             dictContainsMethodCache[dict.Type] = method = 
                 ExFunction.Wrap(dict.Type, "ContainsKey", key.Type);
         }
@@ -90,7 +90,7 @@ public static class ExExtensions {
 
     public static bool TryAsConst<T>(this Ex ex, out T val) {
         if (ex is ConstantExpression cx && ex.Type == typeof(T)) {
-            val = ((T) cx.Value)!;
+            val = (T) cx.Value!;
             return true;
         }
         val = default!;

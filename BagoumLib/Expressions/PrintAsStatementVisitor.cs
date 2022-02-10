@@ -8,7 +8,8 @@ public class PrintAsStatementVisitor : DerivativePrintVisitor {
     public override PrintAsStatementVisitor Stmter => this;
     public PrintAsStatementVisitor(PrintVisitor parent) : base(parent) { }
 
-    public override Expression Visit(Expression node) {
+    public override Expression? Visit(Expression? node) {
+        if (node == null) return node;
         switch (node) {
             case BlockExpression:
                 return parent.Visit(node);

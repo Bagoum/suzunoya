@@ -2,13 +2,11 @@
 using BagoumLib.Functional;
 
 namespace BagoumLib.Events {
-public class ConstantObservable<T> : IBObservable<T> {
+public class ConstantObservable<T> : ICObservable<T> {
     public T Value { get; }
-    public Maybe<T> LastPublished { get; }
     
     public ConstantObservable(T value) {
         Value = value;
-        LastPublished = Value;
     }
 
     public IDisposable Subscribe(IObserver<T> observer) {

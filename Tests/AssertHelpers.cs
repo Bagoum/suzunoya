@@ -23,7 +23,9 @@ public static class AssertHelpers {
                 Assert.Fail($"{extraFail}At index {ii}, left is {left[ii]} and right is {right[ii]}.");
             }
         }
-        if (extraFail.Length > 0) Assert.Fail(extraFail);
+        if (extraFail.Length > 0) {
+            Assert.Fail(extraFail);
+        }
     }
 
     public static void IEnumEq<T>(IEnumerable<T> left, IEnumerable<T> right) => ListEq(left.ToList(), right.ToList());

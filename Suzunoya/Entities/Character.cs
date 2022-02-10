@@ -7,7 +7,8 @@ using Suzunoya.ControlFlow;
 using Suzunoya.Dialogue;
 
 namespace Suzunoya.Entities {
-public interface ICharacter : ITransform, IEntity {
+public interface ICharacter : IRendered {
+    IdealOverride<string?> Emote { get; }
     SpeechSettings SpeechCfg { get; }
     string Name { get; }
 }
@@ -16,7 +17,7 @@ public abstract class Character : Rendered, ICharacter {
     public virtual SpeechSettings SpeechCfg { get; } = SpeechSettings.Default;
     public virtual string Name => "Nobody";
 
-    public Evented<string?> Emote = new(null);
+    public IdealOverride<string?> Emote { get; } = new(null);
 
     public VNOperation Say(LString content, IDialogueBox? box = null, SpeakFlags flags = SpeakFlags.Default) =>
         (box ?? Container.MainDialogueOrThrow).Say(content, this, flags);
@@ -29,8 +30,6 @@ public abstract class Character : Rendered, ICharacter {
 
     public VNOperation AlsoSayN(LString content, IDialogueBox? box = null, SpeakFlags flags = SpeakFlags.Default) =>
         (box ?? Container.MainDialogueOrThrow).AlsoSayN(content, this, flags);
-
-    public void Show() => Visible.Value = true;
 }
 
 }
