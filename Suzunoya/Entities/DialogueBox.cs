@@ -3,6 +3,7 @@ using System.Collections;
 using System.Reactive;
 using System.Text;
 using System.Threading.Tasks;
+using BagoumLib;
 using BagoumLib.Cancellation;
 using BagoumLib.Culture;
 using BagoumLib.Events;
@@ -33,7 +34,7 @@ public interface IDialogueBox : IEntity {
     AccEvent<(SpeechFragment frag, string lookahead)> Dialogue { get; }
     Event<Unit> DialogueCleared { get; }
     Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; }
-    void Clear(bool clearSpeaker=true);
+    void Clear(SpeakFlags? speakerClear = null);
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default);
 }
 
@@ -65,11 +66,11 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
     public Event<Unit> DialogueCleared { get; } = new();
     public Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; } = new((default, SpeakFlags.Default));
 
-    public void Clear(bool clearSpeaker=true) {
+    public void Clear(SpeakFlags? speakerClear = null) {
         Dialogue.Clear();
         DialogueStarted.Clear();
-        if (clearSpeaker)
-            Speaker.OnNext((null, default));
+        if (speakerClear.Try(out var s))
+            Speaker.OnNext((null, s));
         DialogueCleared.OnNext(Unit.Default);
     }
 
@@ -118,8 +119,8 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default) =>
         this.MakeVNOp(cT => {
             Container.OperationID.OnNext(content.ID ?? content.defaultValue);
-            if ((flags & SpeakFlags.DontClearText) == 0)
-                Clear(character == null);
+            if (!flags.HasFlag(SpeakFlags.DontClearText))
+                Clear(null);
             Speaker.OnNext((character, flags));
             Run(Say(
                 new DialogueOp(content, character, flags, cT.Location), 

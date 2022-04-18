@@ -12,20 +12,28 @@ namespace BagoumLib.Events {
 [PublicAPI]
 public class PushLerper<T> : ICObservable<T> {
     private readonly Func<T, T, float, T> lerper;
-    private readonly float lerpTime;
+    private readonly Func<T, T, float> lerpTime;
 
     private bool set = false;
     private T prevValue;
     private T nextValue;
     private float elapsed;
-    private float ElapsedRatio => BMath.Clamp(0, 1, lerpTime <= 0 ? 1 : (elapsed / lerpTime));
+    private float ElapsedRatio(float lt) => BMath.Clamp(0, 1, lt <= 0 ? 1 : (elapsed / lt));
 
     private Evented<T> OnChange { get; }
     public T Value => OnChange.Value;
+
+    public PushLerper(float lerpTime, Func<T, T, float, T>? lerper = null) : this((a, b) => lerpTime, lerper) { }
     
-    public PushLerper(float lerpTime, Func<T, T, float, T> lerper) {
-        this.lerpTime = elapsed = lerpTime;
-        this.lerper = lerper;
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="lerpTime">A pure function that returns the lerp time given the previous and next values.</param>
+    /// <param name="lerper"></param>
+    public PushLerper(Func<T, T, float> lerpTime, Func<T, T, float, T>? lerper = null) {
+        this.lerpTime = lerpTime;
+        elapsed = lerpTime(default!, default!);
+        this.lerper = lerper ?? GenericOps.GetLerp<T>();
         this.OnChange = new(this.prevValue = nextValue = default!);
     }
 
@@ -34,7 +42,7 @@ public class PushLerper<T> : ICObservable<T> {
             prevValue = Value;
             nextValue = targetValue;
             elapsed = initTime;
-            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio);
+            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio(lerpTime(prevValue, nextValue)));
         } else {
             elapsed = initTime;
             OnChange.Value = prevValue = nextValue = targetValue;
@@ -48,9 +56,10 @@ public class PushLerper<T> : ICObservable<T> {
     }
 
     public void Update(float dT) {
-        if (elapsed < lerpTime) {
+        var lt = lerpTime(prevValue, nextValue);
+        if (elapsed < lt) {
             elapsed += dT;
-            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio);
+            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio(lt));
         }
     }
 
@@ -58,7 +67,7 @@ public class PushLerper<T> : ICObservable<T> {
     /// Puts the object in a state such that the next time a value is pushed, it will be instantaneously lerped to.
     /// </summary>
     public void Unset() {
-        elapsed = lerpTime;
+        elapsed = lerpTime(prevValue, nextValue);
         set = false;
     }
 

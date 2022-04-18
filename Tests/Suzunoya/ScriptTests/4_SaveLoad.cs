@@ -65,7 +65,7 @@ public class _4SaveLoadTest {
             if (sendConfirm)
                 s.vn.UserConfirm();
         }
-        s.vn.UpdateSavedata();
+        s.vn.UpdateInstanceData();
         Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>{"outer"}));
         Assert.IsTrue(new[]{"A", "B", "C",}.All(sd.GlobalData.IsLineRead));
         Assert.IsFalse(new[]{"D", "E", "F"}.Any(sd.GlobalData.IsLineRead));

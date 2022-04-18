@@ -10,6 +10,7 @@ using Suzunoya.Entities;
 
 namespace Suzunoya.Assertions {
 public abstract record EntityAssertion {
+    public string? ID { get; init; }
     public (int Phase, int Ordering) Priority { get; set; }
     protected EntityAssertion? Parent;
     public List<IAssertion> Children { get; } = new();
@@ -29,9 +30,17 @@ public abstract record EntityAssertion {
     }
 }
 public record EntityAssertion<C> : EntityAssertion, IChildLinkedAssertion, IAssertion<EntityAssertion<C>> where C : IRendered, new() {
-    public string? ID { get; init; }
     public IVNState vn { get; init; }
+    /// <summary>
+    /// Extra bindings to apply to actualized objects.
+    /// </summary>
+    public Action<C>? ExtraBind { get; init; }
+    
+    /// <summary>
+    /// Callback to invoke when an actualized object is first create (not during inheritance).
+    /// </summary>
     public Action<C>? OnActualize { get; init; }
+    
     public bool DynamicEntryAllowed { get; init; } = true;
 
     protected virtual Task DefaultDynamicEntryHandler(C c) {
@@ -55,8 +64,9 @@ public record EntityAssertion<C> : EntityAssertion, IChildLinkedAssertion, IAsse
         DynamicExitHandler = handler;
     }
 
-    public EntityAssertion(IVNState vn) {
+    public EntityAssertion(IVNState vn, string? id = null) {
         this.vn = vn;
+        this.ID = id;
         this.DynamicEntryHandler = DefaultDynamicEntryHandler;
         this.DynamicExitHandler = DefaultDynamicExitHandler;
     }
@@ -67,13 +77,23 @@ public record EntityAssertion<C> : EntityAssertion, IChildLinkedAssertion, IAsse
         ent.EulerAnglesD.SetIdeal(EulerAnglesD);
         ent.Scale.SetIdeal(Scale);
         ent.Tint.SetIdeal(Tint);
+        ExtraBind?.Invoke(ent);
+    }
+
+    /// <summary>
+    /// Bindings run after the object is added to the VNState.
+    /// </summary>
+    protected virtual void LateBind(C ent) {
         if (Parent is { BoundGeneric: null })
             throw new Exception("Child constructed before parent!");
         ent.Parent = Parent?.BoundGeneric;
     }
 
     public Task ActualizeOnNewState() {
-        Bind(vn.Add(new C()));
+        var obj = new C();
+        Bind(obj);
+        vn.Add(obj);
+        LateBind(obj);
         OnActualize?.Invoke(Bound);
         return Task.CompletedTask;
     }

@@ -17,7 +17,7 @@ public static class EventRecordHelpers {
     private static readonly HashSet<Type> tObs = new() { typeof(IObservable<>), typeof(ICObservable<>) };
     private static readonly MethodInfo registerEv = typeof(EventRecord).GetMethod("TrackEvent")!;
     private static HashSet<string> ignoreKeys = new() {
-        "onupdate", "logs", 
+        "onupdate", "logs", "instancedatachanged",
         //use computed instead
         "location", "euleranglesd", "scale", "tint"
     };

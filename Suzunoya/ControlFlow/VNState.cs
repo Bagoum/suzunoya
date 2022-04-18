@@ -141,11 +141,18 @@ public interface IVNState {
     
 
     void RecordCG(IGalleryable cg);
+
+    /// <summary>
+    /// Event that is published whenever the instance data changes,
+    ///  either due to the ending of a <see cref="BoundedContext{T}"/>
+    ///  or a value manually saved via <see cref="VNState.SaveContextValue{T}"/>.
+    /// </summary>
+    Event<IInstanceData> InstanceDataChanged { get; }
+    
     /// <summary>
     /// Update and return the save data.
     /// </summary>
-    /// <returns></returns>
-    IInstanceData UpdateSavedata();
+    IInstanceData UpdateInstanceData();
     
     /// <summary>
     /// Cascade destroy all currently running enumerators, then destroy all objects.
@@ -175,35 +182,38 @@ public interface IVNState {
     
     Evented<string> OperationID { get; }
     ISubject<LogMessage> Logs { get; }
+
+    bool TryGetContextResult<T>(out T value, params string[] contextKeys);
 }
 [PublicAPI]
 public class VNState : IVNState, IConfirmationReceiver {
     public float dT { get; private set; }
-    
     /// <summary>
     /// If this value is set (via LoadLocation),
     /// the VNState will almost instantaneously skip forward to the given location.
     /// </summary>
-    public VNLocation? LoadTo { get; private set; }
+    public (VNLocation location, Action? onLoaded)? LoadTo { get; private set; }
 
-    public void LoadToLocation(VNLocation target) {
-        LoadTo = target;
+    public void LoadToLocation(VNLocation target, Action? onLoaded = null) {
+        LoadTo = (target, onLoaded);
         Logs.OnNext(new LogMessage($"Began loading to location {LoadTo}", LogLevel.INFO));
     }
 
     private void StopLoading() {
         Logs.OnNext(new LogMessage($"Finished loading to location {LoadTo}", LogLevel.INFO));
+        var c = LoadTo?.onLoaded;
         LoadTo = null;
+        c?.Invoke();
     }
 
     /// <summary>
     /// While this value is true, the current operation should be skipped in order to load to the target LoadTo.
     /// </summary>
-    private bool IsLoadSkipping => !(LoadTo is null) &&
+    private bool IsLoadSkipping => LoadTo is var (location, _) &&
                                     //Skip until the contexts match
-                                    (!LoadTo.ContextsMatch(Contexts) ||
+                                    (!location.ContextsMatch(Contexts) ||
                                      //Skip until the operation matches
-                                     LoadTo.LastOperationID != OperationID.Value);
+                                     location.LastOperationID != OperationID.Value);
 
     private SkipMode? userSetSkipMode = null;
     /// <summary>
@@ -255,7 +265,6 @@ public class VNState : IVNState, IConfirmationReceiver {
     /// </summary>
     public bool DefaultLoadSkipUnit { get; set; } = false;
     
-    public readonly IInstanceData saveData;
     private bool vnUpdated = false;
     private readonly Coroutines cors = new();
     private DMCompactingArray<IEntity> Entities { get; } = new();
@@ -279,6 +288,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     public List<IBoundedContext> Contexts { get; } = new();
     public Event<IBoundedContext> ContextStarted { get; } = new();
     public Event<IBoundedContext> ContextFinished { get; } = new();
+    public Event<IInstanceData> InstanceDataChanged { get; } = new();
 
     //Separate key used for automatically saving BoundedContext results.
     // The fancy prefix is to avoid collsiion with manually-executed saved data.
@@ -313,7 +323,8 @@ public class VNState : IVNState, IConfirmationReceiver {
     public ISubject<LogMessage> Logs { get; } = new Event<LogMessage>();
     public Evented<bool> VNStateActive { get; } = new(true);
     
-    public IInstanceData InstanceData => saveData;
+    public IInstanceData InstanceData { get; }
+
     public IDialogueBox MainDialogueOrThrow =>
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
     public IBoundedContext LowestContext => Contexts[^1];
@@ -325,20 +336,24 @@ public class VNState : IVNState, IConfirmationReceiver {
     /// <param name="save">Save file for the VN</param>
     public VNState(ICancellee extCToken, IInstanceData save) {
         this.extCToken = extCToken;
-        this.saveData = save;
+        this.InstanceData = save;
         lifetimeToken = new Cancellable();
         CToken = new JointCancellee(extCToken, lifetimeToken);
 
         Tokens.Add(OperationID.Subscribe(id => { 
             //TODO: globalData does not contextualize lineRead with context -- is this a problem?
-            if (SkippingMode == SkipMode.FASTFORWARD && FastforwardReadTextOnly && !saveData.GlobalData.IsLineRead(id))
+            if (SkippingMode == SkipMode.FASTFORWARD && FastforwardReadTextOnly && !InstanceData.GlobalData.IsLineRead(id))
                 SetSkipMode(null);
-            saveData.GlobalData.LineRead(id);
-            if (LoadTo is not null && LoadTo.ContextsMatch(Contexts) && id == LoadTo.LastOperationID) {
+            InstanceData.GlobalData.LineRead(id);
+            if (LoadTo is var (location, _) && location.ContextsMatch(Contexts) && id == location.LastOperationID) {
                 StopLoading();
             }
         }));
         Tokens.Add(ContextStarted.Subscribe(ctx => OperationID.OnNext(OPEN_OPID + "::" + ctx.ID)));
+        Tokens.Add(ContextFinished.Subscribe(c => {
+            if (Contexts.Count == 0 && SkippingMode is SkipMode.FASTFORWARD or SkipMode.AUTOPLAY)
+                SetSkipMode(null);
+        }));
 
         // ReSharper disable once VirtualMemberCallInConstructor
         DefaultRenderGroup = MakeDefaultRenderGroup();
@@ -408,8 +423,9 @@ public class VNState : IVNState, IConfirmationReceiver {
         this.AssertActive();
         using var openCtx = new OpenedContext<T>(this, ctx);
         //When load skipping, we can skip the entire context if the current context stack does not match the target
-        if (LoadTo?.ContextsMatchPrefix(Contexts) == false) {
-            if (saveData.TryGetData<T>(ContextsResultKey, out var res) || ctx.LoadingDefault.Try(out res)) {
+        if (LoadTo?.location.ContextsMatchPrefix(Contexts) == false) {
+            if (InstanceData.TryGetData<T>(ContextsResultKey, out var res) || 
+                 ctx.LoadingDefault.Try(out res)) {
                 Logs.OnNext($"Load-skipping section {ContextsKey} with return value {res}");
                 ctx.ShortCircuit?.Invoke();
                 return res;
@@ -422,39 +438,41 @@ public class VNState : IVNState, IConfirmationReceiver {
                                     "corresponding information");
         }
         var result = await innerTask();
-        saveData.SaveData(ContextsResultKey, result);
+        Logs.OnNext($"Saving result {result} to context {ContextsKey}");
+        InstanceData.SaveData(ContextsResultKey, result);
+        InstanceDataChanged.OnNext(InstanceData);
         return result;
     }
 
     public bool TryGetContextResult<T>(out T value, params string[] contextKeys) =>
-        saveData.TryGetData(ComputeContextsResultKey(contextKeys), out value);
+        InstanceData.TryGetData(ComputeContextsResultKey(contextKeys), out value);
     
     /// <summary>
     /// Get the saved result (ie. return value) of the context with the provided ID list.
     /// <br/>Will throw if the variable is not assigned.
     /// </summary>
     public T GetContextResult<T>(params string[] contextKeys) =>
-        saveData.GetData<T>(ComputeContextsResultKey(contextKeys));
+        InstanceData.GetData<T>(ComputeContextsResultKey(contextKeys));
 
     public bool TryGetContextValue<T>(string varName, out T value, params string[] contextKeys) =>
-        saveData.TryGetData(ComputeContextsValueKey(varName, contextKeys), out value);
+        InstanceData.TryGetData(ComputeContextsValueKey(varName, contextKeys), out value);
     
     /// <summary>
     /// Get a saved variable assigned to the context with the provided ID list.
     /// <br/>Will throw if the variable is not assigned.
     /// </summary>
     public T GetContextValue<T>(string varName, params string[] contextIDs) =>
-        saveData.GetData<T>(ComputeContextsValueKey(varName, contextIDs));
+        InstanceData.GetData<T>(ComputeContextsValueKey(varName, contextIDs));
     
     public bool TryGetLocalValue<T>(string varName, out T value) =>
-        saveData.TryGetData(ContextsValueKey(varName), out value);
+        InstanceData.TryGetData(ContextsValueKey(varName), out value);
 
     /// <summary>
     /// Get a saved variable assigned to the current context.
     /// <br/>Will throw if the variable is not assigned.
     /// </summary>
     public T GetLocalValue<T>(string varName) =>
-        saveData.GetData<T>(ContextsValueKey(varName));
+        InstanceData.GetData<T>(ContextsValueKey(varName));
     
     /// <summary>
     /// Try to get a saved variable assigned to the current context.
@@ -471,15 +489,19 @@ public class VNState : IVNState, IConfirmationReceiver {
     /// Save a variable to the context with the provided ID list. It can be accessed via
     /// <see cref="GetContextValue{T}"/> or <see cref="GetLocalValue{T}"/>.
     /// </summary>
-    public void SaveContextValue<T>(string varName, T value, params string[] contextIDs) =>
-        saveData.SaveData(ComputeContextsValueKey(varName, contextIDs), value);
-    
+    public void SaveContextValue<T>(string varName, T value, params string[] contextIDs) {
+        InstanceData.SaveData(ComputeContextsValueKey(varName, contextIDs), value);
+        InstanceDataChanged.OnNext(InstanceData);
+    }
+
     /// <summary>
     /// Save a variable to the current bounded context. It can be accessed via
     /// <see cref="GetContextValue{T}"/> or <see cref="GetLocalValue{T}"/>.
     /// </summary>
-    public void SaveLocalValue<T>(string varName, T value) =>
-        saveData.SaveData(ContextsValueKey(varName), value);
+    public void SaveLocalValue<T>(string varName, T value) {
+        InstanceData.SaveData(ContextsValueKey(varName), value);
+        InstanceDataChanged.OnNext(InstanceData);
+    }
 
     /// <summary>
     /// Get the boolean result of a bounded context.
@@ -506,6 +528,10 @@ public class VNState : IVNState, IConfirmationReceiver {
         }
     }
 
+    /// <summary>
+    /// Update with a timestep of zero to flush any cancelled coroutines.
+    /// </summary>
+    public void Flush() => Update(0);
     
     public void Update(float deltaTime) {
         this.AssertActive();
@@ -525,6 +551,12 @@ public class VNState : IVNState, IConfirmationReceiver {
         vnUpdated = false;
     }
 
+    public T Find<T>() {
+        for (int ii = 0; ii < Entities.Count; ++ii)
+            if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
+                return obj;
+        throw new Exception($"Couldn't find entity of type {typeof(T)}");
+    }
     public T? FindEntity<T>() where T : class {
         for (int ii = 0; ii < Entities.Count; ++ii)
             if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
@@ -565,12 +597,19 @@ public class VNState : IVNState, IConfirmationReceiver {
         _RenderGroupCreated.OnNext(rg);
         return dsp;
     }
-        
-        
-    
+
+
+
     public VNOperation Wait(float time) {
         return new VNOperation(this.AssertActive(), cT => {
             Run(WaitingUtils.WaitFor(time, WaitingUtils.GetCompletionAwaiter(out var t), cT, () => dT));
+            return t;
+        });
+    }
+
+    public VNOperation Wait(Func<bool> condition) {
+        return new VNOperation(this.AssertActive(), cT => {
+            Run(WaitingUtils.WaitFor(condition, WaitingUtils.GetCompletionAwaiter(out var t), cT));
             return t;
         });
     }
@@ -650,7 +689,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     }
 
     public void RecordCG(IGalleryable cg) {
-        saveData.GlobalData.GalleryCGViewed(cg.Key);
+        InstanceData.GlobalData.GalleryCGViewed(cg.Key);
     }
 
     protected virtual void _DeleteAll() {
@@ -689,9 +728,9 @@ public class VNState : IVNState, IConfirmationReceiver {
         _DeleteAll();
     }
 
-    public IInstanceData UpdateSavedata() {
-        saveData.Location = VNLocation.Make(this);
-        return saveData;
+    public IInstanceData UpdateInstanceData() {
+        InstanceData.Location = VNLocation.Make(this);
+        return InstanceData;
     }
 
 

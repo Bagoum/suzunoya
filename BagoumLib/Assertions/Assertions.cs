@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BagoumLib.Tasks;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Assertions {
 
@@ -83,6 +84,7 @@ public static class AssertionHelpers {
 /// inherited (modifying objects already existing according to a new state representation),
 /// or deactualized (destroying objects represented by the state).
 /// </summary>
+[PublicAPI]
 public record IdealizedState {
     private List<IAssertion> Assertions { get; } = new();
     private Dictionary<int, List<IAssertion>> AssertionsByPhase { get; } = new();
@@ -92,13 +94,13 @@ public record IdealizedState {
     public IdealizedState(params IAssertion[] assertions) {
         Assert(assertions);
     }
-    public async Task Actualize(IdealizedState? prev) {
+    public async Task Actualize(IdealizedState? prev, bool simultaneousActualize = false) {
         if (prev is not { IsActualized: true })
             await ActualizeOnNewState();
         else {
             IsActualized = true;
-            var tasks = new List<Task>();
             var typToAssertions = new Dictionary<Type, List<IAssertion>>(); //for new assertions
+            var phaseToDeactualizers = new Dictionary<int, List<IAssertion>>();
             var inheritMap = new Dictionary<IAssertion, IAssertion>(); //new -> prev
             foreach (var a in Assertions) {
                 var t = a.GetType();
@@ -106,8 +108,8 @@ public record IdealizedState {
                     typToAssertions[t] = l = new();
                 l.Add(a);
             }
-            foreach (var pg in prev.AssertionsByPhase) {
-                foreach (var pa in pg.Value) {
+            foreach (var (phase, assertions) in prev.AssertionsByPhase.OrderBy(p => p.Key)) {
+                foreach (var pa in assertions) {
                     var t = pa.GetType();
                     if (typToAssertions.TryGetValue(t, out var l))
                         for (int ii = 0; ii < l.Count; ++ii)
@@ -116,43 +118,63 @@ public record IdealizedState {
                                 l.RemoveAt(ii);
                                 goto foundPair;
                             }
-                    tasks.Add(pa.DeactualizeOnNoSucceeding());
+                    if (!phaseToDeactualizers.TryGetValue(phase, out l))
+                        phaseToDeactualizers[phase] = l = new();
+                    l.Add(pa);
                     foundPair: ;
                 }
-                Logging.Log($"Deactualizing previous state for phase {pg.Key}...");
-                if (tasks.Count > 0)
-                    await Task.WhenAll(tasks);
-                Logging.Log($"Completed deactualization of previous for phase {pg.Key}");
-                tasks.Clear();
             }
-            foreach (var g in AssertionsByPhase) {
-                foreach (var a in g.Value) {
-                    if (inheritMap.TryGetValue(a, out var pa))
-                        tasks.Add(a.Inherit(pa));
-                    else
-                        tasks.Add(a.ActualizeOnNoPreceding());
+
+            async Task DeactualizePrev() {
+                foreach (var (phase, assertions) in phaseToDeactualizers.OrderBy(p => p.Key)) {
+                    Logging.Log($"Deactualizing previous state for phase {phase}...");
+                    await Task.WhenAll(assertions.Select(pa => pa.DeactualizeOnNoSucceeding()));
+                    Logging.Log($"Completed deactualization of previous for phase {phase}");
                 }
-                Logging.Log($"Actualizing next state for phase {g.Key}...");
-                await Task.WhenAll(tasks);
-                Logging.Log($"Completed actualization of next state for phase {g.Key}");
-                tasks.Clear();
+            }
+            async Task ActualizeNext() {
+                var tasks = new List<Task>();
+                var pairings = new List<(IAssertion, IAssertion?)>();
+                foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
+                    //Can't call Inherit directly in the loop as that can cause the hashcode to change
+                    // (record-type equality semantics lmao)
+                    // and destabilize the dictionary.
+                    foreach (var a in assertions) 
+                        pairings.Add(inheritMap.TryGetValue(a, out var pa) ? (a, pa) : (a, null));
+                    foreach (var (a, pa) in pairings)
+                        tasks.Add(pa == null ? a.ActualizeOnNoPreceding() : a.Inherit(pa));
+                    if (tasks.Count > 0) {
+                        Logging.Log($"Actualizing next state for phase {phase}...");
+                        await Task.WhenAll(tasks);
+                        Logging.Log($"Completed actualization of next state for phase {phase}");
+                    }
+                    pairings.Clear();
+                    tasks.Clear();
+                }
+            }
+
+            if (simultaneousActualize)
+                await Task.WhenAll(DeactualizePrev(), ActualizeNext());
+            else {
+                await DeactualizePrev();
+                await ActualizeNext();
             }
         }
     }
 
     public virtual async Task ActualizeOnNewState() {
         IsActualized = true;
-        foreach (var phase in AssertionsByPhase.Keys.OrderBy(x => x)) {
+        foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
             Logging.Log($"Actualizing new-state for phase {phase}...");
-            await Task.WhenAll(AssertionsByPhase[phase].Select(a => a.ActualizeOnNewState()));
+            await Task.WhenAll(assertions.Select(a => a.ActualizeOnNewState()));
             Logging.Log($"Completed actualization of new-state for phase {phase}");
         }
     }
     public virtual async Task DeactualizeOnEndState() {
         IsActualized = false;
-        foreach (var phase in AssertionsByPhase.Keys.OrderBy(x => x)) {
+        foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
             Logging.Log($"Deactualizing end-state for phase {phase}...");
-            await Task.WhenAll(AssertionsByPhase[phase].Select(a => a.DeactualizeOnEndState()));
+            await Task.WhenAll(assertions.Select(a => a.DeactualizeOnEndState()));
             Logging.Log($"Completed deactualization of end-state for phase {phase}");
         }
     }
@@ -160,7 +182,7 @@ public record IdealizedState {
     public void Assert(params IAssertion[] assertions) {
         var reorderPhases = new HashSet<int>();
         void HandleAssertion(IAssertion a) {
-            Assertions.AddRange(assertions);
+            Assertions.Add(a);
             if (!AssertionsByPhase.TryGetValue(a.Priority.Phase, out var l))
                 AssertionsByPhase[a.Priority.Phase] = l = new();
             l.Add(a);

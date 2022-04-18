@@ -16,11 +16,16 @@ public interface IKeyValueRepository {
     /// Check if a key exists in the repository. False if key is null.
     /// </summary>
     bool HasData(string? key);
+    /// <summary>
+    /// Get all keys saved in this repository.
+    /// </summary>
+    IEnumerable<string> Keys { get; }
 }
 //You can't proto-compress object, so json it is!
 [Serializable]
 public class KeyValueRepository : IKeyValueRepository {
     public Dictionary<string, object> Data { get; init; } = new();
+    public IEnumerable<string> Keys => Data.Keys;
 
     public void SaveData<T>(string? key, T value) {
         if (key == null) return;

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using BagoumLib.DataStructures;
+using BagoumLib.Events;
 using BagoumLib.Functional;
 using BagoumLib.Mathematics;
 using JetBrains.Annotations;
@@ -418,6 +419,17 @@ public static class DataStructureExtensions {
         stack.Count > 0 ? stack.Peek() : null;
     public static T? TryPeek<T>(this StackList<T> stack) where T : class =>
         stack.Count > 0 ? stack.Peek() : null;
+}
+
+[PublicAPI]
+public static class EventExtensions {
+    public static ICObservable<U> Map<T, U>(this ICObservable<T> ev, Func<T, U> map) =>
+        new MappedICObservable<T, U>(ev, map);
+    
+    public static IBObservable<U> Map<T, U>(this IBObservable<T> ev, Func<T, U> map) =>
+        new MappedIBObservable<T, U>(ev, map);
+
+    public static UnitEventProxy<T> Erase<T>(this IObservable<T> ev) => new(ev);
 }
 
 }

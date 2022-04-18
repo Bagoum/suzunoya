@@ -20,7 +20,11 @@ public static class Utilities {
         }
     };
 
-    public static Task ContinueWithSync(this Task t, Action? done) =>
+    /// <summary>
+    /// Runs a continuation and logs errors from the task or the continuation.
+    /// <br/>It is useful to use this on unawaited tasks, as it logs errors.
+    /// </summary>
+    public static Task ContinueWithSync(this Task t, Action? done = null) =>
         t.ContinueWith(WrapRethrow(done), TaskContinuationOptions.ExecuteSynchronously);
 
     /// <summary>

@@ -11,7 +11,7 @@ public record CharacterAssertion<C>(IVNState vn) : EntityAssertion<C>(vn), IAsse
 
     protected override Task DefaultDynamicEntryHandler(C c) {
         var sign = c.Location.Value.X > 0 ? 1 : -1;
-        c.Location.Value += sign * Vector3.One;
+        c.Location.Value += sign * Vector3.UnitX;
         c.Tint.Value = c.Tint.Value.WithA(0);
         return c.MoveBy(sign * new Vector3(-1, 0, 0), 1f).And(c.FadeTo(1, 1)).Task;
     }

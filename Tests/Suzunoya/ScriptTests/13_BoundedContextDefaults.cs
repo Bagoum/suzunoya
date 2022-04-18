@@ -62,7 +62,7 @@ public class _13BoundedContextDefaultTest {
         var t = s.Run().Execute();
         for (int ii = 0; ii < 13; ++ii)
 	        s.vn.Update(1f);
-        var sd = s.vn.UpdateSavedata();
+        var sd = s.vn.UpdateInstanceData();
         s = new _TestScript(new VNState(Cancellable.Null, sd));
         t = s.Runv2().Execute();
         //InnerCtxBad runs even though it shouldn't

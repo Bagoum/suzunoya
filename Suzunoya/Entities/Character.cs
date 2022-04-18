@@ -10,12 +10,12 @@ namespace Suzunoya.Entities {
 public interface ICharacter : IRendered {
     IdealOverride<string?> Emote { get; }
     SpeechSettings SpeechCfg { get; }
-    string Name { get; }
+    LString Name { get; }
 }
 
 public abstract class Character : Rendered, ICharacter {
     public virtual SpeechSettings SpeechCfg { get; } = SpeechSettings.Default;
-    public virtual string Name => "Nobody";
+    public virtual LString Name { get; set; } = "Nobody";
 
     public IdealOverride<string?> Emote { get; } = new(null);
 

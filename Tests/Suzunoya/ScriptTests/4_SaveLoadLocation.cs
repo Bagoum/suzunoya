@@ -66,7 +66,7 @@ public class _4SaveLoadLocationTest {
             if (ii == 10)
                 loc = VNLocation.Make(s.vn)!;
         }
-        s.vn.UpdateSavedata();
+        s.vn.UpdateInstanceData();
         s.vn.DeleteAll();
         Assert.AreEqual(loc, new VNLocation("B", new List<string>(){ "test4" }));
         Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>(){ "test4" }));

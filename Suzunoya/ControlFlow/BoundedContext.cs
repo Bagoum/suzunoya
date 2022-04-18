@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
@@ -11,8 +12,12 @@ namespace Suzunoya.ControlFlow {
 /// <summary>
 /// Non-generic interface for BoundedContext&lt;T&gt;.
 /// </summary>
+[PublicAPI]
 public interface IBoundedContext {
     IVNState VN { get; }
+    /// <summary>
+    /// If this is empty, then the context will be considered unidentifiable.
+    /// </summary>
     string ID { get; }
 }
 
@@ -26,9 +31,11 @@ public interface IBoundedContext {
 /// <br/>The return value of the contained task is automatically saved in the VNState when this runs to completion.
 /// <br/>To allow for minor exceptions to the "no lasting effects" rule, a ShortCircuit function may be provided
 /// that will be run in the full-skip case. This function should replicate any lasting effects.
+/// <br/>Also note that from a practical perspective, a top-level bounded context may have lasting effects.
 /// <br/>All external awaited tasks should be wrapped in BoundedContext (see <see cref="VNState.Bound{T}"/>)
 /// </summary>
 /// <typeparam name="T">Type of the return value of the contained task</typeparam>
+[PublicAPI]
 public class BoundedContext<T> : IBoundedContext {
     public IVNState VN { get; }
     public string ID { get; }
@@ -41,6 +48,9 @@ public class BoundedContext<T> : IBoundedContext {
     ///  without a ComputeFlag guard, or if an update was made to the game.
     /// </summary>
     public Maybe<T> LoadingDefault { get; init; } = Maybe<T>.None;
+    
+    public bool IsCompletedInContexts(params string[] contexts) => 
+        VN.TryGetContextResult<T>(out _, contexts.Append(ID).ToArray());
     
     public BoundedContext(VNState vn, string id, Func<Task<T>> innerTask, Action? shortCircuit = null) {
         VN = vn;

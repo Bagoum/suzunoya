@@ -65,7 +65,7 @@ public class _12BoundedContextTest {
             s.vn.Update(1f);
         }
         ListEq(s.er.SimpleLoggedEventStrings, stored);
-        var sd = s.vn.UpdateSavedata();
+        var sd = s.vn.UpdateInstanceData();
         s.er.LoggedEvents.Clear();
         //7 frames puts us in the middle of the inner context. Load it back and step again.
         //Note: even though after 7 frames we are in the process of loading Yukari's "12345" string,
@@ -79,7 +79,7 @@ public class _12BoundedContextTest {
 	        s.vn.Update(1f);
         }
         ListEq(s.er.SimpleLoggedEventStrings, stored2);
-        var sd2 = s.vn.UpdateSavedata();
+        var sd2 = s.vn.UpdateInstanceData();
         s.er.LoggedEvents.Clear();
         
         //Now we are past the inner context. If we reload, the inner context should never get evaluated.

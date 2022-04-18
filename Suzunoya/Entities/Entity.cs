@@ -84,6 +84,17 @@ public abstract class Entity : IEntity {
     public VNOperation Tween(ITransition tweener) => this.AssertActive().MakeVNOp(ct => 
         tweener.With(this.BindLifetime(ct), () => Container.dT).Run(cors));
 
+    /// <summary>
+    /// SoftSkip all coroutines before deleting.
+    /// </summary>
+    public void SoftDelete() {
+        lifetimeToken.Cancel(ICancellee.SoftSkipLevel);
+        cors.Close();
+        if (cors.Count > 0)
+            throw new Exception($"Some entity coroutines were not closed in the softdelete process. " +
+                                $"{this} has {cors.Count} remaining.");
+        Delete();
+    }
     public virtual void Delete() {
         if (_EntityActive.Value == false) return;
         lifetimeToken.Cancel(ICancellee.HardCancelLevel);

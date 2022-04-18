@@ -64,6 +64,17 @@ public static class WaitingUtils {
         }
         done(cT.ToCompletion());
     }
+    
+    /// <summary>
+    /// Waits until the condition is satisfied, but can be cancelled early by the cT.
+    /// </summary>
+    public static IEnumerator WaitFor(Func<bool> condition, Action<Completion> done, ICancellee cT) {
+        while (!condition()) {
+            if (cT.Cancelled) break;
+            yield return null;
+        }
+        done(cT.ToCompletion());
+    }
 
     /// <summary>
     /// Waits until the cT is cancelled.

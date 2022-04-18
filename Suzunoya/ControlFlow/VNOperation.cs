@@ -128,6 +128,7 @@ public record VNOperation : ILazyAwaitable<Completion> {
 
     private Task<Completion>? loadedTask;
     public Task<Completion> Task => loadedTask ??= _AsTask();
+    public Task<Completion> TaskWithCT(ICancellee cT) => loadedTask ??= _AsTask(cT);
     public VNConfirmTask C => VN.SpinUntilConfirm(this);
 
     public VNOperation(IVNState vn, params Func<VNOpTracker, Task>[] suboperations) {
@@ -135,8 +136,9 @@ public record VNOperation : ILazyAwaitable<Completion> {
         this.Suboperations = suboperations;
     }
 
-    private async Task<Completion> _AsTask() {
-        using var d = VN.GetOperationCanceller(out var cT, AllowUserSkip);
+    private async Task<Completion> _AsTask(ICancellee? cT = null) {
+        using var d = VN.GetOperationCanceller(out var cT0, AllowUserSkip);
+        cT = new JointCancellee(cT, cT0);
         cT.ThrowIfHardCancelled();
         var tracker = new VNOpTracker(VN, cT);
         foreach (var t in Suboperations) {

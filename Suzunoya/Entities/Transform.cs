@@ -83,7 +83,10 @@ public class Transform : Entity, ITransform {
         parentTokens.Add(nParent.EntityActive.Subscribe(b => {
             if (!b) {
                 Container.Logs.OnNext($"{this} has received a cascading deletion from a parent.");
-                Delete();
+                //Cascading deletions should be soft since they may occur in cases where
+                // parent and child are simultaneously running exit animations (and the parent finishes first),
+                // and these should not cause hard cancellations to be raised.
+                SoftDelete();
             }
         }));
         parentTokens.Add(ComputedLocation.AddDisturbance(nParent.ComputedLocation));

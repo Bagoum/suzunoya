@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Numerics;
+using BagoumLib.Culture;
 using BagoumLib.Events;
 using Suzunoya;
 using Suzunoya.Entities;
@@ -22,7 +23,7 @@ public class MyTestCharacter : Character {
 //Character-specific subclasses are for convenience, and also can contain character-specific information
 public class Reimu : MyTestCharacter {
     public Evented<float> GoheiLength { get; } = new(14);
-    public override string Name => "Reimu";
+    public override LString Name => "Reimu";
 }
 
 public class Yukari : MyTestCharacter {

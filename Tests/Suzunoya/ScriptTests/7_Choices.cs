@@ -73,7 +73,7 @@ public class _6ChoicesTest {
             if (ii == 3)
                 s.asker.SubmitSelection(0);
         }
-        s.vn.UpdateSavedata();
+        s.vn.UpdateInstanceData();
         Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>{"outer"}));
         Assert.AreEqual(sd.Data["$$__ctxResult__$$::outer::key2"], 4.2f);
         ListEq(s.er.SimpleLoggedEventStrings, stored1);

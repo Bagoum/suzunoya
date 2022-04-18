@@ -42,7 +42,7 @@ public class _14ComputeFlag {
         for (int ii = 0; ii < 3; ++ii)
 	        s.vn.Update(1f);
         Assert.IsFalse(t.IsCompleted);
-        var sd = s.vn.UpdateSavedata();
+        var sd = s.vn.UpdateInstanceData();
         //don't do it this way in practice, GetContextValue is the correct way, lmao.
         Assert.AreEqual(sd.GetData<int>(VNState.ComputeContextsValueKey("var1", 
 	        Array.Empty<string>())), 7);
@@ -53,7 +53,7 @@ public class _14ComputeFlag {
         for (int ii = 0; ii < 100; ++ii)
 	        s.vn.Update(1f);
         Assert.AreEqual(t.Result, 100);
-        sd = s.vn.UpdateSavedata();
+        sd = s.vn.UpdateInstanceData();
         Assert.AreEqual(s.vn.GetContextValue<int>("var1"), 7);
         Assert.AreEqual(s.vn.GetFlag("outer", "isvar1Eq7"), false);
         
