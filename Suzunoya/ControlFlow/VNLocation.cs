@@ -100,13 +100,17 @@ public class VNLocation {
     public static bool operator !=(VNLocation? a, VNLocation? b) => !(a == b);
 }
 
-public record VNOpTracker(IVNState vn, ICancellee cT) : ICancellee {
+/// <summary>
+/// A wrapper around a cancellation token that also links to the containing VN.
+/// </summary>
+/// <param name="vn"></param>
+/// <param name="cT"></param>
+public record VNCancellee(IVNState vn, ICancellee cT) : ICancellee {
     public int CancelLevel => cT.CancelLevel;
-    public bool Cancelled => cT.Cancelled;
     public ICancellee Root => cT.Root;
     public VNLocation? Location => VNLocation.Make(vn);
 
-    public VNOpTracker BoundCT(ICancellee ncT) => new(vn, new JointCancellee(cT, ncT));
+    //public VNCancellee BoundCT(ICancellee ncT) => new(vn, new JointCancellee(cT, ncT));
 }
 
 }

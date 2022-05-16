@@ -14,7 +14,7 @@ using Suzunoya.Dialogue;
 
 namespace Tests.Suzunoya {
 public static class EventRecordHelpers {
-    private static readonly HashSet<Type> tObs = new() { typeof(IObservable<>), typeof(ICObservable<>) };
+    private static readonly HashSet<Type> tObs = new() { typeof(IObservable<>), typeof(ICObservable<>), };
     private static readonly MethodInfo registerEv = typeof(EventRecord).GetMethod("TrackEvent")!;
     private static HashSet<string> ignoreKeys = new() {
         "onupdate", "logs", "instancedatachanged",

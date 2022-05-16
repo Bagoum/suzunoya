@@ -179,7 +179,9 @@ public record IdealizedState {
         }
     }
 
-    public void Assert(params IAssertion[] assertions) {
+    public void Assert(params IAssertion[] assertions) => this.Assert(assertions as IEnumerable<IAssertion>);
+
+    public void Assert(IEnumerable<IAssertion> assertions) {
         var reorderPhases = new HashSet<int>();
         void HandleAssertion(IAssertion a) {
             Assertions.Add(a);

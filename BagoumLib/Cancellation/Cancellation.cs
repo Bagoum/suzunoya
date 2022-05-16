@@ -71,7 +71,7 @@ public interface ICancellee {
     /// <summary>
     /// Get the youngest ancestor cancellee that is not a passthrough.
     /// </summary>
-    ICancellee Root { get; }
+    ICancellee Root => this;
 }
 
 [PublicAPI]
@@ -79,7 +79,6 @@ public class Cancellable : ICancellable, ICancellee {
     public static readonly ICancellee Null = new Cancellable();
     public int CancelLevel { get; private set; }
     public bool Cancelled => CancelLevel > 0;
-    public ICancellee Root => this;
     public void Cancel(int level) => CancelLevel = Math.Max(level, CancelLevel);
 
     //i love traits
@@ -116,7 +115,6 @@ public class JointCancellee : ICancellee {
     private readonly ICancellee c2;
     public int CancelLevel => Math.Max(c1.CancelLevel, c2.CancelLevel);
     public bool Cancelled => CancelLevel > 0;
-    public ICancellee Root => this;
 
     public JointCancellee(ICancellee? c1, ICancellee? c2) {
         this.c1 = c1 ?? Cancellable.Null;
@@ -133,7 +131,14 @@ public class JointCancellee : ICancellee {
         if (c2 == null) return c1;
         return new JointCancellee(c1, c2);
     }
+}
 
+/// <summary>
+/// A cancellee that proxies a source by treating soft cancellations as no-cancellation.
+/// </summary>
+[PublicAPI]
+public record StrongCancellee(ICancellee Source) : ICancellee {
+    public int CancelLevel => Source.CancelLevel >= ICancellee.HardCancelLevel ? ICancellee.HardCancelLevel : 0;
 }
 
 /// <summary>
@@ -150,7 +155,6 @@ public interface ICancellee<T> : ICancellee {
 public class GCancellable<T> : ICancellee<T> {
     public static readonly ICancellee<T> Null = new GCancellable<T>();
     public int CancelLevel { get; private set; }
-    public ICancellee Root => this;
     private Maybe<T> obj = Maybe<T>.None;
 
     

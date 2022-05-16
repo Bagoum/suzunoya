@@ -1,0 +1,186 @@
+﻿using System.Numerics;
+using System.Reactive;
+using System.Threading.Tasks;
+using BagoumLib;
+using BagoumLib.DataStructures;
+using BagoumLib.Events;
+using BagoumLib.Mathematics;
+using NUnit.Framework;
+using Suzunoya.ControlFlow;
+using Suzunoya.Dialogue;
+using Suzunoya.Entities;
+using static Tests.Suzunoya.MyTestCharacter;
+using static Tests.Suzunoya.ScriptTestHelpers;
+using static Tests.AssertHelpers;
+using static Suzunoya.Helpers;
+
+namespace Tests.Suzunoya {
+
+public class _15InterruptionScriptTest {
+    public class _TestScript : TestScript {
+        public async Task<int> Run(bool firstC) {
+            var md = vn.Add(new TestDialogueBox());
+            using var yukari = vn.Add(new Yukari());
+            yukari.speechCfg = SpeechSettings.Default with {
+                opsPerChar = (s, i) => 1,
+                opsPerSecond = 1,
+                rollEvent = null
+            };
+            if (firstC)
+	            await yukari.Say("12345").C;
+            else
+	            await yukari.Say("12345");
+            await yukari.Say("67890").C;
+            return 24;
+        }
+
+        public BoundedContext<int> DoThisInterruptTask() => new BoundedContext<int>(vn, "interruptor", async () => {
+            var y = vn.Find<Yukari>();
+            await y.Say("ABCDE").C;
+            return 12;
+        });
+
+    }
+    private void ScriptTestInner(bool firstC, InterruptionStatus ret, string[] cmp) {
+        var s = new _TestScript();
+        var t = s.Run(firstC);
+        s.er.LoggedEvents.Clear();
+        //Mimicking some usage-specific update loop
+        for (int ii = 0; !t.IsCompleted; ++ii) {
+            s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
+            s.vn.Update(1f);
+            if (ii == 3) {
+                var it = s.vn.Interrupt();
+                ++ii;
+                for (var inner = s.DoThisInterruptTask().Execute(); !inner.IsCompleted; ++ii) {
+                    s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
+                    s.vn.Update(1f);
+                    if (ii == 10)
+                        s.vn.UserConfirm();
+                }
+                --ii;
+                it.ReturnInterrupt(ret);
+            }
+            if (ii == 20)
+                s.vn.UserConfirm();
+        }
+        ListEq(s.er.SimpleLoggedEventStrings, cmp);
+    }
+
+    [Test]
+    public void ScriptTestWithC() => ScriptTestInner(true, InterruptionStatus.Continue, stored);
+    [Test]
+    public void ScriptTestWithoutC() => ScriptTestInner(false, InterruptionStatus.Continue, stored);
+    [Test]
+    public void ScriptTestAbort() => ScriptTestInner(true, InterruptionStatus.Abort, stored2);
+    
+    
+    private static readonly string[] stored = {
+	    "<VNState>.$UpdateCount ~ 0",
+	    "<VNState>.DialogueLog ~ Nobody:12345",
+	    "<TestDialogueBox>.DialogueStarted ~ Nobody:12345",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 1 }, 2345)",
+	    "<VNState>.$UpdateCount ~ 1",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 2 }, 345)",
+	    "<VNState>.$UpdateCount ~ 2",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 3 }, 45)",
+	    "<VNState>.$UpdateCount ~ 3",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 4 }, 5)",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
+	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.InterruptionStarted ~ Suzunoya.ControlFlow.VNInterruptionLayer",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::interruptor",
+	    "<VNState>.ContextStarted ~ Context:interruptor",
+	    "<VNState>.OperationID ~ ABCDE",
+	    "<TestDialogueBox>.DialogueCleared ~ ()",
+	    "<TestDialogueBox>.Speaker ~ (<Yukari>, Default)",
+	    "<VNState>.$UpdateCount ~ 4",
+	    "<VNState>.DialogueLog ~ Nobody:ABCDE",
+	    "<TestDialogueBox>.DialogueStarted ~ Nobody:ABCDE",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = A }, BCDE)",
+	    "<VNState>.$UpdateCount ~ 5",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = B }, CDE)",
+	    "<VNState>.$UpdateCount ~ 6",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = C }, DE)",
+	    "<VNState>.$UpdateCount ~ 7",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = D }, E)",
+	    "<VNState>.$UpdateCount ~ 8",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = E }, )",
+	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.AwaitingConfirm ~ Suzunoya.ControlFlow.VNState",
+	    "<VNState>.$UpdateCount ~ 9",
+	    "<VNState>.$UpdateCount ~ 10",
+	    "<VNState>.AwaitingConfirm ~ ",
+	    "<VNState>.$UpdateCount ~ 11",
+	    "<VNState>.ContextFinished ~ Context:interruptor",
+	    "<VNState>.InterruptionEnded ~ Suzunoya.ControlFlow.VNInterruptionLayer",
+	    "<VNState>.$UpdateCount ~ 12",
+	    "<VNState>.OperationID ~ 67890",
+	    "<TestDialogueBox>.DialogueCleared ~ ()",
+	    "<TestDialogueBox>.Speaker ~ (<Yukari>, Default)",
+	    "<VNState>.DialogueLog ~ Nobody:67890",
+	    "<TestDialogueBox>.DialogueStarted ~ Nobody:67890",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 6 }, 7890)",
+	    "<VNState>.$UpdateCount ~ 13",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 7 }, 890)",
+	    "<VNState>.$UpdateCount ~ 14",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 8 }, 90)",
+	    "<VNState>.$UpdateCount ~ 15",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 9 }, 0)",
+	    "<VNState>.$UpdateCount ~ 16",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 0 }, )",
+	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.AwaitingConfirm ~ Suzunoya.ControlFlow.VNState",
+	    "<VNState>.$UpdateCount ~ 17",
+	    "<VNState>.$UpdateCount ~ 18",
+	    "<VNState>.$UpdateCount ~ 19",
+	    "<VNState>.$UpdateCount ~ 20",
+	    "<VNState>.AwaitingConfirm ~ ",
+	    "<VNState>.$UpdateCount ~ 21",
+	    "<Yukari>.EntityActive ~ False"
+    };
+
+    private static readonly string[] stored2 = {
+	    "<VNState>.$UpdateCount ~ 0",
+	    "<VNState>.DialogueLog ~ Nobody:12345",
+	    "<TestDialogueBox>.DialogueStarted ~ Nobody:12345",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 1 }, 2345)",
+	    "<VNState>.$UpdateCount ~ 1",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 2 }, 345)",
+	    "<VNState>.$UpdateCount ~ 2",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 3 }, 45)",
+	    "<VNState>.$UpdateCount ~ 3",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 4 }, 5)",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
+	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.InterruptionStarted ~ Suzunoya.ControlFlow.VNInterruptionLayer",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::interruptor",
+	    "<VNState>.ContextStarted ~ Context:interruptor",
+	    "<VNState>.OperationID ~ ABCDE",
+	    "<TestDialogueBox>.DialogueCleared ~ ()",
+	    "<TestDialogueBox>.Speaker ~ (<Yukari>, Default)",
+	    "<VNState>.$UpdateCount ~ 4",
+	    "<VNState>.DialogueLog ~ Nobody:ABCDE",
+	    "<TestDialogueBox>.DialogueStarted ~ Nobody:ABCDE",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = A }, BCDE)",
+	    "<VNState>.$UpdateCount ~ 5",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = B }, CDE)",
+	    "<VNState>.$UpdateCount ~ 6",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = C }, DE)",
+	    "<VNState>.$UpdateCount ~ 7",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = D }, E)",
+	    "<VNState>.$UpdateCount ~ 8",
+	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = E }, )",
+	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.AwaitingConfirm ~ Suzunoya.ControlFlow.VNState",
+	    "<VNState>.$UpdateCount ~ 9",
+	    "<VNState>.$UpdateCount ~ 10",
+	    "<VNState>.AwaitingConfirm ~ ",
+	    "<VNState>.$UpdateCount ~ 11",
+	    "<VNState>.ContextFinished ~ Context:interruptor",
+	    "<VNState>.InterruptionEnded ~ Suzunoya.ControlFlow.VNInterruptionLayer",
+	    "<VNState>.$UpdateCount ~ 12",
+	    "<Yukari>.EntityActive ~ False"
+    };
+}
+}

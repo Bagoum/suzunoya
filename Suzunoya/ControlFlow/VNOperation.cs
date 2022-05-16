@@ -8,6 +8,7 @@ using BagoumLib;
 using BagoumLib.Cancellation;
 using BagoumLib.Tasks;
 using JetBrains.Annotations;
+using Suzunoya.Entities;
 
 namespace Suzunoya.ControlFlow {
 /// <summary>
@@ -17,7 +18,7 @@ namespace Suzunoya.ControlFlow {
 public interface ILazyAwaitable {
     Task Task { get; }
     TaskAwaiter GetAwaiter() => Task.GetAwaiter();
-    ILazyAwaitable BoundCT(ICancellee cT);
+    //ILazyAwaitable BoundCT(ICancellee cT);
 
     public static readonly ILazyAwaitable Null = new LazyAction(() => { });
 }
@@ -27,10 +28,10 @@ public interface ILazyAwaitable {
 /// </summary>
 public interface ILazyAwaitable<T> : ILazyAwaitable {
     Task ILazyAwaitable.Task => Task;
-    ILazyAwaitable ILazyAwaitable.BoundCT(ICancellee cT) => BoundCT(cT);
+    //ILazyAwaitable ILazyAwaitable.BoundCT(ICancellee cT) => BoundCT(cT);
     new Task<T> Task { get; }
     new TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
-    new ILazyAwaitable<T> BoundCT(ICancellee cT);
+    //new ILazyAwaitable<T> BoundCT(ICancellee cT);
 }
 
 /// <summary>
@@ -45,10 +46,10 @@ public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
         return System.Threading.Tasks.Task.FromResult(result);
     }
 
-    public ILazyAwaitable<T> BoundCT(ICancellee cT) => new LazyFunc<T>(() => {
+    /*public ILazyAwaitable<T> BoundCT(ICancellee cT) => new LazyFunc<T>(() => {
         if (cT.IsHardCancelled()) throw new OperationCanceledException();
         return lazyFunc();
-    });
+    });*/
 
     public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
 
@@ -72,16 +73,14 @@ public record LazyAction : LazyFunc<Unit> {
 public record ParallelLazyAwaitable(params ILazyAwaitable[] tasks) : ILazyAwaitable {
     private Task? loadedTask;
     public Task Task => loadedTask ??= Task.WhenAll(tasks.Select(t => t.Task));
-    public ILazyAwaitable BoundCT(ICancellee cT) =>
-        new ParallelLazyAwaitable(tasks.Select(t => t.BoundCT(cT)).ToArray());
+    //public ILazyAwaitable BoundCT(ICancellee cT) => new ParallelLazyAwaitable(tasks.Select(t => t.BoundCT(cT)).ToArray());
 }
 
 public record SequentialLazyAwaitable(params ILazyAwaitable?[] tasks) : ILazyAwaitable {
     private Task? loadedTask;
     public Task Task => loadedTask ??= LazyTask();
 
-    public ILazyAwaitable BoundCT(ICancellee cT) =>
-        new SequentialLazyAwaitable(tasks.Select(t => t?.BoundCT(cT)).ToArray());
+    //public ILazyAwaitable BoundCT(ICancellee cT) => new SequentialLazyAwaitable(tasks.Select(t => t?.BoundCT(cT)).ToArray());
     
     private async Task LazyTask() {
         foreach (var t in tasks)
@@ -91,17 +90,69 @@ public record SequentialLazyAwaitable(params ILazyAwaitable?[] tasks) : ILazyAwa
 }
 
 /// <summary>
-/// The task that is produced when waiting for a confirmation signal.
-/// This is similar to VNOperation, but is not bounded by an operation canceller.
+/// A group of processes (generally <see cref="VNOperation"/>)
+/// running on a VN bounded by a common cancellation/confirmation/interruption interface.
 /// </summary>
-public record VNConfirmTask(VNOperation? preceding, Func<ICancellee?, Task<Completion>> t) : ILazyAwaitable<Completion> {
+public class VNProcessGroup : ICancellee {
+    public VNInterruptionLayer InterruptHandler { get; }
+    public IVNState VN => InterruptHandler.VN;
+    public bool WasInterrupted { get; set; } = false;
+    public readonly Cancellable operationCTS = new();
+    public bool userSkipAllowed;
+    public readonly ICancellee operationCToken;
+    private (Cancellable cTs, IConfirmationReceiver recv)? confirmToken;
+    public ICancellee? ConfirmToken => confirmToken?.cTs;
+    public IConfirmationReceiver? ConfirmReceiver => confirmToken?.recv;
+    public int OperationCTokenDependencies { get; private set; } = 0;
+    public int CancelLevel => Math.Max(operationCToken.CancelLevel, InterruptHandler.InducedOperationCancelLevel);
+    public ICancellee Root => this;
+        
+    public VNProcessGroup(VNInterruptionLayer ih, bool allowUserSkip) {
+        InterruptHandler = ih;
+        userSkipAllowed = allowUserSkip;
+        operationCToken = new JointCancellee(ih.VN.CToken, operationCTS);
+    }
+
+    public ICancellee AwaitConfirm() {
+        return (confirmToken ??= (new Cancellable(), VN)).cTs;
+    }
+
+    public void DoConfirm() {
+        if (confirmToken?.cTs is { Cancelled: false }) {
+            confirmToken?.cTs.Cancel(ICancellee.SoftSkipLevel);
+            confirmToken = null;
+        }
+    }
+
+    public IDisposable CreateSubOp() => new SubOperationTracker(this);
+    private class SubOperationTracker : IDisposable {
+        private readonly VNProcessGroup op;
+        public SubOperationTracker(VNProcessGroup op) {
+            this.op = op;
+            ++op.OperationCTokenDependencies;
+        }
+
+        public void Dispose() {
+            --op.OperationCTokenDependencies;
+        }
+    }
+
+    
+}
+
+/// <summary>
+/// The task that is produced when waiting for a confirmation signal.
+/// This is similar to VNOperation, but cannot be soft-skipped except by interruption.
+/// </summary>
+public record VNConfirmTask(IVNState VN, VNOperation? Preceding, Func<VNProcessGroup, Task<Completion>> Confirm) : ILazyAwaitable<Completion> {
     private Task<Completion>? loadedTask;
     public Task<Completion> Task => loadedTask ??= _AsTask();
 
     private async Task<Completion> _AsTask() {
-        if (preceding != null)
-            await preceding;
-        return await t(null);
+        using var _ = VN.GetOperationCanceller(out var op);
+        if (Preceding != null)
+            await Preceding.TaskInGroup(op);
+        return await Confirm(op);
     }
     
     [UsedImplicitly]
@@ -111,41 +162,54 @@ public record VNConfirmTask(VNOperation? preceding, Func<ICancellee?, Task<Compl
     /// <summary>
     /// Create a copy of this awaitable that can be cancelled by the provided cancellation token.
     /// </summary>
-    public VNConfirmTask BoundCT(ICancellee cT) => new(preceding?.BoundCT(cT), c => t(JointCancellee.From(c, cT)));
-    ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);
+    //public VNConfirmTask BoundCT(ICancellee cT) => new(Preceding?.BoundCT(cT), c => Confirm(JointCancellee.From(c, cT)));
+    //ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);
 }
 
 /// <summary>
-/// A VNOperation is a sequential sequence of tasks bounded by one common operation cancellation token.
-/// If multiple VNOperations are run at the same time, they may end up sharing the same operation token.
-/// Tasks batched under a VNOperation do not need to check cancellation at their start or end.
+/// A VNOperation is a sequential sequence of tasks bounded by a common cancellation/interruption interface.
+/// <br/>The cancellation/interruption is provided through <see cref="VNProcessGroup"/>.
+/// If multiple VNOperations are run at the same time, they may end up sharing the same <see cref="VNProcessGroup"/>.
+/// <br/>Tasks batched under a VNOperation do not need to check cancellation at their start or end.
 /// </summary>
 public record VNOperation : ILazyAwaitable<Completion> {
     public IVNState VN { get; }
-    public Func<VNOpTracker, Task>[] Suboperations { get; init; }
+    public Func<VNCancellee, Task>[] Suboperations { get; init; }
 
     public bool AllowUserSkip { get; init; } = true;
 
     private Task<Completion>? loadedTask;
     public Task<Completion> Task => loadedTask ??= _AsTask();
+    public Task<Completion> TaskInGroup(VNProcessGroup op) => loadedTask ??= _AsTask(op);
     public Task<Completion> TaskWithCT(ICancellee cT) => loadedTask ??= _AsTask(cT);
     public VNConfirmTask C => VN.SpinUntilConfirm(this);
 
-    public VNOperation(IVNState vn, params Func<VNOpTracker, Task>[] suboperations) {
+    public VNOperation(IVNState vn, params Func<VNCancellee, Task>[] suboperations) {
         this.VN = vn;
         this.Suboperations = suboperations;
     }
 
-    private async Task<Completion> _AsTask(ICancellee? cT = null) {
-        using var d = VN.GetOperationCanceller(out var cT0, AllowUserSkip);
-        cT = new JointCancellee(cT, cT0);
-        cT.ThrowIfHardCancelled();
-        var tracker = new VNOpTracker(VN, cT);
+    private async Task<Completion> _AsTask(VNProcessGroup op, ICancellee? cT = null) {
+        cT = new JointCancellee(op, cT);
+        var tracker = new VNCancellee(VN, cT);
+        tracker.ThrowIfHardCancelled();
         foreach (var t in Suboperations) {
             await t(tracker);
-            cT.ThrowIfHardCancelled();
+            tracker.ThrowIfHardCancelled();
         }
-        return cT.ToCompletion();
+        if (op.InterruptHandler.Interruption == InterruptionStatus.Interrupted) {
+            VN.Run(WaitingUtils.WaitFor(() => op.InterruptHandler.Interruption != InterruptionStatus.Interrupted,
+                //don't respect soft-skip during interrupt hanging
+                WaitingUtils.GetCompletionAwaiter(out var aw), new StrongCancellee(tracker)));
+            await aw;
+            tracker.ThrowIfHardCancelled();
+        }
+        return tracker.ToCompletion();
+    }
+
+    private async Task<Completion> _AsTask(ICancellee? cT = null) {
+        using var _ = VN.GetOperationCanceller(out var op, AllowUserSkip);
+        return await _AsTask(op, cT);
     }
 
     public VNOperation Then(Action nxt) {
@@ -202,9 +266,9 @@ public record VNOperation : ILazyAwaitable<Completion> {
     /// <summary>
     /// Create a copy of this awaitable that can be cancelled by the provided cancellation token.
     /// </summary>
-    public VNOperation BoundCT(ICancellee cT) => this with {
-        Suboperations = Suboperations.Select(f => (Func<VNOpTracker, Task>)(o => f(o.BoundCT(cT)))).ToArray()
+    /*public VNOperation BoundCT(ICancellee cT) => this with {
+        Suboperations = Suboperations.Select(f => (Func<VNCancellee, Task>)(o => f(o.BoundCT(cT)))).ToArray()
     };
-    ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);
+    ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);*/
 }
 }

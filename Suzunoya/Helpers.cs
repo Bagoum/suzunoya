@@ -32,7 +32,7 @@ public static class Helpers {
     /// </summary>
     public static ICancellee BindLifetime(this IEntity e, ICancellee cT) => new JointCancellee(e.LifetimeToken, cT);
 
-    public static VNOperation MakeVNOp(this IEntity e, Func<VNOpTracker, Task> task, bool allowUserSkip=true) {
+    public static VNOperation MakeVNOp(this IEntity e, Func<VNCancellee, Task> task, bool allowUserSkip=true) {
         return new(e.Container.AssertActive(), task) { AllowUserSkip = allowUserSkip };
     }
 
@@ -127,11 +127,11 @@ public static class Helpers {
     public static VNOperation Disturb<T>(this Entity ent, DisturbedEvented<T> dist, Func<float, T> valuer, 
         float time, bool timeTo01=true) => ent.MakeVNOp(cT => {
         IEnumerator _Disturb(Action done) {
-            if (!cT.Cancelled) {
+            if (cT.CancelLevel == 0) {
                 var ev = new Evented<T>(valuer(0));
                 var token = dist.AddDisturbance(ev);
                 for (float elapsed = 0; elapsed < time; elapsed += ent.Container.dT) {
-                    if (cT.Cancelled)
+                    if (cT.CancelLevel > 0)
                         break;
                     ev.OnNext(valuer(timeTo01 ? (elapsed / time) : elapsed));
                     yield return null;

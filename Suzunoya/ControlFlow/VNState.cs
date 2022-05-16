@@ -20,7 +20,7 @@ using Suzunoya.Entities;
 
 namespace Suzunoya.ControlFlow {
 
-public interface IVNState {
+public interface IVNState : IConfirmationReceiver {
     IInstanceData InstanceData { get; }
     IGlobalData GlobalData => InstanceData.GlobalData;
     ICancellee CToken { get; }
@@ -106,6 +106,11 @@ public interface IVNState {
     void Update(float deltaTime);
 
     /// <summary>
+    /// Run a coroutine.
+    /// </summary>
+    void Run(IEnumerator ienum);
+
+    /// <summary>
     /// Create a lazy task that completes when a Confirm is sent to the VNState (see below).
     /// </summary>
     VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null);
@@ -120,7 +125,7 @@ public interface IVNState {
     /// Get a cToken that indicates when a task has been cancelled via skip.
     /// <br/>The caller should dispose the IDisposable when their task is complete, whether or not it has been skipped.
     /// </summary>
-    public IDisposable GetOperationCanceller(out ICancellee cT, bool allowUserSkip = true);
+    public IDisposable GetOperationCanceller(out VNProcessGroup cT, bool allowUserSkip = true);
     
     /// <summary>
     /// Skip the current operation. This will result in a skip even if user input skips are ignored.
@@ -168,7 +173,7 @@ public interface IVNState {
     /// <summary>
     /// Null if no target is waiting for a confirm.
     /// </summary>
-    Evented<IConfirmationReceiver?> AwaitingConfirm { get; }
+    ICSubject<IConfirmationReceiver?> AwaitingConfirm { get; }
     
     /// <summary>
     /// Whether or not VN components should allow user input. Set this to false eg. during pauses.
@@ -186,7 +191,7 @@ public interface IVNState {
     bool TryGetContextResult<T>(out T value, params string[] contextKeys);
 }
 [PublicAPI]
-public class VNState : IVNState, IConfirmationReceiver {
+public class VNState : IVNState {
     public float dT { get; private set; }
     /// <summary>
     /// If this value is set (via LoadLocation),
@@ -238,7 +243,7 @@ public class VNState : IVNState, IConfirmationReceiver {
         userSetSkipMode = mode;
         if (mode == SkipMode.FASTFORWARD)
             SkipOperation();
-        if (SkippingMode != null && confirmToken != null)
+        if (SkippingMode != null && CurrentProcesses?.ConfirmToken != null)
             _Confirm();
         Logs.OnNext(new LogMessage($"Set the user skip mode to {mode}", LogLevel.INFO));
         return true;
@@ -280,10 +285,11 @@ public class VNState : IVNState, IConfirmationReceiver {
     /// Cancellation token governing the lifetime of the VNState.
     /// </summary>
     private readonly Cancellable lifetimeToken;
-    /// <summary>
-    /// Cancellation token used by the unique confirmation task.
-    /// </summary>
-    private Cancellable? confirmToken;
+    private Stack<VNInterruptionLayer> interrupts = new();
+    private VNInterruptionLayer CurrentInterrupt => interrupts.Peek();
+    private VNProcessGroup? CurrentProcesses => CurrentInterrupt.CurrentProcesses;
+    public Event<VNInterruptionLayer> InterruptionStarted { get; } = new();
+    public Event<VNInterruptionLayer> InterruptionEnded { get; } = new();
     public ICancellee CToken { get; }
     public List<IBoundedContext> Contexts { get; } = new();
     public Event<IBoundedContext> ContextStarted { get; } = new();
@@ -316,7 +322,8 @@ public class VNState : IVNState, IConfirmationReceiver {
     //Use a replay event because the first render group will usually be created before any listeners are attached
     private ReplayEvent<RenderGroup> _RenderGroupCreated { get; } = new(1);
     public IObservable<RenderGroup> RenderGroupCreated => _RenderGroupCreated;
-    public Evented<IConfirmationReceiver?> AwaitingConfirm { get; } = new(null);
+    public ICSubject<IConfirmationReceiver?> AwaitingConfirm => _awaitingConfirm;
+    private LazyEvented<IConfirmationReceiver?> _awaitingConfirm;
     public Evented<bool> InputAllowed { get; } = new(true);
     private const string OPEN_OPID = "$$__OPEN__$$";
     public Evented<string> OperationID { get; } = new(OPEN_OPID);
@@ -328,6 +335,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     public IDialogueBox MainDialogueOrThrow =>
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
     public IBoundedContext LowestContext => Contexts[^1];
+    
 
     /// <summary>
     /// 
@@ -339,6 +347,9 @@ public class VNState : IVNState, IConfirmationReceiver {
         this.InstanceData = save;
         lifetimeToken = new Cancellable();
         CToken = new JointCancellee(extCToken, lifetimeToken);
+        interrupts.Push(new(this, null));
+        _awaitingConfirm = new(() => CurrentProcesses?.ConfirmReceiver, 
+            InterruptionStarted.Erase(), InterruptionEnded.Erase());
 
         Tokens.Add(OperationID.Subscribe(id => { 
             //TODO: globalData does not contextualize lineRead with context -- is this a problem?
@@ -361,39 +372,12 @@ public class VNState : IVNState, IConfirmationReceiver {
 
     protected virtual RenderGroup MakeDefaultRenderGroup() => new(this, visible: true);
 
-    private OperationCancellation? op = null;
-    public int OperationCTokenDependencies { get; private set; } = 0;
-    private class OperationCancellation {
-        public readonly Cancellable operationCTS = new();
-        public bool userSkipAllowed;
-        public readonly ICancellee? operationCToken;
-        
-        public OperationCancellation(VNState vn, bool allowUserSkip) {
-            userSkipAllowed = allowUserSkip;
-            operationCToken = new JointCancellee(vn.CToken, operationCTS);
-        }
-    }
-    private class SubOpTracker : IDisposable {
-        private readonly VNState vn;
-        public SubOpTracker(VNState vn) {
-            this.vn = vn;
-            ++vn.OperationCTokenDependencies;
-        }
-
-        public void Dispose() {
-            --vn.OperationCTokenDependencies;
-        }
-    }
-    
-    public IDisposable GetOperationCanceller(out ICancellee cT, bool allowUserSkip=true) {
-        if (op == null || OperationCTokenDependencies <= 0) {
-            op = new OperationCancellation(this, allowUserSkip);
-            if (SkippingMode.SkipsOperations())
-                SkipOperation();
-        } else
-            op.userSkipAllowed &= allowUserSkip;
-        cT = op.operationCToken!;
-        return new SubOpTracker(this);
+    public IDisposable GetOperationCanceller(out VNProcessGroup op, bool allowUserSkip=true) {
+        op = CurrentInterrupt.GetOrMakeProcessGroup();
+        op.userSkipAllowed &= allowUserSkip;
+        if (SkippingMode.SkipsOperations())
+            SkipOperation();
+        return op.CreateSubOp();
     }
 
     /// <summary>
@@ -625,40 +609,78 @@ public class VNState : IVNState, IConfirmationReceiver {
 
     public ILazyAwaitable Sequential(params ILazyAwaitable[] tasks) => new SequentialLazyAwaitable(tasks);
 
+    /// <summary>
+    /// Add a new interruption layer. This hangs the VNOperations on the current layer
+    ///  until it is resumed.
+    /// </summary>
+    public IVNInterruptionToken Interrupt() => new InterruptionToken(this, CurrentInterrupt);
+
+    private class InterruptionToken : IVNInterruptionToken {
+        public VNState VN { get; }
+        public VNInterruptionLayer Interruptee => inner.Layer;
+        private readonly VNInterruptionLayer.ProcessGroupInterruption inner;
+        public InterruptionToken(VNState vn, VNInterruptionLayer layer) {
+            this.VN = vn;
+            this.inner = layer.Interrupt();
+            VN.Flush();
+            var newLayer = new VNInterruptionLayer(VN, Interruptee);
+            VN.interrupts.Push(newLayer);
+            VN.InterruptionStarted.OnNext(newLayer);
+        }
+
+        public void ReturnInterrupt(InterruptionStatus resultStatus) {
+            if (VN.interrupts.Peek().Parent == Interruptee) {
+                VN.InterruptionEnded.OnNext(VN.interrupts.Pop());
+                inner.ReturnInterrupt(resultStatus);
+            }
+        }
+    }
+    
     public VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
         this.AssertActive();
-        return new VNConfirmTask(preceding, cT => {
+        return new VNConfirmTask(this, preceding, op => {
             if (SkippingMode == SkipMode.LOADING)
                 return Task.FromResult(Completion.SoftSkip);
-            if (AwaitingConfirm.Value == null)
-                AwaitingConfirm.Value = this;
-            confirmToken ??= new Cancellable();
-            Run(WaitingUtils.Spin(WaitingUtils.GetCompletionAwaiter(out var t), 
-                new JointCancellee(CToken, JointCancellee.From(cT, confirmToken))));
-            if (SkippingMode.IsPlayerControlled() && SkippingMode != null)
-                Run(AutoconfirmAfterDelay(confirmToken, SkippingMode.Value));
+            var awaiter = WaitingUtils.GetCompletionAwaiter(out var t);
+            Run(
+                //If an confirm is interrupted, then when it returns to execution,
+                // the confirm should be skipped and the next operation should be run.
+                WaitingUtils.WaitFor(() => op.WasInterrupted, c => {
+                        awaiter(c);
+                        op.DoConfirm(); //in case we went through interruption shortcut
+                        _awaitingConfirm.Recompute();
+                    }, 
+                    //Use StrongCancellee since we don't respect soft-skips (from Fastforward or from interruption)
+                    new JointCancellee(CToken, JointCancellee.From(new StrongCancellee(op), op.AwaitConfirm()))));
+            _awaitingConfirm.Recompute();
+            if (SkippingMode.IsPlayerControlled() && SkippingMode != null) 
+                Run(AutoconfirmAfterDelay(op, SkippingMode.Value));
             return t;
         });
     }
 
-    private IEnumerator AutoconfirmAfterDelay(Cancellable confToken, SkipMode s) {
+    private IEnumerator AutoconfirmAfterDelay(VNProcessGroup op, SkipMode s) {
+        var cT = op.ConfirmToken;
         var time = s == SkipMode.FASTFORWARD ? TimePerFastforwardConfirm : TimePerAutoplayConfirm;
-        for (float elapsed = 0; elapsed < time; elapsed += dT)
+        for (float elapsed = 0; elapsed < time; elapsed += dT) {
+            if (lifetimeToken.Cancelled) break;
             yield return null;
+        }
         //Ensure that only the same operation is cancelled
-        if (SkippingMode == s && confToken == confirmToken)
-            _Confirm();
+        if (SkippingMode == s && cT == op.ConfirmToken)
+            op.DoConfirm();
+        _awaitingConfirm.Recompute();
     }
     
     private void _Confirm() {
-        AwaitingConfirm.Value = null;
-        confirmToken?.Cancel(ICancellee.SoftSkipLevel);
-        confirmToken = null;
+        if (interrupts.TryPeek(out var op))
+            op.DoConfirm();
+        _awaitingConfirm.Recompute();
     }
 
     public bool UserConfirm() {
         this.AssertActive();
-        if (confirmToken != null) {
+        if (interrupts.TryPeek(out var op) && op.ConfirmToken != null) {
             //User confirm cancels autoskip
             if (SkippingMode.IsPlayerControlled()) {
                 Logs.OnNext($"Cancelling skip mode {SkippingMode} due to user confirm input.");
@@ -671,7 +693,7 @@ public class VNState : IVNState, IConfirmationReceiver {
     }
 
     public void SkipOperation() {
-        op?.operationCTS.Cancel(ICancellee.SoftSkipLevel);
+        CurrentProcesses?.operationCTS.Cancel(ICancellee.SoftSkipLevel);
     }
     
     public bool RequestSkipOperation() {
@@ -681,7 +703,7 @@ public class VNState : IVNState, IConfirmationReceiver {
             Logs.OnNext($"Cancelling skip mode {SkippingMode} due to user skip input.");
             SetSkipMode(null);
         }
-        if (op?.userSkipAllowed == true) {
+        if (CurrentProcesses?.userSkipAllowed is true) {
             SkipOperation();
             return true;
         } else
