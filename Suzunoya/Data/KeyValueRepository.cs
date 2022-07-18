@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace Suzunoya.Data {
 
@@ -25,6 +26,7 @@ public interface IKeyValueRepository {
 [Serializable]
 public class KeyValueRepository : IKeyValueRepository {
     public Dictionary<string, object> Data { get; init; } = new();
+    [JsonIgnore]
     public IEnumerable<string> Keys => Data.Keys;
 
     public void SaveData<T>(string? key, T value) {

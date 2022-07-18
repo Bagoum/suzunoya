@@ -8,22 +8,30 @@ using Suzunoya.Dialogue;
 namespace Tests.Suzunoya {
 
 /// <summary>
-/// Tests cases where flags are modified between load and save time.
+/// Tests proxy loading.
 /// </summary>
-public class _14ComputeFlag {
+public class _14SaveLoadTimeInconsistency {
     public class _TestScript : TestScript {
 	    public _TestScript(VNState? vn = null) : base(vn) { }
+
+	    public BoundedContext<int> InnerResult() => new(vn, "inner", async () => 9);
 	    public BoundedContext<int> Run() => new(vn, "outer", async () => {
 		    using var md = vn.Add(new TestDialogueBox());
 		    using var reimu = vn.Add(new Reimu());
-		    var result = 100;
-		    //This branch should not be entered on load.
-		    //if (vn.saveData.GetData<int>("var1") == 7) { <- this would cause the branch to be entered on load
-		    if (await vn.ComputeFlag(vn.GetContextValue<int>("var1") == 7, "isvar1Eq7")) {
+		    vn.SaveLocalValue("var1", 1000);
+		    var result = 300;
+		    if (vn.GetLocalValue<int>("var1") == 7) {
 			    await vn.Wait(9999);
 			    result = 200;
 		    }
-		    vn.SaveContextValue("var1", 7);
+		    vn.SaveLocalValue("var1", 7);
+		    if (vn.GetLocalValue<int>("var1") == 7) {
+			    result = 100;
+		    }
+		    result += vn.InstanceData.TryGetChainedData<int>("outer", "inner")?.Result.ValueOrNull ?? 1;
+		    await InnerResult();
+		    result += vn.InstanceData.TryGetChainedData<int>("outer", "inner")?.Result.ValueOrNull ?? 2;
+		    
 		    reimu.speechCfg = SpeechSettings.Default with {
 			    opsPerChar = (s, i) => 1,
 			    opsPerSecond = 1,
@@ -36,27 +44,23 @@ public class _14ComputeFlag {
     [Test]
     public void ScriptTest() {
         var s = new _TestScript(new VNState(Cancellable.Null, new InstanceData(new GlobalData())));
-        s.vn.SaveContextValue("var1", 6);
-        Assert.AreEqual(s.vn.GetContextValue<int>("var1"), 6);
         var t = s.Run().Execute();
         for (int ii = 0; ii < 3; ++ii)
 	        s.vn.Update(1f);
         Assert.IsFalse(t.IsCompleted);
         var sd = s.vn.UpdateInstanceData();
-        //don't do it this way in practice, GetContextValue is the correct way, lmao.
-        Assert.AreEqual(sd.GetData<int>(VNState.ComputeContextsValueKey("var1", 
-	        Array.Empty<string>())), 7);
-        Assert.AreEqual(s.vn.GetContextValue<int>("var1"), 7);
-        Assert.AreEqual(s.vn.GetFlag("outer", "isvar1Eq7"), false);
+        //Equivalent
+        Assert.AreEqual(sd.TryGetChainedData<int>("outer")?.Locals.GetData<int>("var1"), 7);
+        Assert.AreEqual(s.vn.GetContextValue<int>("var1", "outer"), 7);
+        Assert.AreEqual(s.vn.GetContextResult<int>("outer", "inner"), 9);
         s = new _TestScript(new VNState(Cancellable.Null, sd));
         t = s.Run().Execute();
         for (int ii = 0; ii < 100; ++ii)
 	        s.vn.Update(1f);
-        Assert.AreEqual(t.Result, 100);
+        Assert.AreEqual(t.Result, 110);
         sd = s.vn.UpdateInstanceData();
-        Assert.AreEqual(s.vn.GetContextValue<int>("var1"), 7);
-        Assert.AreEqual(s.vn.GetFlag("outer", "isvar1Eq7"), false);
-        
+        Assert.AreEqual(s.vn.GetContextValue<int>("var1", "outer"), 7);
+
     }
 }
 }

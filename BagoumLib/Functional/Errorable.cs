@@ -9,6 +9,7 @@ public readonly struct Errorable<T> {
     public bool Valid => _value.Valid;
     public T Value => _value.Value;
     public T GetOrThrow => Valid ? Value : throw new Exception(JoinedErrors);
+    public Either<T, string> AsEither => Valid ? new Either<T, string>(Value) : new Either<T, string>(JoinedErrors);
     private Errorable(string[]? errors, Maybe<T> value) {
         this.errors = errors ?? Helpers.noStrs;
         this._value = value;

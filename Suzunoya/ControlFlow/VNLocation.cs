@@ -29,7 +29,7 @@ public class VNLocation {
     public VNLocation() { }
 #pragma warning restore 8618
     
-    private VNLocation(string lastOperation, IEnumerable<IBoundedContext> ctxs) : 
+    private VNLocation(string lastOperation, IEnumerable<BoundedContext> ctxs) : 
         this(lastOperation, ctxs.Select(c => c.ID).ToList()) { }
     
     public VNLocation(string lastOperation, List<string> ctxs) {
@@ -64,20 +64,20 @@ public class VNLocation {
     /// <summary>
     /// Return true iff the provided contexts are a nonstrict prefix of this object's contexts.
     /// </summary>
-    public bool ContextsMatchPrefix(List<IBoundedContext> contexts) {
+    public bool ContextsMatchPrefix(List<OpenedContext> contexts) {
         if (Contexts.Count < contexts.Count)
             return false;
         for (int ii = 0; ii < contexts.Count; ++ii) {
-            if (Contexts[ii] != contexts[ii].ID)
+            if (Contexts[ii] != contexts[ii].BCtx.ID)
                 return false;
         }
         return true;
     }
-    public bool ContextsMatch(List<IBoundedContext> contexts) {
+    public bool ContextsMatch(List<OpenedContext> contexts) {
         if (Contexts.Count != contexts.Count)
             return false;
         for (int ii = 0; ii < Contexts.Count; ++ii) {
-            if (Contexts[ii] != contexts[ii].ID)
+            if (Contexts[ii] != contexts[ii].BCtx.ID)
                 return false;
         }
         return true;

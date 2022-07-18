@@ -5,6 +5,8 @@ namespace BagoumLib.DataStructures {
 /// <summary>
 /// An ordered collection that supports iteration, as well as deletion of arbitrary indices.
 /// Indices are not guaranteed to be persistent, so deletion must occur during the iteration block of an index.
+/// <br/>Note: this is significantly less flexible than <see cref="DMCompactingArray{T}"/>, but
+/// can function with zero reference overhead and zero garbage.
 /// </summary>
 /// <typeparam name="T"></typeparam>
 [PublicAPI]
@@ -12,6 +14,7 @@ public class CompactingArray<T> {
     protected int count;
     public int Count => count;
     protected bool[] rem;
+    //Leaving this public for low-level efficiency
     public T[] Data { get; private set; }
     public int NullElements { get; protected set; } = 0;
     private readonly int firstResize;
@@ -61,7 +64,7 @@ public class CompactingArray<T> {
         }
     }
 
-    public void Add(ref T obj) {
+    public void AddRef(ref T obj) {
         if (count >= Data.Length) {
             var nLen = Math.Max(Data.Length * 2, firstResize);
             var narr = new T[nLen];
@@ -75,7 +78,7 @@ public class CompactingArray<T> {
         Data[count++] = obj;
     }
 
-    public void AddV(T obj) => Add(ref obj);
+    public void Add(T obj) => AddRef(ref obj);
 
     public void Empty() {
         Array.Clear(Data, 0, Data.Length);

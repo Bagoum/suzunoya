@@ -10,8 +10,20 @@ public interface ITypePrinter {
 /// Tries really hard to convert a type to its C# representation, eg. "int[]" or "Func&lt;bool, string&gt;".
 /// </summary>
 public class CSharpTypePrinter : ITypePrinter {
-    public Func<Type, bool> PrintTypeNamespace { get; set; } = _ => false;
-    public string Print(Type t) {
+    public static readonly ITypePrinter Default = new CSharpTypePrinter();
+    public Func<Type, bool> PrintTypeNamespace { get; init; } = _ => false;
+
+    private static readonly Type[] tupleTypes = {
+        typeof(ValueTuple<>),
+        typeof(ValueTuple<,>),
+        typeof(ValueTuple<,,>),
+        typeof(ValueTuple<,,,>),
+        typeof(ValueTuple<,,,,>),
+        typeof(ValueTuple<,,,,,>),
+        typeof(ValueTuple<,,,,,,>),
+        typeof(ValueTuple<,,,,,,,>)
+    };
+    public virtual string Print(Type t) {
         if (SimpleTypeNameMap.TryGetValue(t, out var v))
             return v;
         string PrependEnclosure(string s) => 
@@ -22,9 +34,13 @@ public class CSharpTypePrinter : ITypePrinter {
                     s;
         if (t.IsArray)
             return PrependEnclosure($"{Print(t.GetElementType()!)}[]");
-        if (t.IsConstructedGenericType)
-            return PrependEnclosure(
-                $"{Print(t.GetGenericTypeDefinition())}<{string.Join(", ", t.GenericTypeArguments.Select(Print))}>");
+        if (t.IsConstructedGenericType) {
+            var gt = t.GetGenericTypeDefinition();
+            var args = string.Join(", ", t.GenericTypeArguments.Select(Print));
+            return PrependEnclosure(tupleTypes.Contains(gt) ? 
+                $"({args})" : 
+                $"{Print(gt)}<{args}>");
+        }
         if (t.IsGenericType) {
             int cutFrom = t.Name.IndexOf('`');
             if (cutFrom > 0)

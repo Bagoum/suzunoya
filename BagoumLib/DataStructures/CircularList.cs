@@ -5,6 +5,9 @@ using BagoumLib.Mathematics;
 using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
+/// <summary>
+/// A list with a fixed capacity that wraps around and overwrites the oldest items.
+/// </summary>
 [PublicAPI]
 public class CircularList<T> : IEnumerable<T> {
     public int Count { get; private set; }

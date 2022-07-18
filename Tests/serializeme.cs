@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reactive;
 using BagoumLib.Events;
+using BagoumLib.Functional;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using Suzunoya.ControlFlow;
@@ -38,10 +40,16 @@ public class serializeme {
                 "233", "453"
             }
         };
+        var bctxc = new BoundedContextData<int>("c", 5, new(), new());
+        bctxc.Locals.SaveData("hello", 10);
+        var bctxb = new BoundedContextData<Unit>("b", Unit.Default, new(), new());
+        bctxb.SaveNested(bctxc);
+        var bctxa = new BoundedContextData<Unit>("a", Maybe<Unit>.None, new(), new());
+        bctxa.SaveNested(bctxb);
+        bctxa.Locals.SaveData("world", "foobar");
         var save = new InstanceData(global) {
-            Data = new Dictionary<string, object>() {
-                {"hello", new[] {"w", "orld"}},
-                {"foo", 433}
+            BCtxData = new() {
+                {"a", bctxa}
             },
             Location = new VNLocation("l_25", new List<string>(){"dec20"}) {
             }

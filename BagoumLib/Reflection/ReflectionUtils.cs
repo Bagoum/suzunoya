@@ -2,28 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BagoumLib.Expressions;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Reflection {
 [PublicAPI]
 public static class ReflectionUtils {
-    public static string NameType(Type t) {
-        if (t.IsArray) {
-            return $"[{NameType(t.GetElementType()!)}]";
-        }
-        if (t.IsConstructedGenericType) {
-            return
-                $"{NameType(t.GetGenericTypeDefinition())}<{string.Join(", ", t.GenericTypeArguments.Select(NameType))}>";
-        }
-        if (t.IsGenericType) {
-            var n = t.Name;
-            int cutFrom = n.IndexOf('`');
-            if (cutFrom > 0) return n.Substring(0, cutFrom);
-        }
-        return t.Name;
-    }
-
-    public static string RName(this Type t) => NameType(t);
+    /// <summary>
+    /// Alias for CSharpTypePrinter.Default.Print(t), which prints the type as close to the native
+    /// C# description as possible without namespaces.
+    /// </summary>
+    public static string RName(this Type t) => CSharpTypePrinter.Default.Print(t);
     
     
     /// <summary>

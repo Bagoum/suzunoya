@@ -33,16 +33,16 @@ public interface IVNState : IConfirmationReceiver {
     IDialogueBox MainDialogueOrThrow { get; }
 
     /// <summary>
-    /// A list of script contexts. A bounded context is defined as a unit of execution which
-    /// can be skipped in its entirety during loading if it has already been fully executed.
-    /// This requires that it leaves no hanging objects after it is complete.
+    /// A list of currently-open script contexts.
     /// </summary>
-    List<IBoundedContext> Contexts { get; }
-    
+    List<OpenedContext> Contexts { get; }
+    Event<OpenedContext> ContextStarted { get; }
+    Event<OpenedContext> ContextFinished { get; }
+
     /// <summary>
-    /// The most recently opened context.
+    /// The most recently opened context (<see cref="Contexts"/>[^1]).
     /// </summary>
-    IBoundedContext LowestContext { get; }
+    OpenedContext LowestContext => Contexts[^1];
 
     /// <summary>
     /// Returns the type of skipping the VN currently has active.
@@ -188,7 +188,13 @@ public interface IVNState : IConfirmationReceiver {
     Evented<string> OperationID { get; }
     ISubject<LogMessage> Logs { get; }
 
-    bool TryGetContextResult<T>(out T value, params string[] contextKeys);
+    bool TryGetContextData<T>(out BoundedContextData<T> value, params string[] contextKeys);
+    
+    /// <summary>
+    /// True if it is possible to run a context twice.
+    /// <br/>This will avoid throwing a "duplicate definition" exception.
+    /// </summary>
+    bool AllowsRepeatContextExecution { get; }
 }
 [PublicAPI]
 public class VNState : IVNState {
@@ -197,24 +203,35 @@ public class VNState : IVNState {
     /// If this value is set (via LoadLocation),
     /// the VNState will almost instantaneously skip forward to the given location.
     /// </summary>
-    public (VNLocation location, Action? onLoaded)? LoadTo { get; private set; }
+    public (VNLocation location, IInstanceData replayer, Action? onLoaded)? LoadTo { get; private set; }
 
-    public void LoadToLocation(VNLocation target, Action? onLoaded = null) {
-        LoadTo = (target, onLoaded);
+    /// <summary>
+    /// Before loading, the <see cref="VNState"/> should be initialized with the
+    ///  save data that it had *before* running the BCtx being loaded into.
+    /// <br/>The instance data at the time of save, with the BCtx partially executed,
+    ///  should be passed as <see cref="replayer"/> here.
+    /// </summary>
+    public void LoadToLocation(VNLocation target, IInstanceData replayer, Action? onLoaded = null) {
+        LoadTo = (target, replayer, onLoaded);
         Logs.OnNext(new LogMessage($"Began loading to location {LoadTo}", LogLevel.INFO));
     }
 
     private void StopLoading() {
+        if (!LoadTo.Try(out var lt))
+            throw new Exception("Cannot stop loading when load configuration is null");
         Logs.OnNext(new LogMessage($"Finished loading to location {LoadTo}", LogLevel.INFO));
-        var c = LoadTo?.onLoaded;
         LoadTo = null;
-        c?.Invoke();
+        InstanceData = lt.replayer;
+        if (Contexts.Count > 0)
+            Contexts[^1].RemapData(InstanceData);
+        lt.onLoaded?.Invoke();
+        InstanceDataChanged.OnNext(InstanceData);
     }
 
     /// <summary>
     /// While this value is true, the current operation should be skipped in order to load to the target LoadTo.
     /// </summary>
-    private bool IsLoadSkipping => LoadTo is var (location, _) &&
+    private bool IsLoadSkipping => LoadTo is var (location, _, _) &&
                                     //Skip until the contexts match
                                     (!location.ContextsMatch(Contexts) ||
                                      //Skip until the operation matches
@@ -291,29 +308,13 @@ public class VNState : IVNState {
     public Event<VNInterruptionLayer> InterruptionStarted { get; } = new();
     public Event<VNInterruptionLayer> InterruptionEnded { get; } = new();
     public ICancellee CToken { get; }
-    public List<IBoundedContext> Contexts { get; } = new();
-    public Event<IBoundedContext> ContextStarted { get; } = new();
-    public Event<IBoundedContext> ContextFinished { get; } = new();
+    public List<OpenedContext> Contexts { get; } = new();
+    public Event<OpenedContext> ContextStarted { get; } = new();
+    public Event<OpenedContext> ContextFinished { get; } = new();
     public Event<IInstanceData> InstanceDataChanged { get; } = new();
 
-    //Separate key used for automatically saving BoundedContext results.
-    // The fancy prefix is to avoid collsiion with manually-executed saved data.
-    public static string ComputeContextsResultKey(IEnumerable<string> ctxIds) => 
-        "$$__ctxResult__$$::" + ComputeContextsKey(ctxIds);
-    
-    //Separate key used for saving contingent values within specific contexts.
-    // The fancy prefix is to avoid collsiion with manually-executed saved data.
-    public static string ComputeContextsValueKey(string varName, IEnumerable<string> ctxIds) => 
-        $"$$__ctxValue[{varName}]__$$::" + ComputeContextsKey(ctxIds);
+    public string ContextsDescriptor => string.Join("::", Contexts.Select(c => c.BCtx.ID));
 
-    public static string ComputeContextsKey(IEnumerable<string> ctxIds) =>
-        string.Join("::", ctxIds);
-
-    private IEnumerable<string> ContextIDs => Contexts.Select(c => c.ID);
-    public string ContextsKey => ComputeContextsKey(ContextIDs);
-    private string ContextsResultKey => ComputeContextsResultKey(ContextIDs);
-    private string ContextsValueKey(string key) => ComputeContextsValueKey(key, ContextIDs);
-    
     public RenderGroup DefaultRenderGroup { get; }
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
     
@@ -330,12 +331,12 @@ public class VNState : IVNState {
     public ISubject<LogMessage> Logs { get; } = new Event<LogMessage>();
     public Evented<bool> VNStateActive { get; } = new(true);
     
-    public IInstanceData InstanceData { get; }
+    public IInstanceData InstanceData { get; private set; }
 
     public IDialogueBox MainDialogueOrThrow =>
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
-    public IBoundedContext LowestContext => Contexts[^1];
-    
+
+    public bool AllowsRepeatContextExecution => true;
 
     /// <summary>
     /// 
@@ -356,7 +357,7 @@ public class VNState : IVNState {
             if (SkippingMode == SkipMode.FASTFORWARD && FastforwardReadTextOnly && !InstanceData.GlobalData.IsLineRead(id))
                 SetSkipMode(null);
             InstanceData.GlobalData.LineRead(id);
-            if (LoadTo is var (location, _) && location.ContextsMatch(Contexts) && id == location.LastOperationID) {
+            if (LoadTo is var (location, _, _) && location.ContextsMatch(Contexts) && id == location.LastOperationID) {
                 StopLoading();
             }
         }));
@@ -380,83 +381,94 @@ public class VNState : IVNState {
         return op.CreateSubOp();
     }
 
-    /// <summary>
-    /// Wrap a task in a BoundedContext so its result is stored in the instance save
-    ///  and can be read during the skip-load process (or at any future time during execution).
-    /// <br/>This should be executed for all external tasks that are awaited within VN execution, as
-    ///  well as for any computed flags that may change throughout execution (eg. global route flags).
-    /// <br/>Note that <see cref="Ask{T}"/> automatically wraps its task in a BoundedContext.
-    /// </summary>
-    public BoundedContext<T> Bound<T>(Func<Task<T>> task, string key, Maybe<T>? deflt = null) =>
-        new(this, key, task) { LoadingDefault = deflt ?? Maybe<T>.None };
-
-    public BoundedContext<T> Bound<T>(Task<T> task, string key, Maybe<T>? deflt = null) =>
-        Bound(() => task, key, deflt);
-
-    public BoundedContext<T> Bound<T>(T value, string key, Maybe<T>? deflt = null) =>
-        Bound(Task.FromResult(value), key, deflt);
-
-    /// <summary>
-    /// Alias for <see cref="Bound{T}"/> when computing a boolean flag.
-    /// </summary>
-    public BoundedContext<bool> ComputeFlag(bool value, string key, bool? deflt = null) =>
-        Bound(value, key, deflt.AsMaybe());
-
 
     public async Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask) {
         this.AssertActive();
         using var openCtx = new OpenedContext<T>(this, ctx);
         //When load skipping, we can skip the entire context if the current context stack does not match the target
-        if (LoadTo?.location.ContextsMatchPrefix(Contexts) == false) {
-            if (InstanceData.TryGetData<T>(ContextsResultKey, out var res) || 
-                 ctx.LoadingDefault.Try(out res)) {
-                Logs.OnNext($"Load-skipping section {ContextsKey} with return value {res}");
-                ctx.ShortCircuit?.Invoke();
+        if (LoadTo.Try(out var load) && load.location.ContextsMatchPrefix(Contexts) == false &&
+            ctx is StrongBoundedContext<T> sbc) {
+            //Either use the result from execution, or use the loading default
+            var lctx = load.replayer.TryGetChainedData<T>(Contexts);
+            void Finish() {
+                sbc.OnFinish?.Invoke();
+                sbc.ShortCircuit?.Invoke();
+                //Hierarchical data transfer: copy skipped BCTXData from the proxy/replayer load info
+                // into the proxied/blank load info.
+                //This includes the BCTX result as well as any saved locals.
+                //If custom save data not handled by VNState is modified, then you cannot use StrongBoundedContext.
+                if (lctx != null)
+                    if (Contexts.Count > 1)
+                        Contexts[^2].Data.SaveNested(lctx, true);
+                    else
+                        InstanceData.SaveBCtxData(lctx, true);
+            }
+            if (lctx?.Result is {Valid: true, Value: {} res}) {
+                Logs.OnNext($"Load-skipping section {ContextsDescriptor} with return value {res}");
+                Finish();
                 return res;
-            } else if (typeof(T) == typeof(Unit) && DefaultLoadSkipUnit) {
-                Logs.OnNext($"Load-skipping section {ContextsKey} with default Unit return");
-                ctx.ShortCircuit?.Invoke();
+            } else if (sbc.LoadingDefault.Try(out res)) {
+                Logs.OnNext($"Load-skipping section {ContextsDescriptor} with default return {res}");
+                Finish();
+                return res;
+            }  else if (typeof(T) == typeof(Unit) && DefaultLoadSkipUnit) {
+                Logs.OnNext($"Load-skipping section {ContextsDescriptor} with default Unit return");
+                Finish();
                 return default!;
             } else
-                throw new Exception($"Requested to load-skip context {ContextsKey}, but save data does not have " +
-                                    "corresponding information");
+                throw new Exception($"Requested to load-skip context {ContextsDescriptor}, " +
+                                    "but save data does not have corresponding information");
         }
         var result = await innerTask();
-        Logs.OnNext($"Saving result {result} to context {ContextsKey}");
-        InstanceData.SaveData(ContextsResultKey, result);
+        if (ctx is StrongBoundedContext<T> sbc_)
+            sbc_.OnFinish?.Invoke();
+        Logs.OnNext($"Saving result {result} to context {ContextsDescriptor}");
+        openCtx.Data.Result = result;
         InstanceDataChanged.OnNext(InstanceData);
         return result;
     }
 
-    public bool TryGetContextResult<T>(out T value, params string[] contextKeys) =>
-        InstanceData.TryGetData(ComputeContextsResultKey(contextKeys), out value);
-    
+    public bool TryGetContextData<T>(out BoundedContextData<T> value, params string[] contextKeys) =>
+        (value = InstanceData.TryGetChainedData<T>(contextKeys)!) != null;
+
+    public BoundedContextData GetContextData(params string[] contextKeys) =>
+        InstanceData.TryGetChainedData(contextKeys) ?? 
+        throw new Exception($"No context data for {string.Join("::", contextKeys)}");
+
+    public BoundedContextData<T> GetContextData<T>(params string[] contextKeys) =>
+        GetContextData(contextKeys).CastTo<T>();
+
     /// <summary>
     /// Get the saved result (ie. return value) of the context with the provided ID list.
     /// <br/>Will throw if the variable is not assigned.
     /// </summary>
     public T GetContextResult<T>(params string[] contextKeys) =>
-        InstanceData.GetData<T>(ComputeContextsResultKey(contextKeys));
+        GetContextData<T>(contextKeys).Result.Try(out var res) ?
+            res :
+            throw new Exception($"Context {string.Join("::", contextKeys)} is unfinished");
 
-    public bool TryGetContextValue<T>(string varName, out T value, params string[] contextKeys) =>
-        InstanceData.TryGetData(ComputeContextsValueKey(varName, contextKeys), out value);
-    
+    public bool TryGetContextValue<T>(string varName, out T value, params string[] contextKeys) {
+        value = default!;
+        return InstanceData.TryGetChainedData(contextKeys) is { } data && 
+               data.Locals.TryGetData<T>(varName, out value);
+    }
+
     /// <summary>
-    /// Get a saved variable assigned to the context with the provided ID list.
+    /// Get a saved local variable assigned to the context with the provided ID list.
     /// <br/>Will throw if the variable is not assigned.
     /// </summary>
     public T GetContextValue<T>(string varName, params string[] contextIDs) =>
-        InstanceData.GetData<T>(ComputeContextsValueKey(varName, contextIDs));
-    
+        GetContextData(contextIDs).Locals.GetData<T>(varName);
+
     public bool TryGetLocalValue<T>(string varName, out T value) =>
-        InstanceData.TryGetData(ContextsValueKey(varName), out value);
+        Contexts[^1].Data.Locals.TryGetData(varName, out value);
 
     /// <summary>
     /// Get a saved variable assigned to the current context.
     /// <br/>Will throw if the variable is not assigned.
     /// </summary>
     public T GetLocalValue<T>(string varName) =>
-        InstanceData.GetData<T>(ContextsValueKey(varName));
+        Contexts[^1].Data.Locals.GetData<T>(varName);
     
     /// <summary>
     /// Try to get a saved variable assigned to the current context.
@@ -470,11 +482,15 @@ public class VNState : IVNState {
     }
 
     /// <summary>
+    /// WARNING: THIS FUNCTION MAY NOT BE SAFE TO CALL WITHIN A BOUNDEDCONTEXT.
+    ///  EDITING OTHER CONTEXTS' DATA MAY CAUSE ISSUES WITH LOADING.
     /// Save a variable to the context with the provided ID list. It can be accessed via
     /// <see cref="GetContextValue{T}"/> or <see cref="GetLocalValue{T}"/>.
     /// </summary>
     public void SaveContextValue<T>(string varName, T value, params string[] contextIDs) {
-        InstanceData.SaveData(ComputeContextsValueKey(varName, contextIDs), value);
+        (InstanceData.TryGetChainedData<T>(contextIDs) ??
+            throw new Exception($"No context exists by keys {string.Join("::", contextIDs)}"))
+            .Locals.SaveData(varName, value);
         InstanceDataChanged.OnNext(InstanceData);
     }
 
@@ -483,7 +499,7 @@ public class VNState : IVNState {
     /// <see cref="GetContextValue{T}"/> or <see cref="GetLocalValue{T}"/>.
     /// </summary>
     public void SaveLocalValue<T>(string varName, T value) {
-        InstanceData.SaveData(ContextsValueKey(varName), value);
+        Contexts[^1].Data.Locals.SaveData(varName, value);
         InstanceDataChanged.OnNext(InstanceData);
     }
 
@@ -493,24 +509,6 @@ public class VNState : IVNState {
     /// </summary>
     public bool GetFlag(params string[] contextIDs) => GetContextResult<bool>(contextIDs);
 
-    private class OpenedContext<T> : IDisposable {
-        private readonly VNState vn;
-        private readonly BoundedContext<T> ctx;
-        
-        public OpenedContext(VNState vn, BoundedContext<T> ctx) {
-            this.vn = vn;
-            this.ctx = ctx;
-            vn.Contexts.Add(ctx);
-            vn.ContextStarted.OnNext(ctx);
-        }
-
-        public void Dispose() {
-            if (vn.LowestContext != ctx)
-                throw new Exception("Contexts closed in wrong order. This is an engine error. Please report this.");
-            vn.Contexts.RemoveAt(vn.Contexts.Count - 1);
-            vn.ContextFinished.OnNext(ctx);
-        }
-    }
 
     /// <summary>
     /// Update with a timestep of zero to flush any cancelled coroutines.
@@ -602,7 +600,7 @@ public class VNState : IVNState {
         this.AssertActive();
         cors.Run(ienum,
             //Correct for the one-frame delay created by TryStepPrepend if this is called after VN finishes its cors.step
-            new CoroutineOptions(execType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
+            new CoroutineOptions(ExecType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
     }
 
     public ILazyAwaitable Parallel(params ILazyAwaitable[] tasks) => new ParallelLazyAwaitable(tasks);
@@ -726,7 +724,7 @@ public class VNState : IVNState {
         RenderGroups.Compact();
         if (RenderGroups.Count > 0)
             throw new Exception("Some VNState render groups were not deleted in the cull process. " +
-                                $"Script {LowestContext.ID} has {RenderGroups.Count} remaining.");
+                                $"Script {ContextsDescriptor} has {RenderGroups.Count} remaining.");
         for (int ii = 0; ii < Entities.Count; ++ii) {
             if (Entities.ExistsAt(ii))
                 Entities[ii].Delete();
@@ -734,11 +732,11 @@ public class VNState : IVNState {
         Entities.Compact();
         if (Entities.Count > 0)
             throw new Exception("Some VNState entities were not deleted in the cull process. " +
-                                $"Script {LowestContext.ID} has {Entities.Count} remaining.");
+                                $"Script {ContextsDescriptor} has {Entities.Count} remaining.");
         cors.Close();
         if (cors.Count > 0)
             throw new Exception($"Some VNState coroutines were not closed in the cull process. " +
-                                $"Script {LowestContext.ID} has {cors.Count} remaining.");
+                                $"Script {ContextsDescriptor} has {cors.Count} remaining.");
         VNStateActive.OnNext(false);
     }
     

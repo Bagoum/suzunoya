@@ -3,9 +3,8 @@
 namespace BagoumLib.DataStructures {
 
 /// <summary>
-/// Node holds inert data for a NodeLinkedList.
+/// An object holding inert data for a NodeLinkedList.
 /// </summary>
-/// <typeparam name="T"></typeparam>
 [PublicAPI]
 public class Node<T> {
     public Node<T>? Prev { get; private set; }
@@ -25,6 +24,9 @@ public class Node<T> {
         Prev = n;
     }
 
+    /// <summary>
+    /// A singly-linked list made up of <see cref="Node{T}"/>s.
+    /// </summary>
     public class LinkedList {
         public Node<T>? First { get; private set; }
         public Node<T>? Last { get; private set; }

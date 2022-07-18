@@ -51,6 +51,10 @@ public interface IAssertion {
     /// <param name="prev">Previous assertion</param>
     Task Inherit(IAssertion prev);
 }
+
+/// <summary>
+/// An <see cref="IAssertion"/> restricted to the type of the designated object.
+/// </summary>
 public interface IAssertion<T> : IAssertion where T: IAssertion<T> {
     /// <summary>
     /// Called when a previous assertion is replaced with this one.
@@ -65,6 +69,10 @@ public interface IAssertion<T> : IAssertion where T: IAssertion<T> {
     //   public Task Inherit(IAssertion prev) => AssertionHelpers.Inherit(prev, this);
 }
 
+/// <summary>
+/// An assertion with children, which may be defined to have some special relation to the parent.
+/// For example, an EntityAssertion's children's transforms are children of that EntityAssertion's transform.
+/// </summary>
 public interface IChildLinkedAssertion : IAssertion {
     public List<IAssertion> Children { get; }
 }
@@ -94,6 +102,15 @@ public record IdealizedState {
     public IdealizedState(params IAssertion[] assertions) {
         Assert(assertions);
     }
+    
+    /// <summary>
+    /// Deactualize the previous state, then actualize this state,
+    ///  creating the objects designated by this object's assertions.
+    /// </summary>
+    /// <param name="prev">A previous state. Objects will be transferred instead of created if already created
+    /// by the previous state.</param>
+    /// <param name="simultaneousActualize">When true, the tasks for deactualizing the previous state
+    /// and actualizing the new state will be executed simultaneously.</param>
     public async Task Actualize(IdealizedState? prev, bool simultaneousActualize = false) {
         if (prev is not { IsActualized: true })
             await ActualizeOnNewState();
@@ -162,6 +179,9 @@ public record IdealizedState {
         }
     }
 
+    /// <summary>
+    /// Actualize this state when no previous state exists (ie, this is a new state).
+    /// </summary>
     public virtual async Task ActualizeOnNewState() {
         IsActualized = true;
         foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
@@ -170,6 +190,12 @@ public record IdealizedState {
             Logging.Log($"Completed actualization of new-state for phase {phase}");
         }
     }
+    
+    /// <summary>
+    /// Deactualize this state when no next state exists (ie, this is the last state).
+    /// If this is not the last state, then call nextState.Actualize(thisState),
+    ///  which will deactualize thisState.
+    /// </summary>
     public virtual async Task DeactualizeOnEndState() {
         IsActualized = false;
         foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
@@ -179,8 +205,14 @@ public record IdealizedState {
         }
     }
 
+    /// <summary>
+    /// Add assertions.
+    /// </summary>
     public void Assert(params IAssertion[] assertions) => this.Assert(assertions as IEnumerable<IAssertion>);
 
+    /// <summary>
+    /// Add assertions.
+    /// </summary>
     public void Assert(IEnumerable<IAssertion> assertions) {
         var reorderPhases = new HashSet<int>();
         void HandleAssertion(IAssertion a) {

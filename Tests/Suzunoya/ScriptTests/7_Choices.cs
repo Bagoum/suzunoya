@@ -30,7 +30,7 @@ public class _6ChoicesTest {
         //In an engine-specific plugin, this class might be a game object of some sort
         // that renders the options to screen while awaiting currentChoice.
         public BoundedContext<T> Ask<T>(string key, params (T value, string description)[] options)
-            => new(vn, key, async () => {
+            => new StrongBoundedContext<T>(vn, key, async () => {
                 currentChoice = new TaskCompletionSource<int>();
                 //Do rendering or whatever here
                 return options[await currentChoice.Task].value;
@@ -40,7 +40,7 @@ public class _6ChoicesTest {
         public readonly Interrogator asker;
 
         public _TestScript(VNState vn) : base(vn) {
-            asker = new(vn);
+            asker = new(this.vn);
         }
 
         public BoundedContext<float> Run() => new(vn, "outer", async () => {
@@ -75,7 +75,7 @@ public class _6ChoicesTest {
         }
         s.vn.UpdateInstanceData();
         Assert.AreEqual(sd.Location, new VNLocation("C", new List<string>{"outer"}));
-        Assert.AreEqual(sd.Data["$$__ctxResult__$$::outer::key2"], 4.2f);
+        Assert.AreEqual(s.vn.GetContextResult<float>("outer", "key2"), 4.2f);
         ListEq(s.er.SimpleLoggedEventStrings, stored1);
         //Then we load again
         s = new _TestScript(new VNState(Cancellable.Null, sd));

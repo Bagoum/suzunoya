@@ -23,7 +23,7 @@ public class _2TweeningBatchingTest {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
             reimu.Location.Value = Vector3.Zero;
-            var exc = vn.LowestContext;
+            var exc = vn.Contexts[^1];
             await vn.Wait(0);
 
             //No sequential batching (base case)

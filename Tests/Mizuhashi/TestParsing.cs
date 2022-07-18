@@ -50,7 +50,7 @@ public class TestParsing1 {
     public void TestEOF() {
         Lower.ThenEOF().AssertFail("hello", "Error at Line 1, Col 2:\n" +
                                                     "hello\n" +
-                                                    ".^\n" +
+                                                    "h| <- at this location\n" +
                                                     "Expected end of file");
     }
 

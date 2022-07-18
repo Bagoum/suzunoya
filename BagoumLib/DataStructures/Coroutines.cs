@@ -3,6 +3,9 @@ using System.Collections;
 using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
+/// <summary>
+/// Details on how to handle a newly-added coroutine.
+/// </summary>
 public enum CoroutineType {
     /// <summary>
     /// If a currently executing ienumerator exists, adds the coroutine before it and steps it in place (StepPrepend).
@@ -28,11 +31,20 @@ public enum CoroutineType {
     AppendToEnd
 }
 
-public record CoroutineOptions(bool droppable = false, CoroutineType execType = CoroutineType.TryStepPrepend) {
+/// <summary>
+/// Options detailing how to handle a new coroutine.
+/// </summary>
+/// <param name="Droppable">True iff the coroutine can be deleted without waiting for cancellation when
+///  the coroutine container is deleted.</param>
+/// <param name="ExecType">Instructions on how to add the new coroutine to the existing list.</param>
+public record CoroutineOptions(bool Droppable = false, CoroutineType ExecType = CoroutineType.TryStepPrepend) {
     public static readonly CoroutineOptions Default = new();
-    public static readonly CoroutineOptions Droppable = new(true);
+    public static readonly CoroutineOptions DroppableDefault = new(true);
 }
 
+/// <summary>
+/// An object on which coroutines can be run.
+/// </summary>
 [PublicAPI]
 public interface ICoroutineRunner {
     void Run(IEnumerator ienum, CoroutineOptions? opts = null);
@@ -67,6 +79,9 @@ public class Coroutines : ICoroutineRunner {
 
     private Node<RCoroutine>? itrNode = null;
 
+    /// <summary>
+    /// Step once through all coroutines.
+    /// </summary>
     public void Step() {
         Node<RCoroutine>? nextNode;
         for (var n = itrNode = coroutines.First; n != null; n = itrNode = nextNode) {
@@ -115,8 +130,16 @@ public class Coroutines : ICoroutineRunner {
         itrNode = lastItrNode;
     }
 
+    /// <summary>
+    /// Number of coroutines currently executing.
+    /// </summary>
     public int Count => coroutines.Count;
 
+    /// <summary>
+    /// Step through all coroutines once, and stops executing any droppable coroutines.
+    /// <br/>Before calling this, non-droppable coroutines should be cancelled via cancellation tokens.
+    /// <br/>After calling this, the caller may want to enforce that no (non-droppable) coroutines remain.
+    /// </summary>
     public void Close() {
         if (coroutines.Count > 0) {
             Step();
@@ -137,24 +160,25 @@ public class Coroutines : ICoroutineRunner {
 
     /// <summary>
     /// Run a couroutine that will be updated once every engine frame.
-    /// This coroutine is expected to clean up immediately on cancellation and will throw an error
-    /// if the executing object is destroyed before it is cancelled (unless opts.droppable is set).
+    /// This coroutine is expected to clean up within one step on cancellation, 
+    ///  for correct behavior with <see cref="Close"/>.
+    /// Alternatively, the coroutine may be marked as droppable under <see cref="CoroutineOptions.Droppable"/>.
     /// </summary>
     /// <param name="ienum">Coroutine</param>
     /// <param name="opts">Settings</param>
     public void Run(IEnumerator ienum, CoroutineOptions? opts = null) {
         opts ??= CoroutineOptions.Default;
-        switch (opts.execType, itrNode) {
+        switch (opts.ExecType, itrNode) {
             case (CoroutineType.StepPrepend, null):
                 throw new Exception("Cannot prepend when not iterating coroutines");
             case (CoroutineType.StepPrepend or CoroutineType.StepTryPrepend or CoroutineType.TryStepPrepend, not null):
-                StepInPlace(coroutines.AddBefore(itrNode!, new RCoroutine(ienum, null, itrNode!.obj.droppable || opts.droppable)));
+                StepInPlace(coroutines.AddBefore(itrNode!, new RCoroutine(ienum, null, itrNode!.obj.droppable || opts.Droppable)));
                 break;
             case (CoroutineType.StepTryPrepend, null):
-                StepInPlace(coroutines.Add(new RCoroutine(ienum, null, opts.droppable)));
+                StepInPlace(coroutines.Add(new RCoroutine(ienum, null, opts.Droppable)));
                 break;
             default:
-                coroutines.Add(new RCoroutine(ienum, null, opts.droppable));
+                coroutines.Add(new RCoroutine(ienum, null, opts.Droppable));
                 break;
         }
     }

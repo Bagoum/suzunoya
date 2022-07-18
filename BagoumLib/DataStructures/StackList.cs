@@ -4,7 +4,9 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
 
-
+/// <summary>
+/// A stack that can also be indexed like a list.
+/// </summary>
 [PublicAPI]
 public class StackList<T> : IEnumerable<T> {
     public int Count { get; private set; }

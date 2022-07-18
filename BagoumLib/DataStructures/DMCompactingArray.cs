@@ -4,11 +4,18 @@ using System.Collections.Generic;
 using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
+/// <summary>
+/// A disposable marker. When disposed, some underlying object will be removed from a collection.
+/// </summary>
 [PublicAPI]
 public interface IDeletionMarker : IDisposable {
     void MarkForDeletion();
+    void IDisposable.Dispose() => MarkForDeletion();
 }
 
+/// <summary>
+/// A disposable marker for a value <see cref="Value"/> within a collection (see <see cref="DMCompactingArray{T}"/>).
+/// </summary>
 public class DeletionMarker<T> : IDeletionMarker {
     public T Value { get; }
     public int Priority { get; }
@@ -20,26 +27,28 @@ public class DeletionMarker<T> : IDeletionMarker {
     }
 
     public void MarkForDeletion() => MarkedForDeletion = true;
-    public void Dispose() => MarkForDeletion();
 }
 
 /// <summary>
 /// An ordered collection that supports iteration, as well as deletion of arbitrary elements via
-/// persistent identification of added elements returned to consumers.
+/// disposable tokens (<see cref="DeletionMarker{T}"/>) returned to consumers.
 /// Indices are not guaranteed to be persistent and should not be used for identification.
+/// <br/>Deletion is O(1) amortized, assuming that <see cref="Compact"/> is called at a reasonable frequency.
 /// </summary>
-/// <typeparam name="T"></typeparam>
 [PublicAPI]
 public class DMCompactingArray<T> : IEnumerable<T> {
     private int count;
     public int Count => count;
-    public DeletionMarker<T>[] Data { get; private set; }
+    protected DeletionMarker<T>[] Data { get; private set; }
 
     public DMCompactingArray(int size = 8) {
         Data = new DeletionMarker<T>[size];
         count = 0;
     }
 
+    /// <summary>
+    /// Remove deleted elements from the underlying data array.
+    /// </summary>
     public void Compact() {
         int ii = 0;
         bool foundDeleted = false;
@@ -124,18 +133,53 @@ public class DMCompactingArray<T> : IEnumerable<T> {
 
     public void Delete(int ii) => Data[ii].MarkForDeletion();
 
+    /// <summary>
+    /// Returns true iff the element at the given index has not been deleted.
+    /// </summary>
     public bool ExistsAt(int index) => !Data[index].MarkedForDeletion;
     public T this[int index] => Data[index].Value;
 
-    public IEnumerator<T> GetEnumerator() {
-        int ct = count;
-        for (int ii = 0; ii < ct; ++ii) {
-            if (!Data[ii].MarkedForDeletion) yield return Data[ii].Value;
+    public bool GetIfExistsAt(int index, out T val) {
+        if (Data[index].MarkedForDeletion) {
+            val = default!;
+            return false;
+        } else {
+            val = Data[index].Value;
+            return true;
         }
+    }
+
+    public bool GetMarkerIfExistsAt(int index, out DeletionMarker<T> val) {
+        if (Data[index].MarkedForDeletion) {
+            val = default!;
+            return false;
+        } else {
+            val = Data[index];
+            return true;
+        }
+    }
+
+    public IEnumerator<T> GetEnumerator() {
+        for (int ii = 0; ii < count; ++ii)
+            if (!Data[ii].MarkedForDeletion) 
+                yield return Data[ii].Value;
     }
 
     IEnumerator IEnumerable.GetEnumerator() {
         return GetEnumerator();
+    }
+
+    public void CopyIntoList(List<T> dst) {
+        for (int ii = 0; ii < count; ++ii)
+            if (!Data[ii].MarkedForDeletion)
+                dst.Add(Data[ii].Value);
+    }
+
+    public T? FirstOrNull() {
+        for (int ii = 0; ii < count; ++ii)
+            if (!Data[ii].MarkedForDeletion)
+                return Data[ii].Value;
+        return default(T?);
     }
 }
 }

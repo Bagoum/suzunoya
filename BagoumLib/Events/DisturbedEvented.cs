@@ -69,6 +69,18 @@ public abstract class DisturbedEvented<T> : ICSubject<T> {
         return new JointDisposable(DoPublishIfNotSame, trackToken);
     }
 
+    /// <summary>
+    /// Copy the disturbances from another <see cref="DisturbedEvented{T}"/>.
+    /// The copied disturbances will be bound by the same <see cref="IDisposable"/>s as the original.
+    /// </summary>
+    /// <param name="src"></param>
+    public void CopyDisturbances(DisturbedEvented<T> src) {
+        for (int ii = 0; ii < src.disturbances.Count; ++ii)
+            if (src.disturbances.GetMarkerIfExistsAt(ii, out var m))
+                disturbances.AddPriority(m);
+        DoPublishIfNotSame();
+    }
+
     private void DoPublishIfNotSame() {
         var nxt = ComputeValue();
         if (Equals(Value, nxt))

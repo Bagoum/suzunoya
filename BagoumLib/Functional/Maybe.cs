@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using BagoumLib.Reflection;
 using JetBrains.Annotations;
+using Newtonsoft.Json;
 
 namespace BagoumLib.Functional {
 [PublicAPI]
@@ -9,10 +10,15 @@ public readonly struct Maybe<T> {
     public bool Valid { get; }
     public T Value { get; }
 
+    [JsonIgnore]
     public (bool, T) Tuple => (Valid, Valid ? Value : default!);
-    public Maybe(bool valid, T val) {
+    [JsonIgnore]
+    public T? ValueOrNull => Valid ? Value : default(T?);
+    
+    [JsonConstructor]
+    public Maybe(bool valid, T value) {
         this.Valid = valid;
-        this.Value = val;
+        this.Value = value;
     }
     public Maybe(T val) {
         this.Valid = true;
@@ -29,6 +35,7 @@ public readonly struct Maybe<T> {
         val = Value;
         return Valid;
     }
+
     
     public bool Equals(Maybe<T> other) => Equals(Tuple, other.Tuple);
 

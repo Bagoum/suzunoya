@@ -1,13 +1,17 @@
 ﻿using System;
 using JetBrains.Annotations;
+using Newtonsoft.Json;
 
 namespace BagoumLib.Functional {
 [PublicAPI]
 public readonly struct Either<L, R> {
-
     public bool IsLeft { get; }
     public L Left { get; }
     public R Right { get; }
+    [JsonIgnore]
+    public L? LeftOrNull => IsLeft ? Left : default(L?);
+    [JsonIgnore]
+    public R? RightOrNull => IsLeft ? default(R?) : Right;
 
     public Either(bool isLeft, L left, R right) {
         IsLeft = isLeft;
@@ -53,7 +57,6 @@ public readonly struct Either<L, R> {
             new (f.Right(Right));
 
 
-
     public override bool Equals(object? obj) => obj is Either<L, R> other && Equals(other);
     public bool Equals(Either<L, R> other) => this == other;
 
@@ -67,5 +70,7 @@ public readonly struct Either<L, R> {
 
     public override string ToString() => IsLeft ? $"Left<{Left}>" : $"Right<{Right}>";
 
+    public static implicit operator Either<L, R>(L l) => new(l);
+    public static implicit operator Either<L, R>(R r) => new(r);
 }
 }

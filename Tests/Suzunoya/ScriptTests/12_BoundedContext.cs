@@ -34,13 +34,13 @@ public class _12BoundedContextTest {
 		    };
 		    await vn.Wait(0);
 		    await reimu.Say("12345");
-		    var innerVal = await InnerCtx().Execute();
+		    var innerVal = await InnerCtx();
 		    await reimu.Say("67890123");
 		    await reimu.Say("4567");
 		    return 25 + innerVal;
 	    });
 
-	    private BoundedContext<int> InnerCtx() => new(vn, "l2", async () => {
+	    private StrongBoundedContext<int> InnerCtx() => new(vn, "l2", async () => {
 		    var yukari = vn.Add(new Yukari());
 		    yukari.speechCfg = SpeechSettings.Default with {
 			    opsPerChar = (s, i) => 1,

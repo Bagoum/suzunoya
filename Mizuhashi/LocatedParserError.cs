@@ -6,6 +6,9 @@ using BagoumLib.Functional;
 using JetBrains.Annotations;
 
 namespace Mizuhashi {
+/// <summary>
+/// Abstract type for errors that occur while parsing.
+/// </summary>
 public abstract record ParserError {
     protected virtual IEnumerable<ParserError> Enumerated() => new[]{this};
     public virtual ParserError JoinWith(ParserError other) => new EitherOf(this, other);
@@ -94,6 +97,10 @@ public abstract record ParserError {
 
     public static implicit operator ParserError?(string? s) => s == null ? null : new Expected(s);
 }
+
+/// <summary>
+/// A <see cref="ParserError"/> paired with a location in the source string.
+/// </summary>
 public readonly struct LocatedParserError {
     //Store Index instead of position because it's more space-efficient. We can expand back to position if there are parsing errors
     public readonly int Index;
@@ -111,12 +118,12 @@ public readonly struct LocatedParserError {
         var lineLength = 0;
         var pos = new Position(source, Index);
         for (int ii = pos.IndexOfLineStart; ii < pos.Index; ++ii)
-            spacesSB.Append(source[ii] == '\t' ? '\t' : '.');
+            spacesSB.Append(source[ii] == '\t' ? '\t' : source[ii]);// '.');
         for (; pos.IndexOfLineStart + lineLength < source.Length && 
                source[pos.IndexOfLineStart + lineLength] != '\n'; ++lineLength) { }
         return $"Error at {pos.ToString()}:\n" +
                $"{source.Substring(pos.IndexOfLineStart, lineLength)}\n" +
-               $"{spacesSB.ToString()}^\n" +
+               $"{spacesSB}| <- at this location\n" +
                $"{Error.Flatten().Show(source)}";
     }
     

@@ -76,7 +76,7 @@ public class DataStructures {
         var ca = new CompactingArray<I>(4);
         for (int ii = 0; ii < 8; ++ii) {
             var x = new I(ii);
-            ca.Add(ref x);
+            ca.AddRef(ref x);
         }
         for (int ii = 0; ii < 8; ++ii) {
             Assert.AreEqual(ca[ii].x, ii);
@@ -94,13 +94,13 @@ public class DataStructures {
         Assert.AreEqual(ca[3].x, 7);
         var _t = new I(20);
         ca[2] = _t;
-        ca.Add(ref _t);
+        ca.AddRef(ref _t);
         _t = new I(30);
-        ca.Add(ref _t);
+        ca.AddRef(ref _t);
         _t = new I(40);
-        ca.Add(ref _t);
+        ca.AddRef(ref _t);
         _t = new I(50);
-        ca.Add(ref _t);
+        ca.AddRef(ref _t);
         ca.Delete(0);
         ca.Delete(4);
         ca.Delete(7);
@@ -120,10 +120,10 @@ public class DataStructures {
                 Assert.AreEqual(null, val);
         }
         var ca = new CompactingArray<int>(8);
-        ca.AddV(100);
-        ca.AddV(101);
-        ca.AddV(102);
-        ca.AddV(103);
+        ca.Add(100);
+        ca.Add(101);
+        ca.Add(102);
+        ca.Add(103);
         Assert.AreEqual(ca.Count, 4);
         AssertTryGet(ca, 2, 102);
         AssertTryGet(ca, 3, 103);
@@ -133,7 +133,7 @@ public class DataStructures {
         ca.Compact();
         Assert.AreEqual(ca.Count, 3);
         AssertTryGet(ca, 2, 102);
-        ca.AddV(203);
+        ca.Add(203);
         Assert.AreEqual(ca.Count, 4);
     }
 

@@ -31,9 +31,11 @@ public class TestScript {
     protected readonly Cancellable cTs = new Cancellable();
 
     public TestScript(VNState? vn = null) {
-        this.vn = vn ?? new VNState(cTs, new InstanceData(new GlobalData()));
-        if (this.vn.InstanceData.Location is not null)
-            this.vn.LoadToLocation(this.vn.InstanceData.Location);
+        this.vn = vn ??= new VNState(cTs, new InstanceData(new GlobalData()));
+        if (vn.InstanceData.Location is not null) {
+            this.vn = new VNState(cTs, new InstanceData(new GlobalData()));
+            this.vn.LoadToLocation(vn.InstanceData.Location, vn.InstanceData);
+        }
         er = new EventRecord();
         er.Record(this.vn);
     }

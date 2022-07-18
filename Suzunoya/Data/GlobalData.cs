@@ -5,6 +5,9 @@ using Suzunoya.ControlFlow;
 
 namespace Suzunoya.Data {
 
+/// <summary>
+/// Container for data relevant to VN execution that is shared by all instances.
+/// </summary>
 public interface IGlobalData {
     ISettings Settings { get; }
     
@@ -24,7 +27,7 @@ public interface IGlobalData {
 }
 
 /// <summary>
-/// A barebones implementation of IGlobalData.
+/// A barebones implementation of <see cref="IGlobalData"/>.
 /// </summary>
 [Serializable]
 public class GlobalData : IGlobalData {

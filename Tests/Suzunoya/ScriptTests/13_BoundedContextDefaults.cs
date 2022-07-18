@@ -36,7 +36,7 @@ public class _13BoundedContextDefaultTest {
 		    return 26 + w;
 	    });
 	    //Simulating an update, or an if statement, coded correctly, because the new value has a default
-	    public BoundedContext<int> Runv3() => new(vn, "outer", async () => {
+	    public StrongBoundedContext<int> Runv3() => new(vn, "outer", async () => {
 		    using var md = vn.Add(new TestDialogueBox());
 		    using var reimu = vn.Add(new Reimu());
 		    await reimu.Say("4567");
@@ -44,12 +44,12 @@ public class _13BoundedContextDefaultTest {
 		    return 27 + w;
 	    });
 
-	    private BoundedContext<int> InnerCtxBad() => new(vn, "inner_bad", async () => {
+	    private StrongBoundedContext<int> InnerCtxBad() => new(vn, "inner_bad", async () => {
 		    await vn.Wait(9999);
 		    return 24;
 	    });
 
-	    private BoundedContext<int> InnerCtxGood() => new(vn, "inner_good", async () => {
+	    private StrongBoundedContext<int> InnerCtxGood() => new(vn, "inner_good", async () => {
 		    using var yukari = vn.Add(new Yukari());
 		    await yukari.Say("12345");
 		    return 24;

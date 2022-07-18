@@ -4,6 +4,9 @@ using System.Linq;
 
 namespace BagoumLib.Culture {
 
+/// <summary>
+/// <see cref="Variant{T}"/> with some utility functions specific to strings.
+/// </summary>
 public class LString : Variant<string> {
     
     public static LString Empty => new LString(null, "");

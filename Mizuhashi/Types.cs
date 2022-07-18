@@ -232,7 +232,7 @@ public readonly struct ParseResult<R> {
 
     public ParseResult<R2> CastFailure<R2>() => 
         Result.Valid ? 
-            throw new Exception("ToErrorType should not be called on non-error parse results") :
+            throw new Exception($"{nameof(CastFailure)} should not be called on non-error parse results") :
             new(Maybe<R2>.None, Error, Start, End);
 
 }
