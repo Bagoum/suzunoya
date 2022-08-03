@@ -139,7 +139,7 @@ public class SortingTests {
     [Test]
     public void SortTestBenchmark() {
 		int testSize = 16;
-		var sizes = new int[]{ 10000, 49999, 262145, 500000, 1000000 };
+		var sizes = new int[]{ 10000, 49999, 262145, 500000 };
 		TestComparator comp = new TestComparator();
 		
 		Testing[] correctnessCases = {

@@ -21,11 +21,12 @@ public class CombMergeSorter<T> : ISorter<T> {
         for (var comb = 1; comb < len; comb *= 2) {
             //Comb backwards so the first half of the merge (A) is always the shorter half
             //This allows efficient buffer usage
+            var minA = start + comb;
             for (var b = end - comb; b > start; b -= comb * 2) {
                 //Optimization for mostly-sorted case
                 if (comp(in array[b - 1], in array[b]))
                     continue;
-                var a = Math.Max(start, b - comb);
+                var a = (minA > b ? minA : b) - comb;
                 var bi = b;
                 var e = b + comb;
                 var a1i = 0;
@@ -52,13 +53,10 @@ public class CombMergeSorter<T> : ISorter<T> {
                             //If the element at the index-to-merge is A (as opposed to freed space from B),
                             // move it to the buffer
                             buffer[a2i++] = array[a3i];
-                        if (comp(in buffer[a1i], in array[bi])) {
-                            array[a3i++] = buffer[a1i];
-                            a1i++;
-                        } else {
-                            array[a3i++] = array[bi];
-                            bi++;
-                        }
+                        array[a3i++] = 
+                            comp(in buffer[a1i], in array[bi]) ?
+                                buffer[a1i++] :
+                                array[bi++];
                     } else if (b > a3i) {
                         //A-buffer is empty, use A in array
                         if (comp(in array[a3i], in array[bi])) {

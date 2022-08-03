@@ -41,5 +41,30 @@ public static partial class Combinators {
     /// </summary>
     public static readonly Parser<Position> GetPosition =
         inp => new(new(inp.Stative.Position), null, inp.Index, inp.Index);
+
+    /// <summary>
+    /// Take the position information (<see cref="int"/> start and (exclusive) end) from the parse
+    ///  result and put it in a condensed type.
+    /// </summary>
+    public static Parser<U> WrapPositionI<T, U>(this Parser<T> p, Func<int, T, int, U> condense) =>
+        inp => {
+            var res = p(inp);
+            return res.Result.Try(out var x) ?
+                new ParseResult<U>(condense(res.Start, x, res.End), res.Error, res.Start, res.End) :
+                res.CastFailure<U>();
+        };
+    
+    /// <summary>
+    /// Take the position information (<see cref="Position"/> start and (exclusive) end) from the parse
+    ///  result and put it in a condensed type.
+    /// </summary>
+    public static Parser<U> WrapPosition<T, U>(this Parser<T> p, Func<T, PositionRange, U> condense) =>
+        inp => {
+            var start = inp.Stative.Position;
+            var res = p(inp);
+            return res.Result.Try(out var x) ? 
+                new ParseResult<U>(condense(x, new(start, inp.Stative.Position)), res.Error, res.Start, res.End) :
+                res.CastFailure<U>();
+        };
 }
 }

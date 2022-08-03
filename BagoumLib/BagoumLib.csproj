@@ -3,13 +3,17 @@
     <PropertyGroup>
         <Nullable>enable</Nullable>
         <LangVersion>9</LangVersion>
-        <TargetFrameworks>net5.0;netstandard2.1</TargetFrameworks>
+        <TargetFrameworks>net6.0;netstandard2.1</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="JetBrains.Annotations" Version="2021.1.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
       <PackageReference Include="System.Reactive" Version="5.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="Functional\Errorable.cs" />
     </ItemGroup>
 
 </Project>

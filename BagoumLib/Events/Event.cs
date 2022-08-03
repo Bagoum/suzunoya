@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reactive;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using BagoumLib.DataStructures;
 using BagoumLib.Functional;
@@ -68,9 +69,10 @@ public class Event<T, U> : IBSubject<T, U> {
             if (callbacks.ExistsAt(ii))
                 callbacks[ii].OnError(error);
         }
+        callbacks.Empty();
     }
 
-    public virtual void OnCompleted() {
+    public void OnCompleted() {
         var ct = callbacks.Count;
         for (int ii = 0; ii < ct; ++ii) {
             if (callbacks.ExistsAt(ii))

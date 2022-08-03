@@ -51,13 +51,67 @@ public readonly struct Position {
         IndexOfLineStart = nextLineStartIndex;
     }
 
-    public override string ToString() => $"Line {Line}, Col {Column}";
+    /// <summary>
+    /// </summary>
+    /// <param name="source">Source string</param>
+    /// <param name="line">Line number (1-indexed)</param>
+    /// <param name="column">Column number (1-indexed)</param>
+    public Position(string source, int line, int column) {
+        var currLine = 1;
+        var currLineStartIndex = 0;
+        int ii = 0;
+        for (; (currLine < line || currLine == line && (ii - currLineStartIndex + 1) < column) && ii < source.Length; ++ii) {
+            if (source[ii] == '\n') {
+                ++currLine;
+                currLineStartIndex = ii + 1;
+            }
+        }
+        Index = ii;
+        Line = currLine;
+        IndexOfLineStart = currLineStartIndex;
+    }
+    
+
+    public override string ToString() => Print(false);
+    public string Print(bool compact) => compact ?
+        $"{Line}:{Column}" :
+        $"Line {Line}, Col {Column}";
 
     public bool Equals(Position other) => this == other;
     public override bool Equals(object? obj) => obj is Position other && Equals(other);
     public override int GetHashCode() => Tuple.GetHashCode();
     public static bool operator ==(Position a, Position b) => a.Tuple == b.Tuple;
     public static bool operator !=(Position a, Position b) => !(a == b);
+}
+
+/// <summary>
+/// A description of a position range in a stream, with an inclusive start and exclusive end.
+/// <br/>When printed, the columns are printed inclusively.
+/// </summary>
+public readonly struct PositionRange {
+    public Position Start { get; }
+    public Position End { get; }
+    public PositionRange(in Position start, in Position end) {
+        Start = start;
+        End = end;
+    }
+
+    public override string ToString() => Print(false);
+    public string Print(bool compact) {
+        if (Start.Line == End.Line) {
+            if (End.Column - 1 > Start.Column)
+                return compact ?
+                    $"{Start.Line}:{Start.Column}-{End.Column}" :
+                    $"Line {Start.Line}, Cols {Start.Column}-{End.Column}";
+            else
+                return $"{Start.Print(compact)}";
+        } else {
+            var sep = compact ? "-" : " to ";
+            return $"{Start.Print(compact)}{sep}{End.Print(compact)}";
+        }
+    }
+
+    public PositionRange Merge(in PositionRange second) => new(Start, second.End);
 }
 
 public readonly struct InputStreamState {

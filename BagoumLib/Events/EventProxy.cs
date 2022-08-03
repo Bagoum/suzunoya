@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Functional;
 using JetBrains.Annotations;
@@ -12,6 +13,7 @@ namespace BagoumLib.Events {
 /// <br/>When X changes, the subscriptions are rolled forward to the events on the new value of X.
 /// <br/>Note that the old subscriptions are not deleted, so if an old value of X hangs around, it
 ///  can still trigger any subscriptions made to it.
+/// <br/>You can generally use SelectMany in place of this.
 /// </summary>
 /// <typeparam name="T">Type of X.</typeparam>
 [PublicAPI]
@@ -44,14 +46,13 @@ public class EventProxy<T> {
     /// Create an observable that reports the value of an observable defined by evGetter
     ///  on the value of the sourcer. When the sourcer changes, this observable will
     ///  also report values from the new value of the sourcer.
+    /// <br/>The returned object can be disposed.
     /// </summary>
-    public IObservable<E> ProxyEvent<E>(Func<T, IObservable<E>> evGetter) {
+    public IProxiedEvent<E> ProxyEvent<E>(Func<T, IObservable<E>> evGetter) {
         var partialEv = new ProxiedEvent<E>(evGetter);
         if (lastRead.Try(out var obj))
             partialEv.GenerateSubscriptions(obj);
-        //This token does not need to be tracked, as proxied events can be considered as simple redirection
-        // pointers with no significant behavior of their own (and therefore they never need to be deleted).
-        _ = resubscribers.Add(partialEv);
+        partialEv.Tokens.Add(resubscribers.Add(partialEv));
         return partialEv;
     }
 
@@ -64,10 +65,13 @@ public class EventProxy<T> {
     private interface IEventProxySubscription {
         void GenerateSubscriptions(T target);
     }
+    
+    public interface IProxiedEvent<E> : IObservable<E>, ITokenized { }
 
-    private class ProxiedEvent<E> : IObservable<E>, IEventProxySubscription {
+    private class ProxiedEvent<E> : IProxiedEvent<E>, IEventProxySubscription {
         private readonly Func<T, IObservable<E>> evGetter;
         private readonly Event<E> ev = new();
+        public List<IDisposable> Tokens { get; } = new();
         
         public ProxiedEvent(Func<T, IObservable<E>> evGetter) {
             this.evGetter = evGetter;
@@ -78,26 +82,20 @@ public class EventProxy<T> {
         }
 
         public void GenerateSubscriptions(T target) {
-            _ = evGetter(target).Subscribe(ev.OnNext);
+            Tokens.Add(evGetter(target).Subscribe(ev.OnNext));
         }
     }
-    private class IndirectEventSubscription<E> : IEventProxySubscription, IDisposable {
+    private class IndirectEventSubscription<E> : IEventProxySubscription, ITokenized {
         private readonly Func<T, IObservable<E>> getter;
         private readonly Action<E> listener;
-        private readonly List<IDisposable> tokens = new();
+        public List<IDisposable> Tokens { get; } = new();
         public IndirectEventSubscription(Func<T, IObservable<E>> getter, Action<E> listener) {
             this.getter = getter;
             this.listener = listener;
         }
 
         public void GenerateSubscriptions(T target) {
-            tokens.Add(getter(target).Subscribe(listener));
-        }
-
-        public void Dispose() {
-            foreach (var t in tokens)
-                t.Dispose();
-            tokens.Clear();
+            Tokens.Add(getter(target).Subscribe(listener));
         }
     }
 }

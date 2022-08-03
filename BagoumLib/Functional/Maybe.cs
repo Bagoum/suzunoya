@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using BagoumLib.Reflection;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
@@ -31,6 +32,7 @@ public readonly struct Maybe<T> {
     public Maybe<U> FMap<U>(Func<T, U> f) => Valid ? new(f(Value)) : Maybe<U>.None;
     public T Or(T dflt) => Valid ? Value : dflt;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Try(out T val) {
         val = Value;
         return Valid;

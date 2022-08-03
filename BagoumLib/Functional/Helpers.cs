@@ -4,21 +4,28 @@ using System.Linq;
 
 namespace BagoumLib.Functional {
 public static class Helpers {
-    public static readonly string[] noStrs = { };
     
-    public static Errorable<List<T>> Acc<T>(this IEnumerable<Errorable<T>> errbs) {
-        var ret = new List<T>();
-        var errs = new List<string[]>();
-        foreach (var x in errbs) {
-            if (errs.Count == 0 && x.Valid) ret.Add(x.Value);
-            else if (x.errors.Length > 0) errs.Add(x.errors);
+    /// <summary>
+    /// Accumulate many Eithers together.
+    /// If at least one Either is Right, then the result will be Right.
+    /// Else the result will be a Left (including in the case when no arguments are provided.)
+    /// </summary>
+    public static Either<List<L>, List<R>> AccFailToR<L, R>(this IEnumerable<Either<L, R>> eithers) {
+        List<L>? l = null;
+        List<R>? r = null;
+        foreach (var x in eithers) {
+            if (x.IsRight) {
+                (r??=new()).Add(x.Right);
+            } else if (r is null)
+                (l??=new()).Add(x.Left);
         }
-        return errs.Count > 0 ? 
-            Errorable<List<T>>.Fail(errs.Join().ToArray()) : 
-            ret;
+        return r is null ?
+            l ?? new() :
+            r;
     }
+    
 
-    public static Errorable<List<T>> ReplaceEntries<T>(bool allowFewer, List<T> replaceIn, List<T> replaceFrom, Func<T, bool> replaceFilter) {
+    public static Either<List<T>, string> ReplaceEntries<T>(bool allowFewer, List<T> replaceIn, List<T> replaceFrom, Func<T, bool> replaceFilter) {
         replaceIn = replaceIn.ToList(); //nondestructive
         int jj = 0;
         for (int ii = 0; ii < replaceIn.Count; ++ii) {
@@ -26,12 +33,12 @@ public static class Helpers {
                 if (jj < replaceFrom.Count) {
                     replaceIn[ii] = replaceFrom[jj++];
                 } else {
-                    if (!allowFewer) return Errorable<List<T>>.Fail("Not enough replacements provided");
+                    if (!allowFewer) return "Not enough replacements provided";
                 }
             }
         }
-        if (jj < replaceFrom.Count) return Errorable<List<T>>.Fail("Too many replacements provided");
-        return Errorable<List<T>>.OK(replaceIn);
+        if (jj < replaceFrom.Count) return "Too many replacements provided";
+        return replaceIn;
     }
 
 }

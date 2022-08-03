@@ -33,18 +33,30 @@ public static partial class Combinators {
     };
 
     /// <summary>
-    /// Fails with the given failure string.
+    /// Fails (fatally) with the given failure string.
     /// <br/>Note: this consumes a character and constructs a fatal error.
     /// </summary>
     public static Parser<R> Fail<R>(string reason) => input => 
         new ParseResult<R>(new ParserError.Failure(reason), input.Index, input.Index + 1);
+
+    /// <summary>
+    /// See <see cref="Error{R}(ParserError)"/>
+    /// </summary>
+    public static Parser<R> Error<R>(string reason) => Error<R>(new ParserError.Failure(reason));
     
     /// <summary>
-    /// Fails with the given failure string.
+    /// Fails (non-fatally) with the given failure string.
     /// <br/>Note: this does not consume, and therefore constructs a non-fatal error.
     /// </summary>
-    public static Parser<R> Error<R>(string reason) => input => 
-        new ParseResult<R>(new ParserError.Failure(reason), input.Index);
+    public static Parser<R> Error<R>(ParserError reason) => input => 
+        new ParseResult<R>(reason, input.Index);
+
+    /// <summary>
+    /// If the provided value is R, then <see cref="PReturn{R}"/> it;
+    /// else <see cref="Error{R}(ParserError)"/> it.
+    /// </summary>
+    public static Parser<R> ReturnOrError<R>(Either<R, ParserError> result) =>
+        result.IsLeft ? PReturn(result.Left) : Error<R>(result.Right);
 
     /// <summary>
     /// FParsec .>>
@@ -219,6 +231,19 @@ public static partial class Combinators {
             ResultStatus.ERROR => new ParseResult<R>(new(pret), result.Error, result.Start,
                 result.End),
             _ => result
+        };
+    };
+
+    /// <summary>
+    /// Try to parse an object of type R, and return it as type R?.
+    /// If it fails (non-catastrophically), then succeed with null(R?).
+    /// </summary>
+    public static Parser<R?> OptionalOrNull<R>(this Parser<R> p) where R : struct => input => {
+        var result = p(input);
+        return result.Status switch {
+            ResultStatus.ERROR => new ParseResult<R?>(Maybe<R?>.Of(null), 
+                result.Error, result.Start, result.End),
+            _ => result.FMap<R?>(x => x)
         };
     };
 

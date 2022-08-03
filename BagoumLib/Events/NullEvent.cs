@@ -20,8 +20,6 @@ public class NullEvent<T> : Event<T> {
     
     public override void OnNext(T value) {}
 
-    public override void OnCompleted() {}
-
     public override IDisposable Subscribe(IObserver<T> observer) => 
         NullDisposable.Default;
 }

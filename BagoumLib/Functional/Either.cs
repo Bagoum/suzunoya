@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 
@@ -8,6 +9,7 @@ public readonly struct Either<L, R> {
     public bool IsLeft { get; }
     public L Left { get; }
     public R Right { get; }
+    [JsonIgnore] public bool IsRight => !IsLeft;
     [JsonIgnore]
     public L? LeftOrNull => IsLeft ? Left : default(L?);
     [JsonIgnore]
