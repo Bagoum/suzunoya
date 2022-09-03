@@ -91,6 +91,8 @@ public readonly struct Position {
 public readonly struct PositionRange {
     public Position Start { get; }
     public Position End { get; }
+    public bool Empty => End.Index <= Start.Index;
+    private (Position, Position) Tuple => (Start, End);
     public PositionRange(in Position start, in Position end) {
         Start = start;
         End = end;
@@ -112,6 +114,15 @@ public readonly struct PositionRange {
     }
 
     public PositionRange Merge(in PositionRange second) => new(Start, second.End);
+
+    public bool Contains(in Position p) => Start.Index <= p.Index && p.Index < End.Index;
+    public bool ContainsInclusiveEnd(in Position p) => Start.Index <= p.Index && p.Index <= End.Index;
+    
+    public bool Equals(PositionRange other) => this == other;
+    public override bool Equals(object? obj) => obj is PositionRange other && Equals(other);
+    public override int GetHashCode() => Tuple.GetHashCode();
+    public static bool operator ==(PositionRange a, PositionRange b) => a.Tuple == b.Tuple;
+    public static bool operator !=(PositionRange a, PositionRange b) => !(a == b);
 }
 
 public readonly struct InputStreamState {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 
@@ -31,6 +32,18 @@ public readonly struct Either<L, R> {
         Right = right;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryL(out L val) {
+        val = Left;
+        return IsLeft;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryR(out R val) {
+        val = Right;
+        return !IsLeft;
+    }
+    
     public T Map<T>(Func<L, T> left, Func<R, T> right) => IsLeft ? left(Left) : right(Right);
 
     public Either<L2, R> FMapL<L2>(Func<L, L2> f) => IsLeft ? 

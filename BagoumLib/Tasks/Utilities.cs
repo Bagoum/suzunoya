@@ -30,7 +30,7 @@ public static class Utilities {
     /// <summary>
     /// Returns true iff either t is equal to parent, or t is a strict subclass of parent.
     /// </summary>
-    public static bool IsWeakSubclassOf(this Type t, Type parent) =>
-        t == parent || t.IsSubclassOf(parent);
+    public static bool IsWeakSubclassOf(this Type? t, Type? parent) =>
+        t == parent || (parent != null && t?.IsSubclassOf(parent) is true);
 }
 }

@@ -34,6 +34,11 @@ public static class Extensions {
         return false;
     }
 
+    public static string FirstToUpper(this string s) => s switch {
+        "" => "",
+        _ => s[0].ToString().ToUpper() + s[1..]
+    };
+
     public static string ToLiteral(this string s) {
         var sb = new StringBuilder(s.Length + 10);
         sb.Append('"');
@@ -87,7 +92,12 @@ public static class Extensions {
 
 [PublicAPI]
 public static class ArrayExtensions {
-
+    public static bool Has<T>(this T[] arr, T ele) where T : IEquatable<T> {
+        for (int ii = 0; ii < arr.Length; ++ii)
+            if (arr[ii].Equals(ele))
+                return true;
+        return false;
+    }
     public static void Insert<T>(this T[] arr, ref int count, T obj, int at) {
         if (count == arr.Length) throw new IndexOutOfRangeException();
         Array.Copy(arr, at, arr, at + 1, count++ - at);
@@ -158,6 +168,8 @@ public interface IUnrollable<T> {
 
 [PublicAPI]
 public static class IEnumExtensions {
+    public static IEnumerable<T> MaybeAppend<T>(this IEnumerable<T> arr, Maybe<T> next) =>
+        next.Try(out var x) ? arr.Append(x) : arr;
     public static IEnumerable<(T, T)> PairSuccessive<T>(this IEnumerable<T> arr, T last) {
         T prev = default!;
         int ct = 0;
@@ -254,6 +266,11 @@ public static class IEnumExtensions {
         foreach (var x in arr) {
             if (x != null) yield return x;
         }
+    }
+
+    public static IEnumerable<T> FilterMaybe<T>(this IEnumerable<Maybe<T>> arr) {
+        foreach (var x in arr)
+            if (x.Valid) yield return x.Value;
     }
 
     public static IEnumerable<(K key, V value)> Items<K, V>(this Dictionary<K, V> dict) where K : notnull
@@ -353,11 +370,32 @@ public static class IEnumExtensions {
 
 [PublicAPI]
 public static class ListExtensions {
-    public static bool ContainsSame<T>(this IList<T> a, IList<T> b) {
-        if (a.Count != b.Count)
+    public static int ElementWiseHashCode<T>(this IReadOnlyList<T> arr) {
+        int result = 17;
+        for (int ii = 0; ii < arr.Count; ++ii) {
+            unchecked {
+                result = result * 23 + (arr[ii]?.GetHashCode() ?? 0);
+            }
+        }
+        return result;
+    }
+    public static bool AreSameNested<T>(this IReadOnlyList<IReadOnlyList<T>>? arr, IReadOnlyList<IReadOnlyList<T>>? other) where T: IEquatable<T> {
+        if (arr == null && other == null) return true;
+        if (arr == null || other == null) return false;
+        if (arr.Count != other.Count)
             return false;
-        for (int ii = 0; ii < a.Count; ++ii)
-            if (!Equals(a[ii], b[ii]))
+        for (int ii = 0; ii < arr.Count; ++ii)
+            if (!arr[ii].AreSame(other[ii]))
+                return false;
+        return true;
+    }
+    public static bool AreSame<T>(this IReadOnlyList<T>? arr, IReadOnlyList<T>? other) where T: IEquatable<T> {
+        if (arr == null && other == null) return true;
+        if (arr == null || other == null) return false;
+        if (arr.Count != other.Count)
+            return false;
+        for (int ii = 0; ii < arr.Count; ++ii)
+            if (!arr[ii].Equals(other[ii]))
                 return false;
         return true;
     }
@@ -376,6 +414,58 @@ public static class ListExtensions {
 
     public static void DecrLoop(this int mod, ref int idx) {
         if (--idx < 0) idx = mod - 1;
+    }
+}
+
+[PublicAPI]
+public static class DictExtensions {
+    public static V GetOrThrow<K, V>(this Dictionary<K, V> dict, K key) where K : notnull {
+        if (dict.TryGetValue(key, out var res)) return res;
+        throw new Exception($"Key \"{key}\" does not exist.");
+    }
+
+    public static V GetOrThrow<K, V>(this IReadOnlyDictionary<K, V> dict, K key, string indict) {
+        if (dict.TryGetValue(key, out var res)) return res;
+        throw new Exception($"Key \"{key}\" does not exist in the dictionary {indict}.");
+    }
+
+    public static V? MaybeGet<K, V>(this IReadOnlyDictionary<K, V> dict, K key) where V : struct {
+        if (dict.TryGetValue(key, out var res)) return res;
+        return null;
+    }
+
+    public static void AddToList<K, V>(this Dictionary<K, List<V>> dict, K key, V value) where K : notnull {
+        if (!dict.TryGetValue(key, out var l)) {
+            dict[key] = l = new List<V>();
+        }
+        l.Add(value);
+    }
+
+    public static bool Has2<K, K2, V>(this Dictionary<K, Dictionary<K2, V>> dict, K key, K2 key2) where K : notnull where K2 : notnull =>
+        dict.TryGetValue(key, out var dct2) && dct2.ContainsKey(key2);
+
+    public static void Add2<K, K2, V>(this Dictionary<K, Dictionary<K2, V>> dict, K key, K2 key2, V val) where K2 : notnull where K : notnull {
+        if (!dict.TryGetValue(key, out var dct2))
+            dct2 = dict[key] = new Dictionary<K2, V>();
+        dct2[key2] = val;
+    }
+    public static bool TryGet2<K, K2, V>(this Dictionary<K, Dictionary<K2, V>> dict, K key, K2 key2, out V val) where K2 : notnull where K : notnull {
+        val = default!;
+        return dict.TryGetValue(key, out var dct2) && dct2.TryGetValue(key2, out val!);
+    }
+
+    public static V SetDefault<K, V>(this Dictionary<K, V> dict, K key) where V : new() where K : notnull {
+        if (!dict.TryGetValue(key, out var data)) {
+            data = dict[key] = new V();
+        }
+        return data;
+    }
+
+    public static V SetDefault<K, V>(this Dictionary<K, V> dict, K key, V deflt) where K : notnull {
+        if (!dict.TryGetValue(key, out var data)) {
+            data = dict[key] = deflt;
+        }
+        return data;
     }
 }
 

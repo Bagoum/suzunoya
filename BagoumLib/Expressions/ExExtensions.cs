@@ -54,10 +54,14 @@ public static class ExExtensions {
 
     public static Ex Field(this Ex me, string field) => Ex.PropertyOrField(me, field);
 
-    public static Ex As<T>(this Ex me) => me.As(typeof(T));
-    public static Ex As(this Ex me, Type t) => 
+    public static Ex Cast<T>(this Ex me) => me.Cast(typeof(T));
+    public static Ex Cast(this Ex me, Type t) => 
         me.Type == t ? me : Ex.Convert(me, t);
 
+    public static Ex As<T>(this Ex me) => me.As(typeof(T));
+    
+    public static Ex As(this Ex me, Type t) =>
+        me.Type == t ? me : Ex.TypeAs(me, t);
     
     private static readonly Dictionary<Type, ExFunction> dictContainsMethodCache = new Dictionary<Type, ExFunction>();
     public static Ex DictContains(this Ex dict, Ex key) {

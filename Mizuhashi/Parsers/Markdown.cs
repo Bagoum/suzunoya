@@ -69,7 +69,7 @@ public abstract record Markdown {
                 if (other is null) return false;
                 if (other.Lines.Count != this.Lines.Count) return false;
                 for (int ii = 0; ii < Lines.Count; ++ii)
-                    if (!other.Lines[ii].ContainsSame(Lines[ii]))
+                    if (!other.Lines[ii].AreSame(Lines[ii]))
                         return false;
                 return true;
             }

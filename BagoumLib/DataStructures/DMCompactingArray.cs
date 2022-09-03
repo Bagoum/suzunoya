@@ -17,7 +17,7 @@ public interface IDeletionMarker : IDisposable {
 /// A disposable marker for a value <see cref="Value"/> within a collection (see <see cref="DMCompactingArray{T}"/>).
 /// </summary>
 public class DeletionMarker<T> : IDeletionMarker {
-    public T Value { get; }
+    public T Value;
     public int Priority { get; }
     public bool MarkedForDeletion { get; private set; } = false;
 
@@ -137,7 +137,7 @@ public class DMCompactingArray<T> : IEnumerable<T> {
     /// Returns true iff the element at the given index has not been deleted.
     /// </summary>
     public bool ExistsAt(int index) => !Data[index].MarkedForDeletion;
-    public T this[int index] => Data[index].Value;
+    public ref T this[int index] => ref Data[index].Value;
 
     public bool GetIfExistsAt(int index, out T val) {
         if (Data[index].MarkedForDeletion) {

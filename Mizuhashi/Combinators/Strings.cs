@@ -239,11 +239,13 @@ public static partial class Combinators {
     
     /// <summary>
     /// Parses zero or more whitespaces (including newlines).
+    /// This parser cannot fail.
     /// <br/>FParsec spaces
     /// </summary>
     public static readonly Parser<Unit> Whitespace = _Whitespace(true, false);
     /// <summary>
     /// Parses zero or more whitespaces (not including newlines).
+    /// This parser cannot fail.
     /// </summary>
     public static readonly Parser<Unit> WhitespaceIL = _Whitespace(false, false);
 

@@ -16,4 +16,10 @@
       <Compile Remove="Functional\Errorable.cs" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Reference Include="FluentIL">
+        <HintPath>..\..\FluentIL\FluentIL\bin\Release\netstandard2.0\FluentIL.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
 </Project>

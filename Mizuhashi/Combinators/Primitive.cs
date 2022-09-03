@@ -235,6 +235,19 @@ public static partial class Combinators {
     };
 
     /// <summary>
+    /// Try to parse an object of type R, and return it as type Maybe&lt;R&gt;.
+    /// If it fails (non-catastrophically), then succeed with Maybe.None.
+    /// </summary>
+    public static Parser<Maybe<R>> OptionalOrNone<R>(this Parser<R> p) => input => {
+        var result = p(input);
+        return result.Status switch {
+            ResultStatus.ERROR => new ParseResult<Maybe<R>>(Maybe<Maybe<R>>.Of(Maybe<R>.None),
+                result.Error, result.Start, result.End),
+            _ => result.FMap<Maybe<R>>(x => x)
+        };
+    };
+
+    /// <summary>
     /// Try to parse an object of type R, and return it as type R?.
     /// If it fails (non-catastrophically), then succeed with null(R?).
     /// </summary>
