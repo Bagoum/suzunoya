@@ -9,24 +9,7 @@ It is free (as in free speech) software. The source code is on Github at [Bagoum
 
 
 
-All source code in the BagoumLib, Mizuhashi, and Suzunoya subprojects is distributed under the MIT license.
-
-
-
-With the exception of the testing subproject, this project consumes the following packages:
-- [JetBrains.Annotations](https://www.nuget.org/packages/JetBrains.Annotations/)
-- [System.Reactive](https://www.nuget.org/packages/System.Reactive/)
-- [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json)
-- [FluentIL](https://github.com/PCOL/FluentIL) ([forked](https://github.com/Bagoum/FluentIL))
-
-The project incorporates code from the following projects:
-- [bezier-easing](https://github.com/gre/bezier-easing/)
-- [FParsec](http://www.quanttec.com/fparsec/about/)
-- [WikiSort](https://github.com/BonzaiThePenguin/WikiSort/)
-
-## Licenses
-
-### This project: MIT
+All source code in the BagoumLib, Mizuhashi, and Suzunoya subprojects is distributed under the MIT license, provided immediately below.
 
 ```
 Copyright (c) 2021 Bagoum <reneedebatz@gmail.com>
@@ -38,151 +21,18 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### JetBrains.Annotations: Generic MIT license
+If you are making use of this project, please reproduce this license file or link to it ([Github link](https://github.com/Bagoum/suzunoya/blob/master/Suzunoya.LICENSE.md)).
 
-```
-MIT License _____
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of _____ (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice (including the next paragraph) shall be included in all copies or substantial portions of the Software.
+With the exception of the testing subproject, this project consumes the following packages:
+- [JetBrains.Annotations](https://www.nuget.org/packages/JetBrains.Annotations/) ([MIT](https://github.com/JetBrains/JetBrains.Annotations/blob/ac4bd278f1e8ccd15c28a62310a4ff5e5274df7e/license.md))
+- [System.Reactive](https://www.nuget.org/packages/System.Reactive/) ([MIT](https://github.com/dotnet/reactive/blob/85f1eb7c53e27cccdbeee3e0b044916168843fcc/LICENSE))
+- [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) ([MIT](https://github.com/JamesNK/Newtonsoft.Json/blob/4dc9af66e07dea321ad101bfb379326127251a80/LICENSE.md))
+- [FluentIL](https://github.com/Bagoum/FluentIL) ([MIT](https://github.com/Bagoum/FluentIL/blob/master/LICENSE))
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL _____ BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
+The project incorporates code from the following projects:
+- [bezier-easing](https://github.com/gre/bezier-easing/) ([MIT](https://github.com/gre/bezier-easing/blob/fcfc40e1b945a8d3b6b2f1aff5aa57f3b56673d9/LICENSE))
+- [FParsec](http://www.quanttec.com/fparsec/about/) ([Simplified BSD License](http://www.quanttec.com/fparsec/license.html))
+- [WikiSort](https://github.com/BonzaiThePenguin/WikiSort/) ([Public Domain](https://github.com/BonzaiThePenguin/WikiSort/blob/df036bd85af713f5012ccc4d329f05eb6a553128/LICENSE))
 
-### System.*: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) .NET Foundation and Contributors
-
-All rights reserved.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-### Newtonsoft.Json: MIT
-
-```
-The MIT License (MIT)
-
-Copyright (c) 2007 James Newton-King
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### FluentIL: MIT
-
-```
-MIT License
-
-Copyright (c) 2017 P Collyer
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-### BezierEasing: MIT
-
-```
-Copyright (c) 2014 Gaëtan Renaudeau
-
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated documentation
-files (the "Software"), to deal in the Software without
-restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-```
-
-### FParsec: BSD
-
-```
-Copyright (c) 2007‒2017, Stephan Tolksdorf. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-    Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-    Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-This software is provided by the copyright holders “as is” and any express or implied warranties, including, but not limited to, the implied warranties of merchantability and fitness for a particular purpose are disclaimed. In no event shall the copyright holders be liable for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; or business interruption) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use of this software, even if advised of the possibility of such damage.
-```
-
-### WikiSort: Public Domain
-
-```
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
-
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org>
-```
