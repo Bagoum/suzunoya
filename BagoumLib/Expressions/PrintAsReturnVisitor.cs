@@ -8,8 +8,12 @@ namespace BagoumLib.Expressions {
 /// A visitor that transforms the provided expression with an implicit return into code with an explicit return.
 /// </summary>
 public class PrintAsReturnVisitor : DerivativePrintVisitor {
+    /// <summary>
+    /// Create a <see cref="PrintAsReturnVisitor"/>
+    /// </summary>
     public PrintAsReturnVisitor(PrintVisitor parent) : base(parent) { }
 
+    /// <inheritdoc/>
     public override Expression? Visit(Expression? node) {
         if (node == null) return node;
         if (node.Type == typeof(void))
@@ -36,6 +40,7 @@ public class PrintAsReturnVisitor : DerivativePrintVisitor {
         return node;
     }
 
+    /// <inheritdoc/>
     protected override Expression VisitBlock(BlockExpression node) {
         var TypeAssigns = new Dictionary<Expression, ParameterExpression>();
         var consumes = new EnumerateVisitor();

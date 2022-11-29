@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using BagoumLib.Tasks;
 
-namespace Suzunoya.Display {
 //this is a plugin class with functionality parallel to BackgroundCombiner.
 //Based on this implementation, we can see that RenderGroup has effectively zero code in terms of transitions/combined renderings.
 /*
@@ -41,5 +40,3 @@ public class RGDisplayer {
 
 }
 */
-
-}

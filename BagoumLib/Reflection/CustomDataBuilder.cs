@@ -13,38 +13,89 @@ using static BagoumLib.Reflection.BuilderExtensions;
 
 namespace BagoumLib.Reflection {
 
+/// <summary>
+/// An example base type for <see cref="CustomDataBuilder"/>.
+/// </summary>
 public class ExampleBaseCustomType {
-    public string nonRecordedField;
+    /// <summary>
+    /// This field is not examined by <see cref="CustomDataBuilder"/>,
+    ///  and is not accessible by the Has/Read/Write methods.
+    /// </summary>
+    public string nonRecordedField = null!;
 
+    /// <summary>
+    /// Base field checker method. Should return false.
+    /// </summary>
     public virtual bool HasFloat(int id) => false;
+    /// <summary>
+    /// Base field reader method. Should throw an exception.
+    /// </summary>
     public virtual float ReadFloat(int id) => throw new Exception();
+    /// <summary>
+    /// Base field writer method. Should throw an exception.
+    /// </summary>
     public virtual void WriteFloat(int id, float val) => throw new Exception();
 
+    /// <summary>
+    /// Copy this object's values onto another object.
+    /// This should copy any values not handled by <see cref="CustomDataBuilder"/>
+    ///  (in this case, just <see cref="nonRecordedField"/>).
+    /// </summary>
     protected ExampleBaseCustomType CopyInto(ExampleBaseCustomType other) {
         other.nonRecordedField = nonRecordedField;
         return other;
     }
 
+    /// <summary>
+    /// Virtual method to copy this object's values onto another object.
+    /// <br/>Subclasses should implement this by casting the argument to their own type
+    /// and then calling their own <see cref="CopyInto"/>, which itself should call this base class <see cref="CopyInto"/>.
+    /// </summary>
     public virtual ExampleBaseCustomType CopyIntoVirtual(ExampleBaseCustomType other) => CopyInto(other);
 
+    /// <summary>
+    /// Virtual method to clone an object.
+    /// Should be `CopyInto(new T())` where T is the type of the overriding subclass.
+    /// </summary>
+    /// <returns></returns>
     public virtual ExampleBaseCustomType Clone() {
         return CopyInto(new ExampleBaseCustomType());
     }
 }
+
+/// <summary>
+/// A description of a field on a custom data type.
+/// </summary>
 public record CustomDataFieldDescriptor(string Name, Type Type) {
+    /// <summary>
+    /// Whether or not the field should also have an associated property.
+    /// </summary>
     public bool MakeProperty { get; init; } = false;
 
+    /// <inheritdoc />
     public override string ToString() => 
         $"{Name}<{Type.RName()}>" + (MakeProperty ? "(P)" : "");
 }
+
+/// <summary>
+/// A description of a custom data type, described uniquely by its fields and its base type.
+/// </summary>
 public record CustomDataDescriptor(params CustomDataFieldDescriptor[] Fields) {
+    /// <summary>
+    /// The base type of the custom data type being constructed.
+    /// </summary>
     public Type? BaseType { get; init; }
     
+    /// <inheritdoc />
     public virtual bool Equals(CustomDataDescriptor? other) => 
         Fields.AreSame(other?.Fields) && BaseType == other?.BaseType;
 
+    /// <inheritdoc />
     public override int GetHashCode() => (BaseType, Fields.ElementWiseHashCode()).GetHashCode();
 
+    /// <summary>
+    /// Checks if this type is a subclass of the provided type.
+    /// </summary>
     public bool IsSubclassOf(BuiltCustomDataDescriptor parent) {
         foreach (var field in parent.Fields)
             if (!Fields.Contains(field.Descriptor))
@@ -52,17 +103,27 @@ public record CustomDataDescriptor(params CustomDataFieldDescriptor[] Fields) {
         return BaseType.IsWeakSubclassOf(parent.BuiltType);
     }
 
+    /// <summary>
+    /// A custom data type with no fields and no base type.
+    /// </summary>
     public static readonly CustomDataDescriptor Empty = new();
 
+    /// <inheritdoc />
     public override string ToString() => string.Join(";", Fields.Select(f => f.ToString()));
 }
 
 
+/// <summary>
+/// The metadata of a field on a built custom data type.
+/// </summary>
 public record BuiltCustomDataFieldDescriptor(CustomDataFieldDescriptor Descriptor, int ID, FieldBuilder Field,
     PropertyBuilder? Property = null);
 
-public record BuiltCustomDataDescriptor(CustomDataDescriptor Descriptor, Type BuiltType, ConstructorInfo Constructor, MethodInfo CopyMethod, params BuiltCustomDataFieldDescriptor[] Fields) {
-}
+/// <summary>
+/// The metadata of a built custom data type.
+/// </summary>
+public record BuiltCustomDataDescriptor(CustomDataDescriptor Descriptor, Type BuiltType, ConstructorInfo Constructor,
+    MethodInfo CopyMethod, params BuiltCustomDataFieldDescriptor[] Fields);
 
 /// <summary>
 /// A class that constructs simple types containing fields of various types.
@@ -73,13 +134,28 @@ public record BuiltCustomDataDescriptor(CustomDataDescriptor Descriptor, Type Bu
 /// </summary>
 [PublicAPI]
 public class CustomDataBuilder {
+    /// <summary>
+    /// Type factory used to create runtime types.
+    /// </summary>
     public TypeFactory Factory { get; }
+    /// <summary>
+    /// Dictionary mapping string, type pairs to IDs, as looked up by GetVariableKey.
+    /// </summary>
     protected readonly Dictionary<(string, Type), int> variableNameToID = new();
     private readonly Dictionary<Type, int> lastVarID = new();
     private readonly Type[] byIdAccessible;
     private readonly Dictionary<Type, int> typeToID = new();
+    /// <summary>
+    /// The starting type from which all types generated by this <see cref="CustomDataBuilder"/> are derived.
+    /// </summary>
     public Type CustomDataBaseType { get; }
+    /// <summary>
+    /// A map containing all types that have been built.
+    /// </summary>
     protected readonly Dictionary<CustomDataDescriptor, Type> customDataTypes = new();
+    /// <summary>
+    /// A map containing the build metadata for all types that have been built.
+    /// </summary>
     protected readonly Dictionary<Type, BuiltCustomDataDescriptor> customDataDescriptors = new();
 
     /// <summary>
@@ -101,6 +177,10 @@ public class CustomDataBuilder {
         
         SetReservedKeys();
     }
+    
+    /// <summary>
+    /// Constructor that can be used when there is no fixed base type.
+    /// </summary>
     public CustomDataBuilder(string asmName, string? moduleName, params Type[] byIdAccessible) {
         Factory = new(asmName, moduleName ?? asmName);
         this.byIdAccessible = byIdAccessible;
@@ -169,6 +249,10 @@ public class CustomDataBuilder {
         SetReservedKeys();
     }
 
+    /// <summary>
+    /// Get the id for a field with the given name and type.
+    /// The id can be passed to the generated field reader, writer, and checker methods.
+    /// </summary>
     public int GetVariableKey(string variable, Type t) {
         if (variableNameToID.TryGetValue((variable, t), out var res)) return res;
         if (!lastVarID.ContainsKey(t))
@@ -182,10 +266,14 @@ public class CustomDataBuilder {
     }
 
     /// <summary>
-    /// Given the name of a variable used in a <see cref="CustomDataDescriptor"/> (eg. "myFloat"), get the name of the corresponding field on a custom data type (eg. "m_0_myFloat").
+    /// Given the name of a variable used in a <see cref="CustomDataDescriptor"/> (eg. "myFloat"), get the name of the corresponding field on a custom data type (eg. "m0_myFloat").
     /// </summary>
     public string GetFieldName(string variable, Type t) => 
         $"m{GetTypeKey(t)}_{variable}";
+    
+    /// <summary>
+    /// Given the name of a variable used in a <see cref="CustomDataDescriptor"/> (eg. "myFloat"), get the name of the corresponding property on a custom data type (eg. "P0_myFloat").
+    /// </summary>
     public string GetPropertyName(string variable, Type t) => 
         $"P{GetTypeKey(t)}_{variable}";
 
@@ -193,23 +281,32 @@ public class CustomDataBuilder {
     private const string CopyIntoVirtualMethod = "CopyIntoVirtual";
     private const string CloneMethod = "Clone";
     private static Regex stringCleaner = new Regex(@"[^a-zA-Z0-9_]", RegexOptions.Compiled);
+    
+    /// <summary>
+    /// Method name for reading an arbitrary value of type T by its id. Generally "ReadT".
+    /// </summary>
     public string FieldReaderMethodName(Type t) {
         GetTypeKey(t);
         return $"Read{stringCleaner.Replace(t.RName(), "").FirstToUpper()}";
     }
+    /// <summary>
+    /// Method name for writing an arbitrary value of type T by its id. Generally "WriteT".
+    /// </summary>
     public string FieldWriterMethodName(Type t) {
         GetTypeKey(t);
         return $"Write{stringCleaner.Replace(t.RName(), "").FirstToUpper()}";
     }
+    /// <summary>
+    /// Method name for checking if a value of type T with the given id exists. Generally "HasT".
+    /// </summary>
     public string FieldCheckerMethodName(Type t) {
         GetTypeKey(t);
         return $"Has{stringCleaner.Replace(t.RName(), "").FirstToUpper()}";
     }
 
-    public MethodInfo FieldFinderMethod(Type t) => 
-        CustomDataBaseType.GetMethod(FieldReaderMethodName(t)) ?? 
-        throw new NotImplementedException();
-
+    /// <summary>
+    /// Set reserved key-id pairs.
+    /// </summary>
     public virtual void SetReservedKeys() { }
 
     /// <summary>

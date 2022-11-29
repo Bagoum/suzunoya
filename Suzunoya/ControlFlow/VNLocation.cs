@@ -29,7 +29,7 @@ public class VNLocation {
     public VNLocation() { }
 #pragma warning restore 8618
     
-    private VNLocation(string lastOperation, IEnumerable<BoundedContext> ctxs) : 
+    private VNLocation(string lastOperation, IEnumerable<IBoundedContext> ctxs) : 
         this(lastOperation, ctxs.Select(c => c.ID).ToList()) { }
     
     public VNLocation(string lastOperation, List<string> ctxs) {
@@ -42,7 +42,7 @@ public class VNLocation {
         List<string>? lines = null;
         foreach (var ctx in vn.Contexts) {
             //Can't save the location if any script in the stack is unidentifiable
-            if (string.IsNullOrEmpty(ctx.ID))
+            if (!ctx.BCtx.Identifiable)
                 return null;
             (lines ??= new()).Add(ctx.ID);
         }

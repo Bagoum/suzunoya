@@ -70,7 +70,12 @@ public readonly struct Position {
         Line = currLine;
         IndexOfLineStart = currLineStartIndex;
     }
-    
+
+    /// <summary>
+    /// Return this position with the index increased by one.
+    /// </summary>
+    /// <returns></returns>
+    public Position Increment() => new(Index + 1, Line, IndexOfLineStart);
 
     public override string ToString() => Print(false);
     public string Print(bool compact) => compact ?

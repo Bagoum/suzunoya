@@ -10,6 +10,7 @@ using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Functional;
+using BagoumLib.Reflection;
 using BagoumLib.Tasks;
 using BagoumLib.Transitions;
 using JetBrains.Annotations;
@@ -20,27 +21,52 @@ using Suzunoya.Entities;
 
 namespace Suzunoya.ControlFlow {
 
+/// <summary>
+/// A top-level stateful object containing all information for the execution of a visual novel.
+/// </summary>
 public interface IVNState : IConfirmationReceiver {
+    /// <summary>
+    /// Save data specific to the save file backing this execution.
+    /// </summary>
     IInstanceData InstanceData { get; }
+    /// <summary>
+    /// Save data common to all save files.
+    /// </summary>
     IGlobalData GlobalData => InstanceData.GlobalData;
+    /// <summary>
+    /// A cancellation token bounded by the lifetime of the <see cref="IVNState"/>.
+    /// </summary>
     ICancellee CToken { get; }
     /// <summary>
     /// Within the update loop, this is set to the delta-time of the frame.
     /// </summary>
     float dT { get; }
 
+    /// <summary>
+    /// The main dialogue box, if it exists.
+    /// </summary>
     IDialogueBox? MainDialogue { get; }
+    
+    /// <summary>
+    /// Get the main dialogue box or throw an exception.
+    /// </summary>
     IDialogueBox MainDialogueOrThrow { get; }
 
     /// <summary>
-    /// A list of currently-open script contexts.
+    /// A list of currently-executing nested <see cref="BoundedContext{T}"/>s.
     /// </summary>
     List<OpenedContext> Contexts { get; }
+    /// <summary>
+    /// An event called when a <see cref="BoundedContext{T}"/> begins, before it is added to <see cref="Contexts"/>.
+    /// </summary>
     Event<OpenedContext> ContextStarted { get; }
+    /// <summary>
+    /// An event called when a <see cref="BoundedContext{T}"/> ends, after it is removed from <see cref="Contexts"/>.
+    /// </summary>
     Event<OpenedContext> ContextFinished { get; }
 
     /// <summary>
-    /// The most recently opened context (<see cref="Contexts"/>[^1]).
+    /// The most recently opened bounded context (<see cref="Contexts"/>[^1]).
     /// </summary>
     OpenedContext LowestContext => Contexts[^1];
 
@@ -87,6 +113,9 @@ public interface IVNState : IConfirmationReceiver {
     /// </summary>
     public void OpenLog();
 
+    /// <summary>
+    /// The default rendering group.
+    /// </summary>
     RenderGroup DefaultRenderGroup { get; }
 
     /// <summary>
@@ -111,7 +140,7 @@ public interface IVNState : IConfirmationReceiver {
     void Run(IEnumerator ienum);
 
     /// <summary>
-    /// Create a lazy task that completes when a Confirm is sent to the VNState (see below).
+    /// Create a lazy task that completes when a Confirm is sent to the VNState (see <see cref="UserConfirm"/>).
     /// </summary>
     VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null);
 
@@ -144,7 +173,9 @@ public interface IVNState : IConfirmationReceiver {
     /// <returns></returns>
     Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask);
     
-
+    /// <summary>
+    /// Record a gallery object as having been viewed ingame. (WIP)
+    /// </summary>
     void RecordCG(IGalleryable cg);
 
     /// <summary>
@@ -168,7 +199,13 @@ public interface IVNState : IConfirmationReceiver {
     /// Log of all dialogue passed through this VNState.
     /// </summary>
     AccEvent<DialogueOp> DialogueLog { get; }
+    /// <summary>
+    /// Event called when an entity is added to the VNState.
+    /// </summary>
     Event<IEntity> EntityCreated { get; }
+    /// <summary>
+    /// Event called when a render group is added to the VNState.
+    /// </summary>
     IObservable<RenderGroup> RenderGroupCreated { get; }
     /// <summary>
     /// Null if no target is waiting for a confirm.
@@ -185,9 +222,19 @@ public interface IVNState : IConfirmationReceiver {
     /// </summary>
     Evented<bool> VNStateActive { get; }
     
+    /// <summary>
+    /// The current operation being executed on the VNState.
+    /// </summary>
     Evented<string> OperationID { get; }
+    /// <summary>
+    /// All logs from executed VN code.
+    /// </summary>
     ISubject<LogMessage> Logs { get; }
 
+    /// <summary>
+    /// Try to get the local data for the <see cref="BoundedContext{T}"/> with the given parentage path.
+    /// <br/>If a context is executed multiple times in different parent contexts, the local data is not shared.
+    /// </summary>
     bool TryGetContextData<T>(out BoundedContextData<T> value, params string[] contextKeys);
     
     /// <summary>
@@ -196,8 +243,11 @@ public interface IVNState : IConfirmationReceiver {
     /// </summary>
     bool AllowsRepeatContextExecution { get; }
 }
+
+/// <inheritdoc cref="IVNState"/>
 [PublicAPI]
 public class VNState : IVNState {
+    /// <inheritdoc/>
     public float dT { get; private set; }
     /// <summary>
     /// If this value is set (via LoadLocation),
@@ -248,6 +298,7 @@ public class VNState : IVNState {
     /// </summary>
     public bool AllowFullSkip { get; set; } = false;
     
+    /// <inheritdoc/>
     public bool SetSkipMode(SkipMode? mode) {
         if (mode == SkipMode.LOADING)
             throw new Exception("Cannot set skip mode to LOADING directly. Use LoadToLocation instead.");
@@ -265,11 +316,13 @@ public class VNState : IVNState {
         Logs.OnNext(new LogMessage($"Set the user skip mode to {mode}", LogLevel.INFO));
         return true;
     }
+    /// <inheritdoc/>
     public SkipMode? SkippingMode =>
         IsLoadSkipping ?
             SkipMode.LOADING :
             userSetSkipMode;
     
+    /// <inheritdoc/>
     public bool TryFullSkip() {
         if (AllowFullSkip) {
             DeleteAll();
@@ -278,8 +331,11 @@ public class VNState : IVNState {
         return false;
     }
 
+    /// <inheritdoc/>
     public bool AutoplayFastforwardAllowed { get; set; } = true;
+    /// <inheritdoc/>
     public float TimePerAutoplayConfirm { get; set; } = 1f;
+    /// <inheritdoc/>
     public float TimePerFastforwardConfirm { get; set; } = 0.2f;
     /// <summary>
     /// True iff bounded contexts with Unit return type can be skipped
@@ -290,8 +346,13 @@ public class VNState : IVNState {
     private bool vnUpdated = false;
     private readonly Coroutines cors = new();
     private DMCompactingArray<IEntity> Entities { get; } = new();
+    /// <inheritdoc/>
     public IDialogueBox? MainDialogue { get; private set; }
+    /// <inheritdoc/>
     public AccEvent<DialogueOp> DialogueLog { get; } = new();
+    /// <summary>
+    /// The disposable tokens within the scope of this object.
+    /// </summary>
     protected List<IDisposable> Tokens { get; } = new();
 
     /// <summary>
@@ -304,42 +365,79 @@ public class VNState : IVNState {
     private readonly Cancellable lifetimeToken;
     private Stack<VNInterruptionLayer> interrupts = new();
     private VNInterruptionLayer CurrentInterrupt => interrupts.Peek();
+
+    /// <summary>
+    /// Reset the interruption status on the current process layer.
+    /// <br/>Call this after a BCTX is finished running in an ADV context to avoid cross-pollution of interruption.
+    /// </summary>
+    public void ResetInterruptStatus() {
+        CurrentInterrupt.Status = InterruptionStatus.Normal;
+    }
     private VNProcessGroup? CurrentProcesses => CurrentInterrupt.CurrentProcesses;
+    /// <summary>
+    /// Event called when an interruption layer is added.
+    /// </summary>
     public Event<VNInterruptionLayer> InterruptionStarted { get; } = new();
+    /// <summary>
+    /// Event called when an interruption layer is completed.
+    /// </summary>
     public Event<VNInterruptionLayer> InterruptionEnded { get; } = new();
+    /// <inheritdoc/>
     public ICancellee CToken { get; }
+    /// <inheritdoc/>
     public List<OpenedContext> Contexts { get; } = new();
+    /// <inheritdoc/>
     public Event<OpenedContext> ContextStarted { get; } = new();
+    /// <inheritdoc/>
     public Event<OpenedContext> ContextFinished { get; } = new();
+    /// <inheritdoc/>
     public Event<IInstanceData> InstanceDataChanged { get; } = new();
 
+    /// <summary>
+    /// A string describing all the currently-opened <see cref="BoundedContext{T}"/>s. This should only be used
+    ///  for logging purposes.
+    /// </summary>
     public string ContextsDescriptor => string.Join("::", Contexts.Select(c => c.BCtx.ID));
 
+    /// <inheritdoc/>
     public RenderGroup DefaultRenderGroup { get; }
+    /// <summary>
+    /// All active rendering groups.
+    /// </summary>
     public DMCompactingArray<RenderGroup> RenderGroups { get; } = new();
     
+    /// <inheritdoc/>
     public Event<IEntity> EntityCreated { get; } = new();
     
     //Use a replay event because the first render group will usually be created before any listeners are attached
     private ReplayEvent<RenderGroup> _RenderGroupCreated { get; } = new(1);
+    /// <inheritdoc/>
     public IObservable<RenderGroup> RenderGroupCreated => _RenderGroupCreated;
+    /// <inheritdoc/>
     public ICSubject<IConfirmationReceiver?> AwaitingConfirm => _awaitingConfirm;
     private LazyEvented<IConfirmationReceiver?> _awaitingConfirm;
+    /// <inheritdoc/>
     public Evented<bool> InputAllowed { get; } = new(true);
     private const string OPEN_OPID = "$$__OPEN__$$";
+    /// <inheritdoc/>
     public Evented<string> OperationID { get; } = new(OPEN_OPID);
+    /// <inheritdoc/>
     public ISubject<LogMessage> Logs { get; } = new Event<LogMessage>();
+    /// <inheritdoc/>
     public Evented<bool> VNStateActive { get; } = new(true);
     
+    /// <inheritdoc/>
     public IInstanceData InstanceData { get; private set; }
 
+    /// <inheritdoc/>
     public IDialogueBox MainDialogueOrThrow =>
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
 
+    /// <inheritdoc/>
     public bool AllowsRepeatContextExecution => true;
 
     /// <summary>
-    /// 
+    /// Create a <see cref="VNState"/>.
     /// </summary>
     /// <param name="extCToken">Cancellation token bounding the execution of the VN</param>
     /// <param name="save">Save file for the VN</param>
@@ -361,7 +459,6 @@ public class VNState : IVNState {
                 StopLoading();
             }
         }));
-        Tokens.Add(ContextStarted.Subscribe(ctx => OperationID.OnNext(OPEN_OPID + "::" + ctx.ID)));
         Tokens.Add(ContextFinished.Subscribe(c => {
             if (Contexts.Count == 0 && SkippingMode is SkipMode.FASTFORWARD or SkipMode.AUTOPLAY)
                 SetSkipMode(null);
@@ -371,8 +468,12 @@ public class VNState : IVNState {
         DefaultRenderGroup = MakeDefaultRenderGroup();
     }
 
+    /// <summary>
+    /// Create a default rendering group. This is called at the end of the constructor.
+    /// </summary>
     protected virtual RenderGroup MakeDefaultRenderGroup() => new(this, visible: true);
 
+    /// <inheritdoc/>
     public IDisposable GetOperationCanceller(out VNProcessGroup op, bool allowUserSkip=true) {
         op = CurrentInterrupt.GetOrMakeProcessGroup();
         op.userSkipAllowed &= allowUserSkip;
@@ -380,11 +481,19 @@ public class VNState : IVNState {
             SkipOperation();
         return op.CreateSubOp();
     }
-
-
+    
+    /// <summary>
+    /// Execute a <see cref="BoundedContext{T}"/>, nesting its execution within any currently-running contexts.
+    /// </summary>
+    /// <param name="ctx"><see cref="BoundedContext{T}"/> providing metadata of execution</param>
+    /// <param name="innerTask">Task code to execute</param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public async Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask) {
         this.AssertActive();
-        using var openCtx = new OpenedContext<T>(this, ctx);
+        using var openCtx = new OpenedContext<T>(ctx);
+        OperationID.OnNext(OPEN_OPID + "::" + ctx.ID);
         //When load skipping, we can skip the entire context if the current context stack does not match the target
         if (LoadTo.Try(out var load) && load.location.ContextsMatchPrefix(Contexts) == false &&
             ctx is StrongBoundedContext<T> sbc) {
@@ -396,7 +505,7 @@ public class VNState : IVNState {
                 //Hierarchical data transfer: copy skipped BCTXData from the proxy/replayer load info
                 // into the proxied/blank load info.
                 //This includes the BCTX result as well as any saved locals.
-                //If custom save data not handled by VNState is modified, then you cannot use StrongBoundedContext.
+                //If custom save data unhandled by VNState is modified, then you cannot use StrongBoundedContext.
                 if (lctx != null)
                     if (Contexts.Count > 1)
                         Contexts[^2].Data.SaveNested(lctx, true);
@@ -428,13 +537,22 @@ public class VNState : IVNState {
         return result;
     }
 
+    /// <inheritdoc/>
     public bool TryGetContextData<T>(out BoundedContextData<T> value, params string[] contextKeys) =>
         (value = InstanceData.TryGetChainedData<T>(contextKeys)!) != null;
 
+    /// <summary>
+    /// Get the local data for the <see cref="IBoundedContext"/> with the provided parentage path,
+    /// or throw an exception if it is not found.
+    /// </summary>
     public BoundedContextData GetContextData(params string[] contextKeys) =>
         InstanceData.TryGetChainedData(contextKeys) ?? 
         throw new Exception($"No context data for {string.Join("::", contextKeys)}");
 
+    /// <summary>
+    /// Get the local data for the <see cref="BoundedContext{T}"/> with the provided parentage path,
+    /// or throw an exception if it is not found.
+    /// </summary>
     public BoundedContextData<T> GetContextData<T>(params string[] contextKeys) =>
         GetContextData(contextKeys).CastTo<T>();
 
@@ -447,6 +565,9 @@ public class VNState : IVNState {
             res :
             throw new Exception($"Context {string.Join("::", contextKeys)} is unfinished");
 
+    /// <summary>
+    /// Try to get a saved local variable assigned to the context with the provided ID list.
+    /// </summary>
     public bool TryGetContextValue<T>(string varName, out T value, params string[] contextKeys) {
         value = default!;
         return InstanceData.TryGetChainedData(contextKeys) is { } data && 
@@ -460,6 +581,9 @@ public class VNState : IVNState {
     public T GetContextValue<T>(string varName, params string[] contextIDs) =>
         GetContextData(contextIDs).Locals.GetData<T>(varName);
 
+    /// <summary>
+    /// Try to get a saved variable assigned to the current context.
+    /// </summary>
     public bool TryGetLocalValue<T>(string varName, out T value) =>
         Contexts[^1].Data.Locals.TryGetData(varName, out value);
 
@@ -515,6 +639,7 @@ public class VNState : IVNState {
     /// </summary>
     public void Flush() => Update(0);
     
+    /// <inheritdoc/>
     public void Update(float deltaTime) {
         this.AssertActive();
         dT = deltaTime;
@@ -532,26 +657,38 @@ public class VNState : IVNState {
         Entities.Compact();
         vnUpdated = false;
     }
-
+    
+    /// <summary>
+    /// Find an entity of type T, or throw.
+    /// </summary>
     public T Find<T>() {
         for (int ii = 0; ii < Entities.Count; ++ii)
             if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
                 return obj;
         throw new Exception($"Couldn't find entity of type {typeof(T)}");
     }
+    /// <summary>
+    /// Find an entity of type T, or return null.
+    /// </summary>
     public T? FindEntity<T>() where T : class {
         for (int ii = 0; ii < Entities.Count; ++ii)
             if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
                 return obj;
         return null;
     }
+    /// <summary>
+    /// Find an entity of the provided type, or return null.
+    /// </summary>
     public object? FindEntity(Type t) {
         for (int ii = 0; ii < Entities.Count; ++ii)
             if (Entities.ExistsAt(ii) && Entities[ii].GetType().IsWeakSubclassOf(t))
                 return Entities[ii];
         return null;
     }
-    public List<T> FindEntities<T>() where T : class {
+    /// <summary>
+    /// Find all entities of the provided type.
+    /// </summary>
+    public List<T> FindEntities<T>() {
         var results = new List<T>();
         for (int ii = 0; ii < Entities.Count; ++ii)
             if (Entities.ExistsAt(ii) && Entities[ii] is T obj)
@@ -559,6 +696,7 @@ public class VNState : IVNState {
         return results;
     }
 
+    /// <inheritdoc/>
     public C Add<C>(C ent, RenderGroup? renderGroup = null, int? sortingID = null) where C : IEntity {
         var dsp = Entities.Add(ent);
         if (ent is IDialogueBox dlg) {
@@ -572,6 +710,7 @@ public class VNState : IVNState {
         return ent;
     }
 
+    /// <inheritdoc/>
     public IDisposable _AddRenderGroup(RenderGroup rg) {
         if (RenderGroups.Any(x => x.Priority == rg.Priority.Value))
             throw new Exception("Cannot have multiple render groups with the same priority");
@@ -579,9 +718,10 @@ public class VNState : IVNState {
         _RenderGroupCreated.OnNext(rg);
         return dsp;
     }
-
-
-
+    
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that waits for the given amount of time.
+    /// </summary>
     public VNOperation Wait(float time) {
         return new VNOperation(this.AssertActive(), cT => {
             Run(WaitingUtils.WaitFor(time, WaitingUtils.GetCompletionAwaiter(out var t), cT, () => dT));
@@ -589,6 +729,9 @@ public class VNState : IVNState {
         });
     }
 
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that waits until the condition is satisfied.
+    /// </summary>
     public VNOperation Wait(Func<bool> condition) {
         return new VNOperation(this.AssertActive(), cT => {
             Run(WaitingUtils.WaitFor(condition, WaitingUtils.GetCompletionAwaiter(out var t), cT));
@@ -596,6 +739,25 @@ public class VNState : IVNState {
         });
     }
 
+    //TODO LockedBoundedContext, also make this take cT -> Task<T>
+    /// <summary>
+    /// Wrap an external task (that does not respect skip/cancel semantics) in a cancellable VNOperation.
+    /// <br/>Note that this cannot be skipped. It will loop. (It can be cancelled.)
+    /// </summary>
+    public async Task<T> WaitExternal<T>(Task<T> task) {
+        while (true) {
+            var vnop = Wait(() => task.IsCompleted);
+            var completion = await vnop;
+            if (completion == Completion.Standard)
+                return task.Result;
+            if (completion == Completion.Cancelled)
+                throw new OperationCanceledException();
+            if (SkippingMode != null)
+                SetSkipMode(null);
+        }
+    }
+
+    /// <inheritdoc/>
     public void Run(IEnumerator ienum) {
         this.AssertActive();
         cors.Run(ienum,
@@ -603,8 +765,14 @@ public class VNState : IVNState {
             new CoroutineOptions(ExecType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
     }
 
+    /// <summary>
+    /// Run multiple <see cref="ILazyAwaitable"/>s in parallel.
+    /// </summary>
     public ILazyAwaitable Parallel(params ILazyAwaitable[] tasks) => new ParallelLazyAwaitable(tasks);
 
+    /// <summary>
+    /// Run multiple <see cref="ILazyAwaitable"/>s in sequence.
+    /// </summary>
     public ILazyAwaitable Sequential(params ILazyAwaitable[] tasks) => new SequentialLazyAwaitable(tasks);
 
     /// <summary>
@@ -614,12 +782,16 @@ public class VNState : IVNState {
     public IVNInterruptionToken Interrupt() => new InterruptionToken(this, CurrentInterrupt);
 
     private class InterruptionToken : IVNInterruptionToken {
-        public VNState VN { get; }
-        public VNInterruptionLayer Interruptee => inner.Layer;
-        private readonly VNInterruptionLayer.ProcessGroupInterruption inner;
-        public InterruptionToken(VNState vn, VNInterruptionLayer layer) {
+        private VNState VN { get; }
+        private VNInterruptionLayer Interruptee { get; }
+        public InterruptionStatus? FinalStatus { get; private set; }
+        public InterruptionToken(VNState vn, VNInterruptionLayer interruptee) {
             this.VN = vn;
-            this.inner = layer.Interrupt();
+            Interruptee = interruptee;
+            interruptee.InterruptedBy = this;
+            interruptee.Status = InterruptionStatus.Interrupted;
+            if (interruptee.CurrentProcesses is { } pg)
+                pg.LastInterruption = this;
             VN.Flush();
             var newLayer = new VNInterruptionLayer(VN, Interruptee);
             VN.interrupts.Push(newLayer);
@@ -627,29 +799,45 @@ public class VNState : IVNState {
         }
 
         public void ReturnInterrupt(InterruptionStatus resultStatus) {
-            if (VN.interrupts.Peek().Parent == Interruptee) {
-                VN.InterruptionEnded.OnNext(VN.interrupts.Pop());
-                inner.ReturnInterrupt(resultStatus);
-            }
+            if (resultStatus is not (InterruptionStatus.Continue or InterruptionStatus.Abort))
+                throw new Exception("Interruption return must either be CONTINUE or ABORT");
+            if (FinalStatus != null)
+                throw new Exception("Tried to return from the same interruption twice");
+            if (VN.interrupts.Peek().Parent != Interruptee)
+                throw new Exception(
+                    "The process layer enclosing the current one is not the one that made the interruption");
+            if (Interruptee.InterruptedBy != this)
+                throw new Exception("Returning from an old interruption");
+            FinalStatus = resultStatus;
+            Interruptee.Status = resultStatus;
+            Interruptee.InterruptedBy = null;
+            VN.InterruptionEnded.OnNext(VN.interrupts.Pop());
         }
     }
     
+    /// <inheritdoc/>
     public VNConfirmTask SpinUntilConfirm(VNOperation? preceding = null) {
         this.AssertActive();
         return new VNConfirmTask(this, preceding, op => {
             if (SkippingMode == SkipMode.LOADING)
                 return Task.FromResult(Completion.SoftSkip);
             var awaiter = WaitingUtils.GetCompletionAwaiter(out var t);
+            //Use StrongCancellee since we don't respect soft-skips (from Fastforward or from interruption)
+            //op implicitly contains the VN CToken
+            var cT = JointCancellee.From(new StrongCancellee(op), op.AwaitConfirm());
             Run(
                 //If an confirm is interrupted, then when it returns to execution,
                 // the confirm should be skipped and the next operation should be run.
-                WaitingUtils.WaitFor(() => op.WasInterrupted, c => {
-                        awaiter(c);
+                WaitingUtils.WaitFor(() => 
+                        op.LastInterruption is { FinalStatus: { } } ||
+                        //In cases where we are waiting on an interruption, we want the interruption to always finish first.
+                        //As such, we raise the ctoken checking to the condition and disallow the case where
+                        // CToken (VN lifetime token) is cancelled && last-interruption is ongoing.
+                        cT.Cancelled && (!CToken.Cancelled || op.LastInterruption is null), _ => {
+                        awaiter(cT.ToCompletion());
                         op.DoConfirm(); //in case we went through interruption shortcut
                         _awaitingConfirm.Recompute();
-                    }, 
-                    //Use StrongCancellee since we don't respect soft-skips (from Fastforward or from interruption)
-                    new JointCancellee(CToken, JointCancellee.From(new StrongCancellee(op), op.AwaitConfirm()))));
+                    }, Cancellable.Null));
             _awaitingConfirm.Recompute();
             if (SkippingMode.IsPlayerControlled() && SkippingMode != null) 
                 Run(AutoconfirmAfterDelay(op, SkippingMode.Value));
@@ -676,6 +864,7 @@ public class VNState : IVNState {
         _awaitingConfirm.Recompute();
     }
 
+    /// <inheritdoc/>
     public bool UserConfirm() {
         this.AssertActive();
         if (interrupts.TryPeek(out var op) && op.ConfirmToken != null) {
@@ -690,10 +879,12 @@ public class VNState : IVNState {
             return false;
     }
 
+    /// <inheritdoc/>
     public void SkipOperation() {
-        CurrentProcesses?.operationCTS.Cancel(ICancellee.SoftSkipLevel);
+        CurrentProcesses?.OperationCTS.Cancel(ICancellee.SoftSkipLevel);
     }
     
+    /// <inheritdoc/>
     public bool RequestSkipOperation() {
         this.AssertActive();
         //User skip cancels autoskip
@@ -708,10 +899,15 @@ public class VNState : IVNState {
             return false;
     }
 
+    /// <inheritdoc/>
     public void RecordCG(IGalleryable cg) {
         InstanceData.GlobalData.GalleryCGViewed(cg.Key);
     }
 
+    /// <summary>
+    /// Inner handler called by <see cref="DeleteAll"/> to destroy all dependencies of this object.
+    /// </summary>
+    /// <exception cref="Exception"></exception>
     protected virtual void _DeleteAll() {
         Logs.OnNext($"Deleting all entities within VNState {this}");
         lifetimeToken.Cancel(ICancellee.HardCancelLevel);
@@ -733,7 +929,7 @@ public class VNState : IVNState {
         if (Entities.Count > 0)
             throw new Exception("Some VNState entities were not deleted in the cull process. " +
                                 $"Script {ContextsDescriptor} has {Entities.Count} remaining.");
-        cors.Close();
+        cors.CloseRepeated();
         if (cors.Count > 0)
             throw new Exception($"Some VNState coroutines were not closed in the cull process. " +
                                 $"Script {ContextsDescriptor} has {cors.Count} remaining.");
@@ -742,22 +938,26 @@ public class VNState : IVNState {
     
     //This is separate from EntityVNState, which is not set until DeleteAll ends
     private bool deleteStarted = false;
+    /// <inheritdoc/>
     public void DeleteAll() {
         if (deleteStarted || VNStateActive == false) return;
         deleteStarted = true;
         _DeleteAll();
     }
 
+    /// <inheritdoc/>
     public IInstanceData UpdateInstanceData() {
         InstanceData.Location = VNLocation.Make(this);
         return InstanceData;
     }
 
 
+    /// <inheritdoc/>
     public virtual void OpenLog() {
         throw new NotImplementedException();
     }
 
+    /// <inheritdoc/>
     public virtual void PauseGameplay() {
         throw new NotImplementedException();
     }

@@ -7,73 +7,87 @@ namespace Suzunoya.ControlFlow {
 
 /// <summary>
 /// A disposable-ish token returned when the current VN execution is interrupted.
+/// <br/>To end the interruption, "dispose" this token by calling <see cref="ReturnInterrupt"/>.
 /// </summary>
 public interface IVNInterruptionToken {
     /// <summary>
-    /// Finish interrupting the enclosing process.
+    /// Finish interrupting the enclosing process layer.
     /// <br/>Has no effect if called a second time.
     /// </summary>
-    /// <param name="resultStatus">Either <see cref="InterruptionStatus.Normal"/> (continue the enclosing process)
+    /// <param name="resultStatus">Either <see cref="InterruptionStatus.Continue"/> (continue the enclosing process)
     ///  or <see cref="InterruptionStatus.Abort"/> (stop the enclosing process).</param>
     void ReturnInterrupt(InterruptionStatus resultStatus);
+    
+    /// <summary>
+    /// The status provided to <see cref="ReturnInterrupt"/> (or null if it has not been called yet).
+    /// </summary>
+    InterruptionStatus? FinalStatus { get; }
 }
 
 /// <summary>
-/// An executing process on a VN, described by <see cref="VNInterruptionLayer"/>,
-///  may be interrupted by another process (<see cref="VNState.Interrupt"/>) and later resumed.
+/// An executing process layer on a VN, described by <see cref="VNInterruptionLayer"/>,
+///  may be interrupted by another process layer (<see cref="VNState.Interrupt"/>) and later resumed.
 /// </summary>
 public class VNInterruptionLayer {
+    /// <summary>
+    /// VN on which this process layer is running.
+    /// </summary>
     public IVNState VN { get; }
+    /// <summary>
+    /// The parent process layer that this process layer interrupted.
+    /// </summary>
     public VNInterruptionLayer? Parent { get; }
-    public InterruptionStatus Interruption { get; set; } = InterruptionStatus.Normal;
-    public int InducedOperationCancelLevel => Interruption switch {
+    /// <summary>
+    /// The current status of the process layer.
+    /// </summary>
+    public InterruptionStatus Status { get; set; } = InterruptionStatus.Normal;
+    /// <summary>
+    /// The <see cref="ICancellee"/> skip level corresponding to <see cref="Status"/>.
+    /// </summary>
+    public int InducedOperationCancelLevel => Status switch {
         //Skip forward to end the current subop while an op is interrupted
         InterruptionStatus.Interrupted => ICancellee.SoftSkipLevel,
         InterruptionStatus.Abort => ICancellee.HardCancelLevel,
         _ => 0
     };
     
-    private ProcessGroupInterruption? interrupter = null;
-    
+    /// <summary>
+    /// The interruption currently interrupting this process layer.
+    /// </summary>
+    public IVNInterruptionToken? InterruptedBy { get; internal set; } = null;
+
+    /// <summary>
+    /// The currently-executing processes on this process layer, all sharing a single skip/confirm token.
+    /// </summary>
     public VNProcessGroup? CurrentProcesses { get; private set; }
+    /// <summary>
+    /// <see cref="CurrentProcesses"/>?.<see cref="VNProcessGroup.ConfirmToken"/>
+    /// </summary>
     public ICancellee? ConfirmToken => CurrentProcesses?.ConfirmToken;
 
-    public VNInterruptionLayer(IVNState vn, VNInterruptionLayer? parent) {
+    /// <summary>
+    /// Create a new process layer. (Should only be called by <see cref="VNState"/>)
+    /// </summary>
+    internal VNInterruptionLayer(IVNState vn, VNInterruptionLayer? parent) {
         this.VN = vn;
         this.Parent = parent;
     }
-
+    
+    /// <summary>
+    /// Get the currently-executing process group, or create a new one if none exists.
+    /// </summary>
     public VNProcessGroup GetOrMakeProcessGroup() {
         if (CurrentProcesses == null || CurrentProcesses.OperationCTokenDependencies == 0) {
             CurrentProcesses = new(this, true);
         }
         return CurrentProcesses;
     }
+    
+    /// <summary>
+    /// Send a confirm input to the currently-executing process group.
+    /// </summary>
     public void DoConfirm() => CurrentProcesses?.DoConfirm();
     
-    public ProcessGroupInterruption Interrupt() {
-        if (CurrentProcesses != null) 
-            CurrentProcesses.WasInterrupted = true;
-        return interrupter ??= new ProcessGroupInterruption(this);
-    }
-
-    public class ProcessGroupInterruption {
-        public VNInterruptionLayer Layer { get; }
-
-        public ProcessGroupInterruption(VNInterruptionLayer layer) {
-            this.Layer = layer;
-            layer.Interruption = InterruptionStatus.Interrupted;
-        }
-
-        public void ReturnInterrupt(InterruptionStatus resultStatus) {
-            if (resultStatus is not (InterruptionStatus.Abort or InterruptionStatus.Continue))
-                throw new Exception($"Interrupt status must be abort or continue, not {resultStatus}");
-            if (Layer.interrupter == this) {
-                Layer.Interruption = resultStatus;
-                Layer.interrupter = null;
-            }
-        }
-    }
     
 }
 

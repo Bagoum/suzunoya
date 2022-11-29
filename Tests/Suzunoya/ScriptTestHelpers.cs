@@ -11,7 +11,7 @@ using Suzunoya.Entities;
 using Suzunoya.Dialogue;
 
 namespace Tests.Suzunoya {
-public static class ScriptTestHelpers {
+internal static class ScriptTestHelpers {
     public static SpeechFragment c(char c) => new SpeechFragment.Char(c);
 
     public static List<(SpeechFragment, string)> FragmentsFromWord(string word) {
@@ -25,7 +25,7 @@ public static class ScriptTestHelpers {
         FragmentsFromWord(word).Select(f => new EventRecord.LogEvent(d, "Dialogue", f));
 }
 
-public class TestScript {
+internal class TestScript {
     public readonly VNState vn;
     public readonly EventRecord er;
     protected readonly Cancellable cTs = new Cancellable();

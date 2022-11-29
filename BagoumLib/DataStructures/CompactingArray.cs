@@ -11,57 +11,75 @@ namespace BagoumLib.DataStructures {
 /// <typeparam name="T"></typeparam>
 [PublicAPI]
 public class CompactingArray<T> {
+    /// <summary>
+    /// Number of elements present in the array.
+    /// Some of the elements may be deleted. Call <see cref="Compact"/> to remove deleted elements and make this number
+    ///  stricter.
+    /// </summary>
     protected int count;
+    /// <inheritdoc cref="count"/>
     public int Count => count;
-    protected bool[] rem;
+    /// <summary>
+    /// Iff the object at index i has been marked for deletion, then the i'th element in this array is true.
+    /// </summary>
+    public bool[] Deleted { get; private set; }
     //Leaving this public for low-level efficiency
+    /// <summary>
+    /// Underlying data array.
+    /// </summary>
     public T[] Data { get; private set; }
+    /// <summary>
+    /// Number of elements that are marked for deletion.
+    /// </summary>
     public int NullElements { get; protected set; } = 0;
     private readonly int firstResize;
 
     public CompactingArray(int size = 8, int firstResize=16) {
         Data = new T[size];
-        rem = new bool[size];
+        Deleted = new bool[size];
         count = 0;
         this.firstResize = firstResize;
     }
 
+    /// <inheritdoc cref="AnyTypeDMCompactingArray{D}.Delete"/>
     public void Delete(int ind) {
-        rem[ind] = true;
+        Deleted[ind] = true;
         ++NullElements;
     }
 
-    public void Compact() {
-        if (NullElements > 0) {
-            int ii = 0;
-
-            while (true) {
-                if (ii == count)
-                    return;
-                if (rem[ii++]) {
-                    rem[ii - 1] = false;
-                    break;
-                }
+    /// <inheritdoc cref="AnyTypeDMCompactingArray{D}.Compact"/>
+    public bool Compact() {
+        if (NullElements <= 0) return false; 
+        int ii = 0;
+        while (true) {
+            if (ii == count) {
+                NullElements = 0;
+                return false;
             }
-            int deficit = 1;
-            int start_copy = ii;
-            for (; ii < count; ++ii) {
-                if (rem[ii]) {
-                    //Found an empty space
-                    if (ii > start_copy) 
-                        //There is at least one element to push backwards
-                        Array.Copy(Data, start_copy, Data, start_copy - deficit, ii - start_copy);
-                    
-                    rem[ii] = false;
-                    ++deficit;
-                    start_copy = ii + 1;
-                }
+            if (Deleted[ii++]) {
+                Deleted[ii - 1] = false;
+                break;
             }
-            if (count > start_copy)
-                Array.Copy(Data, start_copy, Data, start_copy - deficit, count - start_copy);
-            count -= deficit;
-            NullElements = 0;
         }
+        int deficit = 1;
+        int start_copy = ii;
+        for (; ii < count; ++ii) {
+            if (Deleted[ii]) {
+                //Found an empty space
+                if (ii > start_copy) 
+                    //There is at least one element to push backwards
+                    Array.Copy(Data, start_copy, Data, start_copy - deficit, ii - start_copy);
+                
+                Deleted[ii] = false;
+                ++deficit;
+                start_copy = ii + 1;
+            }
+        }
+        if (count > start_copy)
+            Array.Copy(Data, start_copy, Data, start_copy - deficit, count - start_copy);
+        count -= deficit;
+        NullElements = 0;
+        return true;
     }
 
     public void AddRef(ref T obj) {
@@ -71,26 +89,28 @@ public class CompactingArray<T> {
             Data.CopyTo(narr, 0);
             Data = narr;
             var nrem = new bool[nLen];
-            rem.CopyTo(nrem, 0);
-            rem = nrem;
+            Deleted.CopyTo(nrem, 0);
+            Deleted = nrem;
         }
-        rem[count] = false;
+        Deleted[count] = false;
         Data[count++] = obj;
     }
 
     public void Add(T obj) => AddRef(ref obj);
 
+    /// <inheritdoc cref="AnyTypeDMCompactingArray{D}.Empty"/>
     public void Empty() {
         Array.Clear(Data, 0, Data.Length);
-        Array.Clear(rem, 0, rem.Length);
+        Array.Clear(Deleted, 0, Deleted.Length);
         count = 0;
+        NullElements = 0;
     }
 
     public ref T this[int index] => ref Data[index];
     public T ItemAt(int index) => Data[index];
 
     public bool TryGet(int index, out T obj) {
-        if (rem[index]) {
+        if (Deleted[index]) {
             obj = default!;
             return false;
         } else {

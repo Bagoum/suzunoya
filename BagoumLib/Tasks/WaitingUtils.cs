@@ -31,11 +31,6 @@ public static class WaitingUtils {
         return () => done = true;
     }
     
-    public static Action<T> GetAwaiter<T>(out Task<T> t) {
-        var tcs = new TaskCompletionSource<T>();
-        t = tcs.Task;
-        return f => tcs.SetResult(f);
-    }
     public static Action GetCondition(out Func<bool> t) {
         bool completed = false;
         t = () => completed;
@@ -47,12 +42,12 @@ public static class WaitingUtils {
         return () => ++acc;
     }
     public static Action GetManyCallback(int ct, Action whenAll) {
+        if (ct == 1) return whenAll;
         int acc = 0;
         return () => {
             if (++acc == ct) whenAll();
         };
     }
-    
 
     /// <summary>
     /// Waits for the given amount of time, but can be cancelled early by the cT.

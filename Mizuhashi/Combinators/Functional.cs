@@ -2,6 +2,9 @@
 using BagoumLib.Functional;
 
 namespace Mizuhashi {
+/// <summary>
+/// Parser combinator functions
+/// </summary>
 public static partial class Combinators {
     /// <summary>
     /// Parses an object of type A and then map it to type B.

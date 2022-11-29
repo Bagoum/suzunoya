@@ -34,7 +34,8 @@ public enum InterruptionStatus : int {
     /// </summary>
     Interrupted = 2,
     /// <summary>
-    /// The process should abort due to a signal from an interrupting process.
+    /// The process should abort due to a signal from an interrupting process,
+    ///  or if the interrupting process itself was cancelled.
     /// </summary>
     Abort = 3
 }

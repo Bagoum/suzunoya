@@ -16,10 +16,19 @@ namespace Suzunoya.ControlFlow {
 /// This allows chaining in ways that are a bit difficult for tasks.
 /// </summary>
 public interface ILazyAwaitable {
+    /// <summary>
+    /// Task object (accessing this property will cause it to be computed).
+    /// </summary>
     Task Task { get; }
+    /// <summary>
+    /// Syntactic sugar for `await Task`.
+    /// </summary>
     TaskAwaiter GetAwaiter() => Task.GetAwaiter();
     //ILazyAwaitable BoundCT(ICancellee cT);
 
+    /// <summary>
+    /// Awaitable that does nothing.
+    /// </summary>
     public static readonly ILazyAwaitable Null = new LazyAction(() => { });
 }
 
@@ -29,7 +38,11 @@ public interface ILazyAwaitable {
 public interface ILazyAwaitable<T> : ILazyAwaitable {
     Task ILazyAwaitable.Task => Task;
     //ILazyAwaitable ILazyAwaitable.BoundCT(ICancellee cT) => BoundCT(cT);
+
+    /// <inheritdoc cref="ILazyAwaitable.Task"/>
     new Task<T> Task { get; }
+    
+    /// <inheritdoc cref="ILazyAwaitable.GetAwaiter"/>
     new TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
     //new ILazyAwaitable<T> BoundCT(ICancellee cT);
 }
@@ -39,6 +52,7 @@ public interface ILazyAwaitable<T> : ILazyAwaitable {
 /// </summary>
 public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
     private Task<T>? loadedTask;
+    /// <inheritdoc cref="ILazyAwaitable.Task"/>
     public Task<T> Task => loadedTask ??= LazyTask();
 
     private Task<T> LazyTask() {
@@ -94,23 +108,44 @@ public record SequentialLazyAwaitable(params ILazyAwaitable?[] tasks) : ILazyAwa
 /// running on a VN bounded by a common cancellation/confirmation/interruption interface.
 /// </summary>
 public class VNProcessGroup : ICancellee {
-    public VNInterruptionLayer InterruptHandler { get; }
-    public IVNState VN => InterruptHandler.VN;
-    public bool WasInterrupted { get; set; } = false;
-    public readonly Cancellable operationCTS = new();
+    /// <summary>
+    /// The process layer on which this process group is running.
+    /// </summary>
+    public VNInterruptionLayer ProcessLayer { get; }
+    /// <summary>
+    /// The <see cref="IVNState"/> on which this process group is running.
+    /// </summary>
+    public IVNState VN => ProcessLayer.VN;
+    /// <summary>
+    /// The last interruption that occured on this process group.
+    /// <br/>NB: This is not set to null when the interruption is complete.
+    /// </summary>
+    public IVNInterruptionToken? LastInterruption { get; set; } = null;
+    /// <summary>
+    /// The cancellation token source bounding execution of this process group.
+    /// </summary>
+    public Cancellable OperationCTS { get; } = new();
+    /// <summary>
+    /// Whether or not the user can skip this process group.
+    /// </summary>
     public bool userSkipAllowed;
-    public readonly ICancellee operationCToken;
+    /// <summary>
+    /// The cancellation token bounding execution of this process group.
+    /// </summary>
+    public ICancellee OperationCToken { get; }
     private (Cancellable cTs, IConfirmationReceiver recv)? confirmToken;
     public ICancellee? ConfirmToken => confirmToken?.cTs;
     public IConfirmationReceiver? ConfirmReceiver => confirmToken?.recv;
     public int OperationCTokenDependencies { get; private set; } = 0;
-    public int CancelLevel => Math.Max(operationCToken.CancelLevel, InterruptHandler.InducedOperationCancelLevel);
+    /// <inheritdoc/>
+    public int CancelLevel => Math.Max(OperationCToken.CancelLevel, ProcessLayer.InducedOperationCancelLevel);
+    /// <inheritdoc/>
     public ICancellee Root => this;
         
     public VNProcessGroup(VNInterruptionLayer ih, bool allowUserSkip) {
-        InterruptHandler = ih;
+        ProcessLayer = ih;
         userSkipAllowed = allowUserSkip;
-        operationCToken = new JointCancellee(ih.VN.CToken, operationCTS);
+        OperationCToken = new JointCancellee(ih.VN.CToken, OperationCTS);
     }
 
     public ICancellee AwaitConfirm() {
@@ -197,8 +232,8 @@ public record VNOperation : ILazyAwaitable<Completion> {
             await t(tracker);
             tracker.ThrowIfHardCancelled();
         }
-        if (op.InterruptHandler.Interruption == InterruptionStatus.Interrupted) {
-            VN.Run(WaitingUtils.WaitFor(() => op.InterruptHandler.Interruption != InterruptionStatus.Interrupted,
+        if (op.ProcessLayer.Status == InterruptionStatus.Interrupted) {
+            VN.Run(WaitingUtils.WaitFor(() => op.ProcessLayer.Status != InterruptionStatus.Interrupted,
                 //don't respect soft-skip during interrupt hanging
                 WaitingUtils.GetCompletionAwaiter(out var aw), new StrongCancellee(tracker)));
             await aw;

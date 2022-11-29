@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace BagoumLib.Sorting {
 
 /// <summary>
-/// Merge-sort that uses a bottom-up combing method.
+/// Merge sort that uses a bottom-up combing method.
 /// <br/>Best for when the array is mostly sorted.
 /// </summary>
 public class CombMergeSorter<T> : ISorter<T> {

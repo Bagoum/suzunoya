@@ -38,7 +38,13 @@ public enum CoroutineType {
 ///  the coroutine container is deleted.</param>
 /// <param name="ExecType">Instructions on how to add the new coroutine to the existing list.</param>
 public record CoroutineOptions(bool Droppable = false, CoroutineType ExecType = CoroutineType.TryStepPrepend) {
+    /// <summary>
+    /// Default coroutine options (non-droppable and <see cref="CoroutineType.TryStepPrepend"/>)
+    /// </summary>
     public static readonly CoroutineOptions Default = new();
+    /// <summary>
+    /// Default coroutine options (droppable and <see cref="CoroutineType.TryStepPrepend"/>)
+    /// </summary>
     public static readonly CoroutineOptions DroppableDefault = new(true);
 }
 
@@ -47,6 +53,9 @@ public record CoroutineOptions(bool Droppable = false, CoroutineType ExecType = 
 /// </summary>
 [PublicAPI]
 public interface ICoroutineRunner {
+    /// <summary>
+    /// Run the provided coroutine.
+    /// </summary>
     void Run(IEnumerator ienum, CoroutineOptions? opts = null);
 }
 
@@ -69,6 +78,9 @@ public class Coroutines : ICoroutineRunner {
 
     private readonly Node<RCoroutine>.LinkedList coroutines = new();
 
+    /// <summary>
+    /// Convert this object to an IEnumerator.
+    /// </summary>
     public IEnumerator AsIEnum() {
         while (coroutines.Count > 0) {
             Step();
@@ -82,30 +94,37 @@ public class Coroutines : ICoroutineRunner {
     /// <summary>
     /// Step once through all coroutines.
     /// </summary>
-    public void Step() {
+    /// <returns>True iff the coroutine set changed.</returns>
+    public bool Step() {
         Node<RCoroutine>? nextNode;
+        bool changed = false;
         for (var n = itrNode = coroutines.First; n != null; n = itrNode = nextNode) {
-            bool remaining = n.obj.ienum.MoveNext();
-            if (n.Deleted) {
+            var dc = n.DeletedCount;
+            bool remaining = n.Value.ienum.MoveNext();
+            if (n.DeletedCount != dc) {
                 if (coroutines.Count != 0)
                     throw new Exception($"Since a coroutine node was externally deleted, expected all nodes to be " +
                                         $"deleted, but {coroutines.Count} yet exist.");
+                changed = true;
                 break;
             } else if (remaining) {
-                if (n.obj.ienum.Current is IEnumerator ienum) {
-                    nextNode = coroutines.AddAfter(n, new RCoroutine(ienum, n, n.obj.droppable));
+                if (n.Value.ienum.Current is IEnumerator ienum) {
+                    nextNode = coroutines.AddAfter(n, new RCoroutine(ienum, n, n.Value.droppable));
                     coroutines.Remove(n);
+                    changed = true;
                 } else
                     nextNode = n.Next;
             } else {
-                if (n.obj.parent != null)
-                    coroutines.InsertAfter(n, n.obj.parent);
+                if (n.Value.parent != null)
+                    coroutines.InsertAfter(n, n.Value.parent);
                 nextNode = n.Next;
                 coroutines.Remove(n);
+                changed = true;
             }
         }
         //Important for break case.
         itrNode = null;
+        return changed;
     }
     
 
@@ -113,18 +132,19 @@ public class Coroutines : ICoroutineRunner {
         //Roughly copied from step function
         var lastItrNode = itrNode;
         itrNode = n;
-        bool remaining = n.obj.ienum.MoveNext();
-        if (n.Deleted) {
+        var dc = n.DeletedCount;
+        bool remaining = n.Value.ienum.MoveNext();
+        if (n.DeletedCount != dc) {
             //pass
         } else if (remaining) {
-            if (n.obj.ienum.Current is IEnumerator ienum) {
-                var nxt = coroutines.AddAfter(n, new RCoroutine(ienum, n, n.obj.droppable));
+            if (n.Value.ienum.Current is IEnumerator ienum) {
+                var nxt = coroutines.AddAfter(n, new RCoroutine(ienum, n, n.Value.droppable));
                 coroutines.Remove(n);
                 StepInPlace(nxt);
             }
         } else {
-            if (n.obj.parent != null)
-                coroutines.InsertAfter(n, n.obj.parent);
+            if (n.Value.parent != null)
+                coroutines.InsertAfter(n, n.Value.parent);
             coroutines.Remove(n);
         }
         itrNode = lastItrNode;
@@ -139,22 +159,36 @@ public class Coroutines : ICoroutineRunner {
     /// Step through all coroutines once, and stops executing any droppable coroutines.
     /// <br/>Before calling this, non-droppable coroutines should be cancelled via cancellation tokens.
     /// <br/>After calling this, the caller may want to enforce that no (non-droppable) coroutines remain.
+    /// <br/>Use <see cref="CloseRepeated"/> instead of coroutines have dependences on other coroutines.
     /// </summary>
-    public void Close() {
+    /// <returns>True iff the coroutine set changed.</returns>
+    public bool Close() {
         if (coroutines.Count > 0) {
-            Step();
+            var changed = Step();
             Node<RCoroutine>? nextNode;
             for (Node<RCoroutine>? n = coroutines.First; n != null; n = nextNode) {
-                if (n.obj.droppable) {
-                    if (n.obj.parent != null) {
-                        coroutines.InsertAfter(n, n.obj.parent);
+                if (n.Value.droppable) {
+                    if (n.Value.parent != null) {
+                        coroutines.InsertAfter(n, n.Value.parent);
                     }
                     nextNode = n.Next;
                     coroutines.Remove(n);
+                    changed = true;
                 } else
                     nextNode = n.Next;
             }
+            return changed;
         }
+        return false;
+    }
+
+    /// <summary>
+    /// Step through all coroutines once, dropping any droppable coroutines,
+    ///  then repeat the process while this results in changes to the coroutine set.
+    /// <br/>Use this over <see cref="CloseRepeated"/> when coroutines may be dependent on the results of other coroutines.
+    /// </summary>
+    public void CloseRepeated() {
+        while (Close()) { }
     }
 
 
@@ -172,7 +206,7 @@ public class Coroutines : ICoroutineRunner {
             case (CoroutineType.StepPrepend, null):
                 throw new Exception("Cannot prepend when not iterating coroutines");
             case (CoroutineType.StepPrepend or CoroutineType.StepTryPrepend or CoroutineType.TryStepPrepend, not null):
-                StepInPlace(coroutines.AddBefore(itrNode!, new RCoroutine(ienum, null, itrNode!.obj.droppable || opts.Droppable)));
+                StepInPlace(coroutines.AddBefore(itrNode!, new RCoroutine(ienum, null, itrNode!.Value.droppable || opts.Droppable)));
                 break;
             case (CoroutineType.StepTryPrepend, null):
                 StepInPlace(coroutines.Add(new RCoroutine(ienum, null, opts.Droppable)));

@@ -31,7 +31,7 @@ public interface IAssertion {
     Task ActualizeOnNewState();
 
     /// <summary>
-    /// Called when assertion has been added with no preceding assertion.
+    /// Called when this assertion has been added with no preceding assertion.
     /// </summary>
     Task ActualizeOnNoPreceding();
     
@@ -47,6 +47,7 @@ public interface IAssertion {
     
     /// <summary>
     /// Called when a previous assertion is replaced with this one.
+    /// <br/>You should generally implement this as AssertionHelpers.Inherit(prev, this).
     /// </summary>
     /// <param name="prev">Previous assertion</param>
     Task Inherit(IAssertion prev);
@@ -74,10 +75,19 @@ public interface IAssertion<T> : IAssertion where T: IAssertion<T> {
 /// For example, an EntityAssertion's children's transforms are children of that EntityAssertion's transform.
 /// </summary>
 public interface IChildLinkedAssertion : IAssertion {
+    /// <summary>
+    /// Child assertions.
+    /// </summary>
     public List<IAssertion> Children { get; }
 }
 
+/// <summary>
+/// Static class providing helpers for assertions
+/// </summary>
 public static class AssertionHelpers {
+    /// <summary>
+    /// Convert the untyped assertion `prev` to type IAssertion{T}, then inherit it.
+    /// </summary>
     public static Task Inherit<T>(IAssertion prev, IAssertion<T> thisNext) where T: IAssertion<T> {
         return thisNext._Inherit(prev is T obj ?
             obj :
@@ -96,9 +106,19 @@ public static class AssertionHelpers {
 public record IdealizedState {
     private List<IAssertion> Assertions { get; } = new();
     private Dictionary<int, List<IAssertion>> AssertionsByPhase { get; } = new();
+    /// <summary>
+    /// Whether or not the state is currently actualized.
+    /// </summary>
     public bool IsActualized { get; private set; } = false;
 
+    /// <summary>
+    /// Create an idealized state with no assertions.
+    /// </summary>
     public IdealizedState() {}
+    
+    /// <summary>
+    /// Create an idealized state with some assertions.
+    /// </summary>
     public IdealizedState(params IAssertion[] assertions) {
         Assert(assertions);
     }

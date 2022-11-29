@@ -13,7 +13,7 @@ namespace Tests.Suzunoya {
 /// Tests the fastforward skip mode, which skips non-confirm operations and advances confirm operations after a short delay.
 /// </summary>
 public class _11FastforwardTest {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public _TestScript(VNState vn) : base(vn) { }
         public async Task<float> Run() {
             var md = vn.Add(new TestDialogueBox());

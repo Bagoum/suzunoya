@@ -24,7 +24,7 @@ public class _1BasicVNStateFunctionalityTest {
 /// <summary>
 /// Tests basic functionality of VNState, adding components, Say(), and the joint record logger.
 /// </summary>
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public void Run() {
             RenderGroup.DefaultSortingIDStep = 1;
             var md = vn.Add(new TestDialogueBox());

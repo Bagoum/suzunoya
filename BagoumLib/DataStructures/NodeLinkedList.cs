@@ -1,19 +1,39 @@
-﻿using JetBrains.Annotations;
+﻿using System.Collections.Generic;
+using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
-
 /// <summary>
-/// An object holding inert data for a NodeLinkedList.
+/// An object holding inert data for a NodeLinkedList. Instances are cached.
 /// </summary>
-[PublicAPI]
-public class Node<T> {
+internal class Node<T> {
+    private static readonly Stack<Node<T>> cache = new();
+    /// <summary>
+    /// Previous node in the list.
+    /// </summary>
     public Node<T>? Prev { get; private set; }
+    /// <summary>
+    /// Next node in the list.
+    /// </summary>
     public Node<T>? Next { get; private set; }
-    public readonly T obj;
-    public bool Deleted { get; private set; } = false;
+    /// <summary>
+    /// Value of contained data.
+    /// </summary>
+    public T Value { get; private set; }
+    /// <summary>
+    /// The number of times this object has been deleted. Use this to determine if the object has been deleted during iteration.
+    /// </summary>
+    public int DeletedCount { get; private set; } = 0;
 
-    public Node(T t) {
-        obj = t;
+    private Node(T t) {
+        Value = t;
+    }
+
+    public static Node<T> Make(T t) {
+        if (cache.TryPop(out var n)) {
+            n.Value = t;
+            return n;
+        } else
+            return new(t);
     }
 
     private void SetNext(Node<T>? n) {
@@ -33,14 +53,13 @@ public class Node<T> {
         public int Count { get; private set; } = 0;
 
 
-        public Node<T> Add(T obj) => Append(new Node<T>(obj));
+        public Node<T> Add(T obj) => Append(Node<T>.Make(obj));
 
-        public Node<T> AddBefore(Node<T> curr, T obj) => InsertBefore(curr, new Node<T>(obj));
-        public Node<T> AddAfter(Node<T> curr, T obj) => InsertAfter(curr, new Node<T>(obj));
+        public Node<T> AddBefore(Node<T> curr, T obj) => InsertBefore(curr, Node<T>.Make(obj));
+        public Node<T> AddAfter(Node<T> curr, T obj) => InsertAfter(curr, Node<T>.Make(obj));
 
 
         private Node<T> Append(Node<T> n) {
-            n.Deleted = false;
             if (Last != null) {
                 Last.Next = n;
             }
@@ -55,7 +74,6 @@ public class Node<T> {
         }
 
         public Node<T> InsertBefore(Node<T> curr, Node<T> toAdd) {
-            toAdd.Deleted = false;
             if (curr.Prev == null) {
                 //curr == first
                 First = toAdd;
@@ -70,7 +88,6 @@ public class Node<T> {
         }
 
         public Node<T> InsertAfter(Node<T> curr, Node<T> toAdd) {
-            toAdd.Deleted = false;
             if (curr.Next == null) {
                 //curr == last
                 Last = toAdd;
@@ -94,15 +111,17 @@ public class Node<T> {
             if (Last == n) {
                 Last = n.Prev;
             }
-            n.Deleted = true;
             n.Next?.SetPrev(n.Prev);
             n.Prev?.SetNext(n.Next);
+            ++n.DeletedCount;
+            cache.Push(n);
             --Count;
         }
 
         public void Reset() {
             for (var n = First; n != null; n = n.Next) {
-                n.Deleted = true;
+                ++n.DeletedCount;
+                cache.Push(n);
             }
             First = null;
             Last = null;

@@ -15,7 +15,7 @@ public class TemplateTest {
     /// <summary>
     /// Tests tweening, with cancellation usage.
     /// </summary>
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public void Run() {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());

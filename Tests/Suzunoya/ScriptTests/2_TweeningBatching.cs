@@ -18,7 +18,7 @@ public class _2TweeningBatchingTest {
     /// <summary>
     /// Tests tweening, with VN batching.
     /// </summary>
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public async Task Run() {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());

@@ -15,6 +15,8 @@ namespace BagoumLib.Events {
 public class Evented<T> : ICSubject<T> {
     private T _value;
     
+    
+    /// <inheritdoc />
     public T Value {
         get => _value;
         set => onSet.OnNext(this._value = value);
@@ -31,19 +33,29 @@ public class Evented<T> : ICSubject<T> {
         onSet.OnNext(_value);
     }
 
+    /// <summary>
+    /// Gets <see cref="Value"/>
+    /// </summary>
     public static implicit operator T(Evented<T> evo) => evo._value;
 
+    /// <inheritdoc />
     public IDisposable Subscribe(IObserver<T> observer) {
         observer.OnNext(_value);
         return onSet.Subscribe(observer);
     }
 
+    /// <inheritdoc />
     public void OnNext(T value) => Value = value;
 
+    /// <inheritdoc />
     public void OnError(Exception error) => onSet.OnError(error);
 
+    /// <inheritdoc />
     public void OnCompleted() => onSet.OnCompleted();
 
+    /// <summary>
+    /// Set a new value only if it is not equal to the existing value.
+    /// </summary>
     public void PublishIfNotSame(T value) {
         if (!Equals(value, _value))
             OnNext(value);

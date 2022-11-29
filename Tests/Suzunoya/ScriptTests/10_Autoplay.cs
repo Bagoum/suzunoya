@@ -13,7 +13,7 @@ namespace Tests.Suzunoya {
 /// Tests the autoplay skip mode, which advances confirm operations after a delay.
 /// </summary>
 public class _10SkipAllTest {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public _TestScript(VNState vn) : base(vn) { }
         public async Task<float> Run() {
             var md = vn.Add(new TestDialogueBox());

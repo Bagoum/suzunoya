@@ -3,11 +3,20 @@ using System.Linq.Expressions;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Expressions {
+/// <summary>
+/// A visitor that transforms the provided expression into a parenthesized expression (only if necessary).
+/// </summary>
 public class PrintAsParenthesizedVisitor : DerivativePrintVisitor {
+    /// <inheritdoc />
     public override PrintAsParenthesizedVisitor Parener => this;
+    /// <summary>
+    /// Create a <see cref="PrintAsParenthesizedVisitor"/>
+    /// </summary>
     public PrintAsParenthesizedVisitor(PrintVisitor parent) : base(parent) { }
 
     private static readonly Type tvoid = typeof(void);
+
+    /// <inheritdoc />
     public override Expression? Visit(Expression? node) {
         if (node == null) return node;
         switch (node) {

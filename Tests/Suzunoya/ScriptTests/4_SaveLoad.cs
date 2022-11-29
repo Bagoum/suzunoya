@@ -24,7 +24,7 @@ public class _4SaveLoadTest {
     /// <summary>
     /// Basic example/test of how a script can be executed.
     /// </summary>
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public _TestScript(VNState vn) : base(vn) { }
 
         public BoundedContext<Unit> Run() => new(vn, "outer", async () => {

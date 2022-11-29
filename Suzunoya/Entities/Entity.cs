@@ -89,7 +89,7 @@ public abstract class Entity : IEntity {
     /// </summary>
     public void SoftDelete() {
         lifetimeToken.Cancel(ICancellee.SoftSkipLevel);
-        cors.Close();
+        cors.CloseRepeated();
         if (cors.Count > 0)
             throw new Exception($"Some entity coroutines were not closed in the softdelete process. " +
                                 $"{this} has {cors.Count} remaining.");
@@ -101,7 +101,7 @@ public abstract class Entity : IEntity {
         foreach (var t in tokens)
             t.Dispose();
         tokens.Clear();
-        cors.Close();
+        cors.CloseRepeated();
         if (cors.Count > 0)
             throw new Exception($"Some entity coroutines were not closed in the cull process. " +
                                 $"{this} has {cors.Count} remaining.");

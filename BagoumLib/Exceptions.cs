@@ -89,8 +89,11 @@ public static class Exceptions {
                     mul.InnerExceptions.Select(ie => GetNestedExceptionMessages(ie).messages).ToArray()));
                 break;
             } else if (exc is AggregateException agg) {
+                if (agg.InnerExceptions.Count > 0) { 
+                    lastStackTrace = agg.InnerExceptions[0].StackTrace ?? lastStackTrace;
+                }
                 msgs.Add(new ExceptionMessage.Aggregate(agg.Message, 
-                    agg.InnerExceptions.Select(ie => GetNestedExceptionMessages(ie).messages).ToArray()));
+                agg.InnerExceptions.Select(ie => GetNestedExceptionMessages(ie).messages).ToArray()));
                 break;
             }
             msgs.Add(exc.Message);

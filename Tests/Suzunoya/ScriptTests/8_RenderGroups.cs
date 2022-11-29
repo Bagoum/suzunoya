@@ -19,7 +19,7 @@ using static Suzunoya.Helpers;
 namespace Tests.Suzunoya {
 
 public class _8RenderGroupTest {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public async Task<int> Run() {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());

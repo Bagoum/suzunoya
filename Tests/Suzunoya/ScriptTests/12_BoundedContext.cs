@@ -21,7 +21,7 @@ using static Suzunoya.Helpers;
 namespace Tests.Suzunoya {
 
 public class _12BoundedContextTest {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
 	    public _TestScript(VNState? vn = null) : base(vn) { }
 	    public BoundedContext<int> Run() => new(vn, "l1", async () => {
 		    var md = vn.Add(new TestDialogueBox());
@@ -110,8 +110,8 @@ public class _12BoundedContextTest {
 	    "<VNState>.$UpdateCount ~ 4",
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.ContextStarted ~ StrongContext:l2",
 	    "<VNState>.OperationID ~ $$__OPEN__$$::l2",
-	    "<VNState>.ContextStarted ~ Context:l2",
 	    "<RenderGroup>.RendererAdded ~ <Yukari>",
 	    "<VNState>.EntityCreated ~ <Yukari>",
 	    "<Yukari>.Emote ~ ",
@@ -155,8 +155,8 @@ public class _12BoundedContextTest {
 	    "<RenderGroup>.Zoom ~ 1",
 	    "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
 	    "<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
-	    "<VNState>.OperationID ~ $$__OPEN__$$::l1",
 	    "<VNState>.ContextStarted ~ Context:l1",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::l1",
 	    "<RenderGroup>.RendererAdded ~ <TestDialogueBox>",
 	    "<VNState>.EntityCreated ~ <TestDialogueBox>",
 	    "<TestDialogueBox>.EntityActive ~ True",
@@ -196,8 +196,8 @@ public class _12BoundedContextTest {
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 4 }, 5)",
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
+	    "<VNState>.ContextStarted ~ StrongContext:l2",
 	    "<VNState>.OperationID ~ $$__OPEN__$$::l2",
-	    "<VNState>.ContextStarted ~ Context:l2",
 	    "<RenderGroup>.RendererAdded ~ <Yukari>",
 	    "<VNState>.EntityCreated ~ <Yukari>",
 	    "<Yukari>.Emote ~ ",
@@ -238,7 +238,7 @@ public class _12BoundedContextTest {
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 9 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
 	    "<Yukari>.EntityActive ~ False",
-	    "<VNState>.ContextFinished ~ Context:l2",
+	    "<VNState>.ContextFinished ~ StrongContext:l2",
 	    "<VNState>.OperationID ~ 67890123",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (<Reimu>, Default)",
@@ -273,8 +273,8 @@ public class _12BoundedContextTest {
 		"<RenderGroup>.Zoom ~ 1",
 		"<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
 		"<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
-		"<VNState>.OperationID ~ $$__OPEN__$$::l1",
 		"<VNState>.ContextStarted ~ Context:l1",
+		"<VNState>.OperationID ~ $$__OPEN__$$::l1",
 		"<RenderGroup>.RendererAdded ~ <TestDialogueBox>",
 		"<VNState>.EntityCreated ~ <TestDialogueBox>",
 		"<TestDialogueBox>.EntityActive ~ True",
@@ -316,9 +316,9 @@ public class _12BoundedContextTest {
 		"<TestDialogueBox>.DialogueFinished ~ ()",
 		//The inner context is constructed and immediately destroyed without constructing Yukari.
 		//This is the major computational benefit of bounded contexts w.r.t loading/backlogging.
+		"<VNState>.ContextStarted ~ StrongContext:l2",
 		"<VNState>.OperationID ~ $$__OPEN__$$::l2",
-		"<VNState>.ContextStarted ~ Context:l2",
-		"<VNState>.ContextFinished ~ Context:l2",
+		"<VNState>.ContextFinished ~ StrongContext:l2",
 		"<VNState>.OperationID ~ 67890123",
 		"<TestDialogueBox>.DialogueCleared ~ ()",
 		"<TestDialogueBox>.Speaker ~ (<Reimu>, Default)",

@@ -4,41 +4,6 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.Cancellation {
 /// <summary>
-/// A source of cancellation information.
-/// Similar to CancellationTokenSource, but allocates minimal garbage, does not require disposal,
-/// and *is not thread-safe*.
-/// <br/>NB: This implements IDisposable, but does not generally require disposal;
-///  Dispose is an alias for Cancel.
-/// </summary>
-[PublicAPI]
-public interface ICancellable : IDisposable {
-    /// <summary>
-    /// Mark a cancellable as cancelled.
-    /// </summary>
-    /// <param name="level">Numerical level of cancellation. 0 = no cancellation.</param>
-    public void Cancel(int level);
-    
-    /// <summary>
-    /// Cancel with a level of HardCancelLevel.
-    /// </summary>
-    public void Cancel() => Cancel(ICancellee.HardCancelLevel);
-    
-    /// <summary>
-    /// Cancel with a level of SoftSkipLevel.
-    /// </summary>
-    public void SoftCancel() => Cancel(ICancellee.SoftSkipLevel);
-    
-    void IDisposable.Dispose() => Cancel();
-    
-    /// <summary>
-    /// Get a token that reflects the cancellation status of this cancellable.
-    /// </summary>
-    public ICancellee Token { get; }
-
-}
-
-
-/// <summary>
 /// A token passed into tasks to track cancellation.
 /// Similar to CancellationToken, but allocates minimal garbage, does not require disposal,
 /// and *is not thread-safe*.
@@ -67,6 +32,10 @@ public interface ICancellee {
     /// A value LEQ 0 (default 0) indicates that the operation has not been cancelled.
     /// </summary>
     int CancelLevel { get; }
+    
+    /// <summary>
+    /// True iff the token is cancelled (<see cref="CancelLevel"/> > 0).
+    /// </summary>
     bool Cancelled => CancelLevel > 0;
     /// <summary>
     /// Get the youngest ancestor cancellee that is not a passthrough.
@@ -74,17 +43,100 @@ public interface ICancellee {
     ICancellee Root => this;
 }
 
+
+/// <summary>
+/// A source of cancellation information.
+/// Similar to CancellationTokenSource, but allocates minimal garbage, does not require disposal,
+/// and *is not thread-safe*.
+/// <br/>NB: This implements IDisposable, but does not generally require disposal;
+///  Dispose is an alias for Cancel.
+/// </summary>
 [PublicAPI]
-public class Cancellable : ICancellable, ICancellee {
+public interface ICancellable : ICancellee, IDisposable {
+    /// <summary>
+    /// Mark a cancellable as cancelled.
+    /// </summary>
+    /// <param name="level">Numerical level of cancellation. 0 = no cancellation.</param>
+    public void Cancel(int level);
+    
+    /// <summary>
+    /// Cancel with a level of HardCancelLevel.
+    /// </summary>
+    public void Cancel() => Cancel(ICancellee.HardCancelLevel);
+    
+    /// <summary>
+    /// Cancel with a level of SoftSkipLevel.
+    /// </summary>
+    public void SoftCancel() => Cancel(ICancellee.SoftSkipLevel);
+    
+    void IDisposable.Dispose() => Cancel();
+    
+    /// <summary>
+    /// Get a token that reflects the cancellation status of this cancellable.
+    /// </summary>
+    public ICancellee Token { get; }
+
+}
+
+
+/// <inheritdoc cref="ICancellable"/>
+[PublicAPI]
+public class Cancellable : ICancellable {
+    /// <summary>
+    /// A cancellee that is never cancelled.
+    /// </summary>
     public static readonly ICancellee Null = new Cancellable();
+    /// <inheritdoc/>
     public int CancelLevel { get; private set; }
+    /// <inheritdoc/>
     public bool Cancelled => CancelLevel > 0;
+    /// <inheritdoc/>
     public void Cancel(int level) => CancelLevel = Math.Max(level, CancelLevel);
 
     //i love traits
+    /// <inheritdoc/>
     public void Cancel() => Cancel(ICancellee.HardCancelLevel);
+    /// <inheritdoc/>
     public void SoftCancel() => Cancel(ICancellee.SoftSkipLevel);
     
+    /// <inheritdoc/>
+    public ICancellee Token => this;
+}
+
+/// <summary>
+/// A cancellable token that is cancelled when its parent is cancelled or it is locally cancelled (via <see cref="Cancel(int)"/>).
+/// <br/>Note that `new JointCancellable(parent)` is almost the same as `new JointCancellee(parent, new Cancellable())`,
+///  but this is slightly more garbage-efficient.
+/// </summary>
+public class JointCancellable : ICancellable {
+    private int localCancelLevel;
+    /// <summary>
+    /// The parent cancellation token. When it is cancelled, this token will also be cancelled.
+    /// </summary>
+    public ICancellee Parent { get; }
+    /// <inheritdoc/>
+    public int CancelLevel => Math.Max(Parent.CancelLevel, localCancelLevel);
+    /// <inheritdoc/>
+    public bool Cancelled => CancelLevel > 0;
+
+    /// <summary>
+    /// Create a <see cref="JointCancellable"/>.
+    /// </summary>
+    /// <param name="parent">Parent token. If the parent token is cancelled, then this is also cancelled.</param>
+    public JointCancellable(ICancellee parent) {
+        this.Parent = parent;
+    }
+    
+    /// <inheritdoc/>
+    public void Cancel(int level) => localCancelLevel = Math.Max(level, localCancelLevel);
+
+    //i love traits
+    /// <inheritdoc/>
+    public void Cancel() => Cancel(ICancellee.HardCancelLevel);
+    /// <inheritdoc/>
+    public void SoftCancel() => Cancel(ICancellee.SoftSkipLevel);
+    
+    /// <inheritdoc/>
     public ICancellee Token => this;
 }
 
@@ -96,10 +148,13 @@ public class Cancellable : ICancellable, ICancellee {
 /// </summary>
 [PublicAPI]
 public class PassthroughCancellee : ICancellee {
-    public readonly ICancellee root;
+    private readonly ICancellee root;
     private readonly ICancellee local;
+    /// <inheritdoc/>
     public int CancelLevel => Math.Max(root.CancelLevel, local.CancelLevel);
+    /// <inheritdoc/>
     public bool Cancelled => CancelLevel > 0;
+    /// <inheritdoc/>
     public ICancellee Root => root.Root;
 
     public PassthroughCancellee(ICancellee? root, ICancellee? local) {
@@ -109,11 +164,16 @@ public class PassthroughCancellee : ICancellee {
 
 }
 
+/// <summary>
+/// A cancellee that is cancelled when either of its two parents are cancelled.
+/// </summary>
 [PublicAPI]
 public class JointCancellee : ICancellee {
     private readonly ICancellee c1;
     private readonly ICancellee c2;
+    /// <inheritdoc/>
     public int CancelLevel => Math.Max(c1.CancelLevel, c2.CancelLevel);
+    /// <inheritdoc/>
     public bool Cancelled => CancelLevel > 0;
 
     public JointCancellee(ICancellee? c1, ICancellee? c2) {
@@ -126,9 +186,12 @@ public class JointCancellee : ICancellee {
         this.c2 = token = new Cancellable();
     }
 
-    public static ICancellee? From(ICancellee? c1, ICancellee? c2) {
-        if (c1 == null) return c2;
-        if (c2 == null) return c1;
+    /// <summary>
+    /// Create a cancellee from two parents. If either is null, the other will be directly returned.
+    /// </summary>
+    public static ICancellee From(ICancellee? c1, ICancellee? c2) {
+        if (c1 == null) return c2 ?? Cancellable.Null;
+        if (c2 == null) return c1 ?? Cancellable.Null;
         return new JointCancellee(c1, c2);
     }
 }
@@ -138,26 +201,36 @@ public class JointCancellee : ICancellee {
 /// </summary>
 [PublicAPI]
 public record StrongCancellee(ICancellee Source) : ICancellee {
+    /// <inheritdoc/>
     public int CancelLevel => Source.CancelLevel >= ICancellee.HardCancelLevel ? ICancellee.HardCancelLevel : 0;
 }
 
 /// <summary>
 /// A token passed into tasks to track cancellation.
-/// Similar to ICancellee, but when it is cancelled, it must be provided a value of type T
+/// Similar to <see cref="ICancellee"/>, but when it is cancelled, it must be provided a value of type T
 /// (for example, a canceller for a state machine passing the next state).
 /// </summary>
 [PublicAPI]
 public interface ICancellee<T> : ICancellee {
+    /// <summary>
+    /// Check if the token is cancelled, and if it is, get the cancellation value.
+    /// </summary>
     new bool Cancelled(out T value);
 }
 
+/// <inheritdoc cref="ICancellee{T}"/>
 [PublicAPI]
 public class GCancellable<T> : ICancellee<T> {
+    /// <summary>
+    /// A cancellee that is never cancelled.
+    /// </summary>
     public static readonly ICancellee<T> Null = new GCancellable<T>();
+    /// <inheritdoc/>
     public int CancelLevel { get; private set; }
     private Maybe<T> obj = Maybe<T>.None;
 
     
+    /// <inheritdoc/>
     public bool Cancelled(out T value) => obj.Try(out value);
 
     public void Cancel(int level, T value) {

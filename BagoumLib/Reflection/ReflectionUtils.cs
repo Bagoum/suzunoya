@@ -7,6 +7,9 @@ using BagoumLib.Expressions;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Reflection {
+/// <summary>
+/// Helpers for reflection and type handling.
+/// </summary>
 [PublicAPI]
 public static class ReflectionUtils {
     /// <summary>
@@ -14,6 +17,12 @@ public static class ReflectionUtils {
     /// C# description as possible without namespaces.
     /// </summary>
     public static string RName(this Type t) => CSharpTypePrinter.Default.Print(t);
+
+    /// <summary>
+    /// Returns true iff either t is equal to parent, or t is a strict subclass of parent.
+    /// </summary>
+    public static bool IsWeakSubclassOf(this Type? t, Type? parent) =>
+        t == parent || (parent != null && t?.IsSubclassOf(parent) is true);
     
     
     /// <summary>
@@ -26,6 +35,9 @@ public static class ReflectionUtils {
         return _ConstructedGenericTypeMatch(realized, generic, mapper);
     }
 
+    /// <summary>
+    /// Create a concrete method from a generic method provided a dictionary mapping generic types to concrete types.
+    /// </summary>
     public static MethodInfo MakeGeneric(this MethodInfo mi, Dictionary<Type, Type> typeMap) {
         var typeParams = mi.GetGenericArguments()
             .Select(t => typeMap.TryGetValue(t, out var prm) ? prm : 
@@ -33,7 +45,7 @@ public static class ReflectionUtils {
         return mi.MakeGenericMethod(typeParams.ToArray());
     }
 
-    public static bool _ConstructedGenericTypeMatch(Type realized, Type generic, Dictionary<Type, Type> genericMap) {
+    private static bool _ConstructedGenericTypeMatch(Type realized, Type generic, Dictionary<Type, Type> genericMap) {
         if (generic.IsGenericParameter) {
             if (genericMap.TryGetValue(generic, out var x) && x != realized) return false;
             genericMap[generic] = realized;
@@ -48,23 +60,32 @@ public static class ReflectionUtils {
                    .All(t => _ConstructedGenericTypeMatch(t.Item1, t.Item2, genericMap));
     }
 
-
+    /// <summary>
+    /// Create an instance of type T using its constructor.
+    /// </summary>
     public static T CreateInstance<T>(params object[] args) => (T) Activator.CreateInstance(typeof(T), args)!;
     
-    public static MethodInfo MethodInfo(this Type t, string method, bool instance=true) =>
-        t.GetMethod(method, (instance ? BindingFlags.Instance : BindingFlags.Static) 
-                            | BindingFlags.NonPublic | BindingFlags.Public) ??
-        throw new Exception($"Method {t.Name}.{method} not found");
-    
+    /// <summary>
+    /// Find a property.
+    /// </summary>
+    /// <param name="t">Type containing the property</param>
+    /// <param name="prop">Property name</param>
+    /// <param name="instance">True if this is an instance property</param>
     public static PropertyInfo PropertyInfo(this Type t, string prop, bool instance=true) =>
         t.GetProperty(prop, (instance ? BindingFlags.Instance : BindingFlags.Static) 
                             | BindingFlags.NonPublic | BindingFlags.Public) ??
         throw new Exception($"Property {t.Name}.{prop} not found");
     
-    public static FieldInfo FieldInfo(this Type t, string prop, bool instance=true) =>
-        t.GetField(prop, (instance ? BindingFlags.Instance : BindingFlags.Static) 
+    /// <summary>
+    /// Find a field.
+    /// </summary>
+    /// <param name="t">Type containing the field</param>
+    /// <param name="field">Field name</param>
+    /// <param name="instance">True if this is an instance field</param>
+    public static FieldInfo FieldInfo(this Type t, string field, bool instance=true) =>
+        t.GetField(field, (instance ? BindingFlags.Instance : BindingFlags.Static) 
                             | BindingFlags.NonPublic | BindingFlags.Public) ??
-        throw new Exception($"Field {t.Name}.{prop} not found");
+        throw new Exception($"Field {t.Name}.{field} not found");
     
     public static T _Property<T>(this object obj, string prop) => (T) (obj.GetType()
         .GetProperty(prop, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(obj)

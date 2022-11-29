@@ -141,6 +141,7 @@ public class DataStructures {
     public void DMCArray() {
         var ca = new DMCompactingArray<I>(4);
         DeletionMarker<I>[] dmi = new DeletionMarker<I>[12];
+        ca.Compact();
         for (int ii = 0; ii < 8; ++ii) {
             var x = new I(ii);
             dmi[ii] = ca.Add(x);
@@ -176,6 +177,25 @@ public class DataStructures {
         Assert.AreEqual(ca.Count, 5);
         ca.Empty();
         Assert.AreEqual(ca.Count, 0);
+
+        var ordered = new DMCompactingArray<int>(1);
+        var a10 = ordered.AddPriority(10, 10);
+        var a5 = ordered.AddPriority(5, 5);
+        var a15 = ordered.AddPriority(15, 15);
+        var a0 = ordered.AddPriority(0, 0);
+        var a12 = ordered.AddPriority(12, 12);
+        Assert.AreEqual(ordered[0], 0);
+        Assert.AreEqual(ordered[1], 5);
+        Assert.AreEqual(ordered[2], 10);
+        Assert.AreEqual(ordered[3], 12);
+        Assert.AreEqual(ordered[4], 15);
+        a0.MarkForDeletion();
+        a5.MarkForDeletion();
+        a10.MarkForDeletion();
+        a12.MarkForDeletion();
+        a15.MarkForDeletion();
+        ordered.Compact();
+        Assert.AreEqual(ordered.Count, 0);
     }
 
 

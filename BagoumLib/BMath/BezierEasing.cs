@@ -29,8 +29,13 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Mathematics {
+/// <summary>
+/// Implementation of Bezier curves.
+/// </summary>
+[PublicAPI]
 public static class Bezier {
     private const int NEWTON_ITERATIONS = 4;
     private const double NEWTON_MIN_SLOPE = 0.001;
@@ -65,8 +70,8 @@ public static class Bezier {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static double BinarySubdivide(double x, double a, double b, double x1, double x2) {
-        var currx = 0.0;
-        var currt = 0.0;
+        double currx;
+        double currt;
         var ii = 1;
         do {
             currt = a + (b - a) * 0.5;

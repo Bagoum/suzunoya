@@ -4,8 +4,10 @@ using System.Reactive.Linq;
 using BagoumLib;
 using BagoumLib.Events;
 using BagoumLib.Mathematics;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using static Tests.AssertHelpers;
+// ReSharper disable UnusedVariable
 
 namespace Tests.BagoumLib {
 public class Events {
@@ -196,8 +198,24 @@ public class Events {
         source.Value.IntEvent.OnNext(105);
         source.Value.FloatEvented.OnNext(7);
         AssertHelpers.ListEq(output, new []{ 8f, 1102 });
+    }
 
-
+    [Test]
+    public void TestMonadic() {
+        var a = new Evented<Func<int, int>>(x => x);
+        var b = new Evented<int>(100);
+        var output = new List<int>();
+        a.Apply(b).Subscribe(output.Add);
+        var output2 = new List<int>();
+        (from ax in a from bx in b select ax(bx)).Subscribe(output2.Add);
+        a.OnNext(x => x + 1);
+        a.OnNext(x => x + 2);
+        b.OnNext(110);
+        b.OnNext(120);
+        a.OnNext(x => x + 3);
+        b.OnNext(130);
+        AssertHelpers.ListEq(output, new []{ 100, 101, 102, 110, 111, 112, 120, 121, 122, 103, 113, 123, 130, 131, 132, 133 });
+        AssertHelpers.ListEq(output2, new []{ 100, 101, 102, 110, 111, 112, 120, 121, 122, 123, 130, 131, 132, 133 });
     }
     
     [Test]
@@ -206,11 +224,10 @@ public class Events {
         
         var source = new Evented<MyObject>(new MyObject(5));
         source.Value.IntEvent.OnNext(100);
-        var proxy = new EventProxy<MyObject>(source);
-        var partialInt = proxy.ProxyEvent(o => o.IntEvent);
+        var partialInt = source.Bind(o => o.IntEvent);
         var t1 = partialInt.Subscribe(i => output.Add(i + 1000));
-        var t2 = proxy.Subscribe(i => i.IntEvent, i => output.Add(i));
-        var t3 = proxy.Subscribe(i => i.FloatEvented, f => output.Add(f));
+        var t2 = source.BindSubscribe(i => i.IntEvent, i => output.Add(i));
+        var t3 = source.BindSubscribe(i => i.FloatEvented, f => output.Add(f));
         
         AssertHelpers.ListEq(output, new []{ 5f });
         source.Value.IntEvent.OnNext(101);
@@ -234,8 +251,21 @@ public class Events {
         source.Value.IntEvent.OnNext(105);
         source.Value.FloatEvented.OnNext(7);
         AssertHelpers.ListEq(output, new []{ 8f, 1102, 102, 103 });
+    }
 
+    class SomeClass {
+        //Deserialization works with no setter
+        public Evented<int> x { get; } = new(5);
+    }
+    
+    [Test]
+    public void TestSerialize() {
+        var a = new SomeClass();
+        a.x.Value = 20;
+        var s = JsonConvert.SerializeObject(a);
+        var b = JsonConvert.DeserializeObject<SomeClass>(s);
 
+        Assert.AreEqual(b.x.Value, 20);
     }
     
 }

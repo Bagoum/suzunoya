@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using BagoumLib.Functional;
 using JetBrains.Annotations;
 
 namespace BagoumLib.DataStructures {
@@ -9,103 +10,139 @@ namespace BagoumLib.DataStructures {
 /// </summary>
 [PublicAPI]
 public interface IDeletionMarker : IDisposable {
+    /// <summary>
+    /// Sorting priority in the array.
+    /// </summary>
+    int Priority { get; }
+    /// <summary>
+    /// Whether or not the element is currently marked as deleted.
+    /// </summary>
+    internal bool MarkedForDeletion { get; }
+
+    /// <summary>
+    /// Mark the element as deleted. The caller should stop using the marker after this.
+    /// <br/>It is unsafe to reuse (eg. via caching) deletion markers at this point, as the collection
+    ///  may not have deleted them. Wait until <see cref="RemovedFromCollection"/> is called to cache deletion markers.
+    /// </summary>
     void MarkForDeletion();
     void IDisposable.Dispose() => MarkForDeletion();
+
+    /// <summary>
+    /// Called when the collection removes the marker and the underlying element.
+    /// <br/>It is *not guaranteed* that this function will be called, so you should not depend on it.
+    /// <br/>It is permissible to reuse (eg. via caching) deletion markers when this is called,
+    ///  as long as you are not using the marker somewhere else.
+    /// </summary>
+    void RemovedFromCollection() { }
+}
+
+/// <summary>
+/// An <see cref="IDeletionMarker"/> for an underlying value of type <see cref="T"/>.
+/// </summary>
+public interface IDeletionMarker<T> : IDeletionMarker {
+    /// <summary>
+    /// Value of the object in the collection.
+    /// </summary>
+    public T Value { get; }
 }
 
 /// <summary>
 /// A disposable marker for a value <see cref="Value"/> within a collection (see <see cref="DMCompactingArray{T}"/>).
 /// </summary>
-public class DeletionMarker<T> : IDeletionMarker {
+public sealed class DeletionMarker<T> : IDeletionMarker<T> {
+    private static readonly Stack<DeletionMarker<T>> cache = new();
+    /// <inheritdoc/>
+    public int Priority { get; private set; }
+    bool IDeletionMarker.MarkedForDeletion => MarkedForDeletion;
+    internal bool MarkedForDeletion { get; private set; }
+    private bool poolingAllowed = false;
+    /// <summary>
+    /// Value of the object in the array.
+    /// </summary>
     public T Value;
-    public int Priority { get; }
-    public bool MarkedForDeletion { get; private set; } = false;
 
-    public DeletionMarker(T value, int priority) {
+    T IDeletionMarker<T>.Value => Value;
+
+    /// <summary>
+    /// Create a new deletion marker with the given value and priority.
+    /// </summary>
+    private DeletionMarker(T value, int priority) {
         this.Value = value;
         this.Priority = priority;
     }
 
+    /// <summary>
+    /// Create a new deletion marker with the given value and priority.
+    /// </summary>
+    public static DeletionMarker<T> Make(T value, int priority) {
+        if (cache.TryPop(out var dm)) {
+            dm.Value = value;
+            dm.Priority = priority;
+            dm.MarkedForDeletion = false;
+            dm.poolingAllowed = false;
+            return dm;
+        } else
+            return new(value, priority);
+    }
+
+    /// <inheritdoc/>
     public void MarkForDeletion() => MarkedForDeletion = true;
+
+    /// <inheritdoc/>
+    public void RemovedFromCollection() {
+        Value = default!;
+        if (poolingAllowed)
+            cache.Push(this);
+    }
+
+    /// <summary>
+    /// Mark that a DeletionMarker is safe to be pooled when it receives <see cref="RemovedFromCollection"/>.
+    /// <br/>Call this on construction if you are not using the DeletionMarker anywhere else.
+    /// </summary>
+    public DeletionMarker<T> AllowPooling() {
+        poolingAllowed = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Mark that a DeletionMarker is unsafe to be pooled.
+    /// </summary>
+    public DeletionMarker<T> DisallowPooling() {
+        poolingAllowed = false;
+        return this;
+    }
+
+    /// <inheritdoc/>
+    public override string ToString() {
+        var del = MarkedForDeletion ? "[Deleted] " : "";
+        return $"{del} {Value?.ToString()} (P:{Priority})";
+    }
 }
 
 /// <summary>
 /// An ordered collection that supports iteration, as well as deletion of arbitrary elements via
 /// disposable tokens (<see cref="DeletionMarker{T}"/>) returned to consumers.
 /// Indices are not guaranteed to be persistent and should not be used for identification.
-/// <br/>Deletion is O(1) amortized, assuming that <see cref="Compact"/> is called at a reasonable frequency.
+/// <br/>Deletion is O(1) amortized, assuming that <see cref="AnyTypeDMCompactingArray{D}.Compact"/> is called at a reasonable frequency.
 /// </summary>
 [PublicAPI]
-public class DMCompactingArray<T> : IEnumerable<T> {
-    private int count;
-    public int Count => count;
-    protected DeletionMarker<T>[] Data { get; private set; }
-
-    public DMCompactingArray(int size = 8) {
-        Data = new DeletionMarker<T>[size];
-        count = 0;
-    }
+public class DMCompactingArray<T> : AnyTypeDMCompactingArray<DeletionMarker<T>>, IEnumerable<T> {
 
     /// <summary>
-    /// Remove deleted elements from the underlying data array.
+    /// Create a new compacting array with the provided initial capacity.
     /// </summary>
-    public void Compact() {
-        int ii = 0;
-        bool foundDeleted = false;
-        while (ii < count) {
-            if (Data[ii++].MarkedForDeletion) {
-                foundDeleted = true;
-                break;
-            }
-        }
-        if (!foundDeleted) return;
-        int deficit = 1;
-        int start_copy = ii;
-        for (; ii < count; ++ii) {
-            if (Data[ii].MarkedForDeletion) {
-                if (ii > start_copy) {
-                    Array.Copy(Data, start_copy,
-                        Data, start_copy - deficit, ii - start_copy);
-                }
-                ++deficit;
-                start_copy = ii + 1;
-            }
-        }
-        Array.Copy(Data, start_copy,
-            Data, start_copy - deficit, count - start_copy);
-        count -= deficit;
-    }
-
-    private void MaybeResize() {
-        if (count >= Data.Length) {
-            var narr = new DeletionMarker<T>[Data.Length * 2];
-            Data.CopyTo(narr, 0);
-            Data = narr;
-        }
-    }
-
+    /// <param name="capacity"></param>
+    public DMCompactingArray(int capacity = 8) : base(capacity) { }
+    
+    /// <summary>
+    /// Add an element to the array with a default ordering priority of zero.
+    /// </summary>
     public DeletionMarker<T> Add(T obj) {
         MaybeResize();
-        var dm = new DeletionMarker<T>(obj, 0);
+        var dm = DeletionMarker<T>.Make(obj, 0);
         Data[count++] = dm;
         return dm;
     }
-
-    /// <summary>
-    /// Returns the first index where the priority is greater than the given value.
-    /// </summary>
-    /// <param name="p"></param>
-    /// <returns></returns>
-    private int NextIndexForPriority(int p) {
-        //TODO you can make this binary search or whatever
-        for (int ii = 0; ii < count; ++ii) {
-            if (Data[ii].Priority > p) return ii;
-        }
-        return count;
-    }
-
-    public int FirstPriorityGT(int i) => NextIndexForPriority(i - 1);
-
     /// <summary>
     /// Add an element into the array with a priority.
     /// Lower priorities will be inserted at the front of the array.
@@ -114,31 +151,19 @@ public class DMCompactingArray<T> : IEnumerable<T> {
     /// <param name="priority"></param>
     /// <returns></returns>
     public DeletionMarker<T> AddPriority(T obj, int priority) {
-        var dm = new DeletionMarker<T>(obj, priority);
+        var dm = DeletionMarker<T>.Make(obj, priority);
         AddPriority(dm);
         return dm;
     }
-
-    public void AddPriority(DeletionMarker<T> dm) {
-        MaybeResize();
-        Data.Insert(ref count, dm, NextIndexForPriority(dm.Priority));
-    }
-
-    public void Empty() {
-        for (int ii = 0; ii < count; ++ii) {
-            Data[ii] = null!;
-        }
-        count = 0;
-    }
-
-    public void Delete(int ii) => Data[ii].MarkForDeletion();
-
+    
     /// <summary>
-    /// Returns true iff the element at the given index has not been deleted.
+    /// Get the index'th element in the array. Note that this does not check if the element has been deleted.
     /// </summary>
-    public bool ExistsAt(int index) => !Data[index].MarkedForDeletion;
     public ref T this[int index] => ref Data[index].Value;
 
+    /// <summary>
+    /// Get the index'th element in the array if it has not been deleted.
+    /// </summary>
     public bool GetIfExistsAt(int index, out T val) {
         if (Data[index].MarkedForDeletion) {
             val = default!;
@@ -148,17 +173,8 @@ public class DMCompactingArray<T> : IEnumerable<T> {
             return true;
         }
     }
-
-    public bool GetMarkerIfExistsAt(int index, out DeletionMarker<T> val) {
-        if (Data[index].MarkedForDeletion) {
-            val = default!;
-            return false;
-        } else {
-            val = Data[index];
-            return true;
-        }
-    }
-
+    
+    /// <inheritdoc/>
     public IEnumerator<T> GetEnumerator() {
         for (int ii = 0; ii < count; ++ii)
             if (!Data[ii].MarkedForDeletion) 
@@ -169,17 +185,33 @@ public class DMCompactingArray<T> : IEnumerable<T> {
         return GetEnumerator();
     }
 
+    /// <summary>
+    /// Copy the non-deleted elements of this array into a list.
+    /// </summary>
     public void CopyIntoList(List<T> dst) {
         for (int ii = 0; ii < count; ++ii)
             if (!Data[ii].MarkedForDeletion)
                 dst.Add(Data[ii].Value);
     }
 
+    /// <summary>
+    /// Get the first element in the array, or null if it is empty.
+    /// </summary>
     public T? FirstOrNull() {
         for (int ii = 0; ii < count; ++ii)
             if (!Data[ii].MarkedForDeletion)
                 return Data[ii].Value;
         return default(T?);
+    }
+    
+    /// <summary>
+    /// Get the first element in the array, or None if it is empty.
+    /// </summary>
+    public Maybe<T> FirstOrNone() {
+        for (int ii = 0; ii < count; ++ii)
+            if (!Data[ii].MarkedForDeletion)
+                return Data[ii].Value;
+        return Maybe<T>.None;
     }
 }
 }

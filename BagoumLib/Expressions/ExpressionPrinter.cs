@@ -7,12 +7,31 @@ using JetBrains.Annotations;
 using static BagoumLib.Expressions.VisitorHelpers;
 
 namespace BagoumLib.Expressions {
+/// <summary>
+/// Converts an expression into C# source code using <see cref="LinearizeVisitor"/> and <see cref="PrintVisitor"/>.
+/// </summary>
 [PublicAPI]
 public class ExpressionPrinter {
+    /// <summary>
+    /// Mumber of tabs with which to start printing.
+    /// </summary>
     public int InitialIndent { get; set; } = 0;
+    /// <summary>
+    /// Number of spaces that one tab corresponds to.
+    /// </summary>
     public int TabToSpace { get; set; } = 4;
+    /// <summary>
+    /// Printer that can convert types into strings.
+    /// </summary>
     public ITypePrinter TypePrinter { get; set; } = new CSharpTypePrinter();
+    /// <summary>
+    /// Printer that can convert simple objects into strings.
+    /// </summary>
     public IObjectPrinter ObjectPrinter { get; set; } = new CSharpObjectPrinter();
+    /// <summary>
+    /// Set this to true if you expect exceptions to arise unexpectedly. This will
+    ///  use more temporary variables to ensure the correct order of exception throwing.
+    /// </summary>
     public bool SafeLinearize { get; set; } = false;
     
     /// <summary>

@@ -21,7 +21,7 @@ public class _3ExternalScriptRunExample {
     /// <summary>
     /// Basic example/test of how a script can be executed.
     /// </summary>
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public async Task Run() {
 	        var md = vn.Add(new TestDialogueBox());
 	        var reimu = vn.Add(new Reimu());

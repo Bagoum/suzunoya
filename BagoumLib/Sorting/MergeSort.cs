@@ -1,10 +1,11 @@
-﻿//Adapted for C# from https://github.com/BonzaiThePenguin/WikiSort/blob/master/WikiSort.java
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace BagoumLib.Sorting {
 
+/// <summary>
+/// An implementation of mergesort that uses a buffer for extra space.
+/// </summary>
 public class MergeSorter<T> : ISorter<T> {
     /// <summary>
     /// Sort an array using mergesort.
@@ -45,13 +46,13 @@ public class MergeSorter<T> : ISorter<T> {
     }
 
     /// <summary>
-    /// See <see cref="Sort(T[],int,int,System.Collections.Generic.IComparer{T},T[])"/>
+    /// See <see cref="Sort(T[],int,int,BagoumLib.Sorting.LeqCompare{T},T[])"/>
     /// </summary>
     public void Sort(T[] array, int start, int end, LeqCompare<T> comp) =>
         Sort(array, start, end, comp, new T[(end - start + 1) / 2]);
 
     /// <summary>
-    /// See <see cref="Sort(T[],int,int,System.Collections.Generic.IComparer{T},T[])"/>
+    /// See <see cref="Sort(T[],int,int,BagoumLib.Sorting.LeqCompare{T},T[])"/>
     /// </summary>
     public void Sort(T[] array, LeqCompare<T> comp) => Sort(array, 0, array.Length, comp);
 }

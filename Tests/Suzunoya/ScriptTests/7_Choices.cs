@@ -36,7 +36,7 @@ public class _6ChoicesTest {
                 return options[await currentChoice.Task].value;
             });
     }
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public readonly Interrogator asker;
 
         public _TestScript(VNState vn) : base(vn) {
@@ -96,11 +96,11 @@ public class _6ChoicesTest {
         "<VNState>.$UpdateCount ~ 1",
         "<Reimu>.ComputedLocation ~ <1, 1, 1>",
         "<VNState>.OperationID ~ A",
+        "<VNState>.ContextStarted ~ StrongContext:key2",
         "<VNState>.OperationID ~ $$__OPEN__$$::key2",
-        "<VNState>.ContextStarted ~ Context:key2",
         "<VNState>.$UpdateCount ~ 2",
         "<VNState>.$UpdateCount ~ 3",
-        "<VNState>.ContextFinished ~ Context:key2",
+        "<VNState>.ContextFinished ~ StrongContext:key2",
         "<VNState>.OperationID ~ C",
         "<VNState>.$CHOICE1 ~ 4.2",
         //"<Reimu>.ComputedLocation ~ <1, 1, 1>",
@@ -118,9 +118,9 @@ public class _6ChoicesTest {
         //"<Reimu>.ComputedLocation ~ <0, 0, 0>",
         "<Reimu>.ComputedLocation ~ <1, 1, 1>",
         "<VNState>.OperationID ~ A",
+        "<VNState>.ContextStarted ~ StrongContext:key2",
         "<VNState>.OperationID ~ $$__OPEN__$$::key2",
-        "<VNState>.ContextStarted ~ Context:key2",
-        "<VNState>.ContextFinished ~ Context:key2",
+        "<VNState>.ContextFinished ~ StrongContext:key2",
         "<VNState>.OperationID ~ C",
         "<VNState>.$CHOICE1 ~ 4.2",
         //"<Reimu>.ComputedLocation ~ <1, 1, 1>",

@@ -11,7 +11,7 @@ namespace Tests.Suzunoya {
 /// The new code should be enclosed within a BoundedContext assigned a LoadingDefault.
 /// </summary>
 public class _13BoundedContextDefaultTest {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
 	    public _TestScript(VNState? vn = null) : base(vn) { }
 	    public BoundedContext<int> Run() => new(vn, "outer", async () => {
 		    using var md = vn.Add(new TestDialogueBox());

@@ -22,7 +22,7 @@ using static Suzunoya.Helpers;
 namespace Tests.Suzunoya {
 
 public class _4SaveLoadLocationTest {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
         public _TestScript(VNState vn) : base(vn) { }
 
         public BoundedContext<int> Run() => new(vn, "test4", async () => {

@@ -89,6 +89,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         }
     }
 
+    /// <inheritdoc />
     protected override Expression VisitBinary(BinaryExpression node) {
         return node.NodeType switch {
             // A && B
@@ -102,6 +103,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         };
     }
 
+    /// <inheritdoc />
     protected override Expression VisitBlock(BlockExpression node) {
         if (node.Expressions.Count == 1 && node.Variables.Count == 0)
             return Visit(node.Expressions[0]);
@@ -120,6 +122,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         return Ex.Block(prms, stmts);
     }
 
+    /// <inheritdoc />
     protected override CatchBlock VisitCatchBlock(CatchBlock node) {
         Expression? filter = null;
         if (node.Filter != null)
@@ -129,6 +132,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         return Ex.MakeCatchBlock(node.Test, node.Variable, Visit(node.Body), filter);
     }
 
+    /// <inheritdoc />
     protected override Expression VisitConditional(ConditionalExpression node) {
         if (node.Type == typeof(void))
             //If/then statements only require fixing the condition, since if statements can take blocks as children
@@ -150,22 +154,26 @@ public class LinearizeVisitor : ExpressionVisitor {
     }
     
     //Constant, default, dynamic, elementInit, extension, goto: no changes
-    
+
+    /// <inheritdoc />
     protected override Expression VisitIndex(IndexExpression node) =>
         Linearize(args => Ex.MakeIndex(args[0], node.Indexer, args.Skip(1)), 
             node.Arguments.Prepend(node.Object).ToArray());
 
+    /// <inheritdoc />
     protected override Expression VisitInvocation(InvocationExpression node) =>
         Linearize(args => Ex.Invoke(args[0], args.Skip(1)), node.Arguments.Prepend(node.Expression).ToArray());
     
     //label, labeltarget, lambda: no changes
 
+    /// <inheritdoc />
     protected override Expression VisitListInit(ListInitExpression node) {
         throw new Exception();
     }
 
     //loop: no changes. TODO: is it possible for loops to have values in C#?
 
+    /// <inheritdoc />
     protected override Expression VisitMember(MemberExpression node) =>
         Linearize(expr => Ex.MakeMemberAccess(expr, node.Member), node.Expression);
 
@@ -180,6 +188,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         throw new Exception($"Member binding not handled: {m.BindingType}");
     }
 
+    /// <inheritdoc />
     protected override Expression VisitMemberInit(MemberInitExpression node) {
         var newExpr = Visit(node.NewExpression);
         var bindings = node.Bindings.Select(LinearizeMemberBinding).ToArray();
@@ -201,12 +210,15 @@ public class LinearizeVisitor : ExpressionVisitor {
         return Ex.Block(prms, stmts);
     }
 
+    /// <inheritdoc />
     protected override Expression VisitMethodCall(MethodCallExpression node) =>
         Linearize(args => Ex.Call(node.Object, node.Method, args), node.Arguments.ToArray());
 
+    /// <inheritdoc />
     protected override Expression VisitNew(NewExpression node) =>
         Linearize(args => Ex.New(node.Constructor, args), node.Arguments.ToArray());
 
+    /// <inheritdoc />
     protected override Expression VisitNewArray(NewArrayExpression node) =>
         Linearize(args => 
             node.NodeType == ExpressionType.NewArrayInit ?
@@ -215,6 +227,7 @@ public class LinearizeVisitor : ExpressionVisitor {
     
     //parameter, runtimevariables: no changes
 
+    /// <inheritdoc />
     protected override Expression VisitSwitch(SwitchExpression node) {
         //Largely the same structure as VisitConditional
         var cases = node.Cases.Select(VisitSwitchCase).ToArray();
@@ -233,6 +246,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         );
     }
 
+    /// <inheritdoc />
     protected override Expression VisitTry(TryExpression node) {
         //Largely the same structure as VisitConditional
         if (node.Type == typeof(void))
@@ -254,11 +268,13 @@ public class LinearizeVisitor : ExpressionVisitor {
 
     }
 
+    /// <inheritdoc />
     protected override Expression VisitTypeBinary(TypeBinaryExpression node) =>
         Linearize(ex => node.NodeType == ExpressionType.TypeEqual ? 
             Ex.TypeEqual(ex, node.Type) :
             Ex.TypeIs(ex, node.Type), node.Expression);
 
+    /// <inheritdoc />
     protected override Expression VisitUnary(UnaryExpression node) =>
         Linearize(ex => Ex.MakeUnary(node.NodeType, ex, node.Type), node.Operand);
 

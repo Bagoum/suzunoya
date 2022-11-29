@@ -8,7 +8,9 @@ namespace BagoumLib.Culture {
 /// <see cref="Variant{T}"/> with some utility functions specific to strings.
 /// </summary>
 public class LString : Variant<string> {
-    
+    /// <summary>
+    /// Default empty string.
+    /// </summary>
     public static LString Empty => new LString(null, "");
     public LString(ILocaleProvider? provider, string defaultValue, 
         params (string locale, string value)[] variants) : base(provider, defaultValue, variants) { }

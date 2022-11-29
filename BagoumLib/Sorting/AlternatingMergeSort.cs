@@ -3,8 +3,11 @@ using System.Collections.Generic;
 
 namespace BagoumLib.Sorting {
 
+/// <summary>
+/// An implementation of merge sort that sorts elements back and forth from the buffer
+/// in order to minimize buffer copies.
+/// </summary>
 public class AlternatingMergeSorter<T> : ISorter<T> {
-
     private void Sort(T[] array, int start, int end, LeqCompare<T> comp, T[] buffer, bool sortIntoBuffer) {
         var len = end - start;
         if (len == 0) return;
@@ -13,8 +16,7 @@ public class AlternatingMergeSorter<T> : ISorter<T> {
                 buffer[0] = array[start];
             return;
         }
-        
-        
+
         int mid = start + len/2;
         var alen = mid - start;
         var blen = end - mid;
@@ -55,13 +57,13 @@ public class AlternatingMergeSorter<T> : ISorter<T> {
     }
 
     /// <summary>
-    /// See <see cref="Sort(T[],int,int,System.Collections.Generic.IComparer{T},T[])"/>
+    /// See <see cref="Sort(T[],int,int,BagoumLib.Sorting.LeqCompare{T},T[])"/>
     /// </summary>
     public void Sort(T[] array, int start, int end, LeqCompare<T> comp) =>
         Sort(array, start, end, comp, new T[(end - start + 1) / 2]);
 
     /// <summary>
-    /// See <see cref="Sort(T[],int,int,System.Collections.Generic.IComparer{T},T[])"/>
+    /// See <see cref="Sort(T[],int,int,BagoumLib.Sorting.LeqCompare{T},T[])"/>
     /// </summary>
     public void Sort(T[] array, LeqCompare<T> comp) => Sort(array, 0, array.Length, comp);
 }

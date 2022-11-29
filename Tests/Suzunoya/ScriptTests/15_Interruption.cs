@@ -17,55 +17,56 @@ using static Suzunoya.Helpers;
 namespace Tests.Suzunoya {
 
 public class _15InterruptionScriptTest {
-    public class _TestScript : TestScript {
-        public async Task<int> Run(bool firstC) {
-            var md = vn.Add(new TestDialogueBox());
-            using var yukari = vn.Add(new Yukari());
-            yukari.speechCfg = SpeechSettings.Default with {
-                opsPerChar = (s, i) => 1,
-                opsPerSecond = 1,
-                rollEvent = null
-            };
-            if (firstC)
-	            await yukari.Say("12345").C;
-            else
-	            await yukari.Say("12345");
-            await yukari.Say("67890").C;
-            return 24;
-        }
+	private class _TestScript : TestScript {
+		public async Task<int> Run(bool firstC) {
+			var md = vn.Add(new TestDialogueBox());
+			using var yukari = vn.Add(new Yukari());
+			yukari.speechCfg = SpeechSettings.Default with {
+				opsPerChar = (s, i) => 1,
+				opsPerSecond = 1,
+				rollEvent = null
+			};
+			if (firstC)
+				await yukari.Say("12345").C;
+			else
+				await yukari.Say("12345");
+			await yukari.Say("67890").C;
+			return 24;
+		}
 
-        public BoundedContext<int> DoThisInterruptTask() => new BoundedContext<int>(vn, "interruptor", async () => {
-            var y = vn.Find<Yukari>();
-            await y.Say("ABCDE").C;
-            return 12;
-        });
+		public BoundedContext<int> DoThisInterruptTask() => new BoundedContext<int>(vn, "interruptor", async () => {
+			var y = vn.Find<Yukari>();
+			await y.Say("ABCDE").C;
+			return 12;
+		});
 
-    }
-    private void ScriptTestInner(bool firstC, InterruptionStatus ret, string[] cmp) {
-        var s = new _TestScript();
-        var t = s.Run(firstC);
-        s.er.LoggedEvents.Clear();
-        //Mimicking some usage-specific update loop
-        for (int ii = 0; !t.IsCompleted; ++ii) {
-            s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
-            s.vn.Update(1f);
-            if (ii == 3) {
-                var it = s.vn.Interrupt();
-                ++ii;
-                for (var inner = s.DoThisInterruptTask().Execute(); !inner.IsCompleted; ++ii) {
-                    s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
-                    s.vn.Update(1f);
-                    if (ii == 10)
-                        s.vn.UserConfirm();
-                }
-                --ii;
-                it.ReturnInterrupt(ret);
-            }
-            if (ii == 20)
-                s.vn.UserConfirm();
-        }
-        ListEq(s.er.SimpleLoggedEventStrings, cmp);
-    }
+	}
+
+	private void ScriptTestInner(bool firstC, InterruptionStatus ret, string[] cmp, int interruptFrame = 3) {
+		var s = new _TestScript();
+		var t = s.Run(firstC);
+		s.er.LoggedEvents.Clear();
+		//Mimicking some usage-specific update loop
+		for (int ii = 0; !t.IsCompleted; ++ii) {
+			s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
+			s.vn.Update(1f);
+			if (ii == interruptFrame) {
+				var it = s.vn.Interrupt();
+				++ii;
+				for (var inner = s.DoThisInterruptTask().Execute(); !inner.IsCompleted; ++ii) {
+					s.er.LoggedEvents.OnNext(s.UpdateLog(ii));
+					s.vn.Update(1f);
+					if (ii == interruptFrame + 7)
+						s.vn.UserConfirm();
+				}
+				--ii;
+				it.ReturnInterrupt(ret);
+			}
+			if (ii == interruptFrame + 17)
+				s.vn.UserConfirm();
+		}
+		ListEq(s.er.SimpleLoggedEventStrings, cmp);
+	}
 
     [Test]
     public void ScriptTestWithC() => ScriptTestInner(true, InterruptionStatus.Continue, stored);
@@ -89,8 +90,8 @@ public class _15InterruptionScriptTest {
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
 	    "<VNState>.InterruptionStarted ~ Suzunoya.ControlFlow.VNInterruptionLayer",
-	    "<VNState>.OperationID ~ $$__OPEN__$$::interruptor",
 	    "<VNState>.ContextStarted ~ Context:interruptor",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::interruptor",
 	    "<VNState>.OperationID ~ ABCDE",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (<Yukari>, Default)",
@@ -154,8 +155,8 @@ public class _15InterruptionScriptTest {
 	    "<TestDialogueBox>.Dialogue ~ (Char { fragment = 5 }, )",
 	    "<TestDialogueBox>.DialogueFinished ~ ()",
 	    "<VNState>.InterruptionStarted ~ Suzunoya.ControlFlow.VNInterruptionLayer",
-	    "<VNState>.OperationID ~ $$__OPEN__$$::interruptor",
 	    "<VNState>.ContextStarted ~ Context:interruptor",
+	    "<VNState>.OperationID ~ $$__OPEN__$$::interruptor",
 	    "<VNState>.OperationID ~ ABCDE",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
 	    "<TestDialogueBox>.Speaker ~ (<Yukari>, Default)",

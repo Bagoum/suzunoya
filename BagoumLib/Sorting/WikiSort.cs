@@ -5,10 +5,8 @@ using System.Collections.Generic;
 
 namespace BagoumLib.Sorting {
 
-
-
 // structure to represent ranges within the array
-public struct RangeSE {
+internal struct RangeSE {
 	public int start;
 	public int end;
 	
@@ -27,7 +25,7 @@ public struct RangeSE {
 	}
 }
 
-struct Pull {
+internal struct Pull {
 	public int from, to, count;
 	public RangeSE range;
 }
@@ -98,12 +96,15 @@ struct Iterator {
 	}
 }
 
+/// <summary>
+/// Wikisort sorting algorithm, adapted for C# from https://github.com/BonzaiThePenguin/WikiSort/blob/master/WikiSort.java
+/// </summary>
 public class WikiSorter<T> {
 	// use a small cache to speed up some of the operations
 	// since the cache size is fixed, it's still O(1) memory!
 	// just keep in mind that making it too small ruins the point (nothing will fit into it),
 	// and making it too large also ruins the point (so much for "low memory"!)
-	private static int cache_size = 512;
+	private const int cache_size = 512;
 	private readonly T[] cache = new T[cache_size];
 	
 	// note that you can easily modify the above to allocate a dynamically sized cache

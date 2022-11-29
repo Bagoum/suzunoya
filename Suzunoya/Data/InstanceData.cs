@@ -18,13 +18,27 @@ namespace Suzunoya.Data {
 [Serializable]
 public abstract record BoundedContextData(string Key, KeyValueRepository Locals,
     Dictionary<string, BoundedContextData> Nested) {
+    /// <summary>
+    /// Save the information of a bounded context executed while nested within this one.
+    /// </summary>
     public void SaveNested(BoundedContextData data, bool allowOverride=false) => SaveNested(this, data, allowOverride);
 
+    /// <summary>
+    /// Check if there exists saved information for a nested bounded context with the provided key.
+    /// </summary>
     public bool HasNested(string? key) => HasNested(this, key);
 
+    /// <summary>
+    /// Get the saved information for a nested bounded context with the provided key.
+    /// </summary>
     public BoundedContextData GetNested(string key) => GetNested(this, key);
+    
+    /// <inheritdoc cref="GetNested"/>
     public BoundedContextData<T> GetNested<T>(string key) => GetNested<T>(this, key);
 
+    /// <summary>
+    /// Cast this to a more specific type.
+    /// </summary>
     public BoundedContextData<T> CastTo<T>() =>
         this as BoundedContextData<T> ??
             throw new Exception($"Definition for BoundedContextData {Key} was not of type {typeof(T)}");
@@ -70,16 +84,38 @@ public record BoundedContextData<T>(string Key, Maybe<T> Result, KeyValueReposit
 /// Data for a (saveable) in-progress VN sequence.
 /// </summary>
 public interface IInstanceData {
+    /// <summary>
+    /// Global save data, shared between instances.
+    /// </summary>
     IGlobalData GlobalData { get; }
+    /// <summary>
+    /// Position in any executing VN dialogue.
+    /// </summary>
     VNLocation? Location { get; set; }
     
+    /// <summary>
+    /// Save the locals and result information from a top-level bounded context execution.
+    /// </summary>
     void SaveBCtxData(BoundedContextData data, bool allowOverride=false);
 
+    /// <summary>
+    /// Check if there exists saved top-level bounded context information for the provided key.
+    /// </summary>
     bool HasBCtxData(string? key);
 
+    /// <summary>
+    /// Get the locals and result information from a top-level bounded context with the provided key.
+    /// </summary>
     BoundedContextData GetBCtxData(string key);
+    
+    /// <inheritdoc cref="GetBCtxData"/>
     BoundedContextData<T> GetBCtxData<T>(string key);
 
+    /// <summary>
+    /// Get the locals and result information from a bounded context that was executed while nested in
+    ///  other bounded contexts.
+    /// </summary>
+    /// <param name="keys">Bounded context keys describing the nesting state, starting with the top-level and ending with the key for the bounded context that needs to be retrieved.</param>
     BoundedContextData? TryGetChainedData(params string[] keys) {
         if (keys.Length == 0)
             throw new Exception("Cannot get chained BCtxData for 0 keys");
@@ -93,9 +129,12 @@ public interface IInstanceData {
                 return null;
         return bctx;
     }
+    
+    /// <inheritdoc cref="TryGetChainedData"/>
     BoundedContextData<T>? TryGetChainedData<T>(params string[] keys) => 
         TryGetChainedData(keys)?.CastTo<T>();
 
+    /// <inheritdoc cref="TryGetChainedData"/>
     BoundedContextData<T>? TryGetChainedData<T>(IList<OpenedContext> ctxs) {
         if (ctxs.Count == 0)
             throw new Exception("Cannot get chained BCtxData for 0 contexts");
@@ -117,13 +156,19 @@ public interface IInstanceData {
 [Serializable]
 public class InstanceData : IInstanceData {
     /// <summary>
-    /// A frozen copy of the global data constructed on initialization.
+    /// A frozen copy of the global data constructed when the instance data is initially created.
     /// </summary>
     public GlobalData FrozenGlobalData { get; init; }
+    
+    /// <inheritdoc cref="IInstanceData.GlobalData"/>
     [field:NonSerialized] [JsonIgnore]
     public GlobalData GlobalData { get; private set; }
     IGlobalData IInstanceData.GlobalData => GlobalData;
+    /// <inheritdoc/>
     public VNLocation? Location { get; set; } = null;
+    /// <summary>
+    /// Top-level saved bounded context information.
+    /// </summary>
     public Dictionary<string, BoundedContextData> BCtxData { get; init; } = new();
 
     /// <summary>
@@ -144,15 +189,23 @@ public class InstanceData : IInstanceData {
         GlobalData = global;
     }
 
+    /// <summary>
+    /// Set the global data.
+    /// </summary>
+    /// <param name="g"></param>
     public void _SetGlobalData_OnlyUseForInitialization(GlobalData g) {
         GlobalData = g;
     }
     
+    /// <inheritdoc/>
     public void SaveBCtxData(BoundedContextData data, bool allowOverride=false) => 
         BoundedContextData.SaveNested(BCtxData, data, allowOverride);
+    /// <inheritdoc/>
     public bool HasBCtxData(string? key) => BoundedContextData.HasNested(BCtxData, key);
     
+    /// <inheritdoc/>
     public BoundedContextData GetBCtxData(string key) => BoundedContextData.GetNested(BCtxData, key);
+    /// <inheritdoc/>
     public BoundedContextData<T> GetBCtxData<T>(string key) => BoundedContextData.GetNested<T>(BCtxData, key);
 
     /// <summary>

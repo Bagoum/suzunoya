@@ -6,17 +6,17 @@ using JetBrains.Annotations;
 namespace BagoumLib.DataStructures {
 [PublicAPI]
 public class ListDisposable : IDisposable {
-    private readonly List<IDisposable> disposable;
+    private readonly IReadOnlyList<IDisposable> disposable;
     private bool disposed = false;
 
-    public ListDisposable(IEnumerable<IDisposable> tokens) {
-        disposable = tokens.ToList();
+    public ListDisposable(IReadOnlyList<IDisposable> tokens) {
+        disposable = tokens;
     }
 
     public static ListDisposable From<T>(IEnumerable<T> objects, Func<T, IDisposable> mapper) =>
-        new(objects.Select(mapper));
+        new(objects.Select(mapper).ToList());
 
-
+    /// <inheritdoc/>
     public void Dispose() {
         if (disposed) return;
         disposed = true;

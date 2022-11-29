@@ -19,27 +19,54 @@ public delegate float Easer(float x);
 [PublicAPI]
 public static class Easers {
     
+    /// <summary>
+    /// Sine easer (slow at beginning).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EInSine(float x) => 1f - (float) Math.Cos(HPI * x);
+    /// <summary>
+    /// Sine easer (slow at end).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutSine(float x) => (float) Math.Sin(HPI * x);
+    /// <summary>
+    /// Sine easer (slow at beginning and end).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOSine(float x) => 0.5f - 0.5f * (float) Math.Cos(PI * x);
 
+    /// <summary>
+    /// Quadratic easer (slow at beginning).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EInQuad(float x) => x * x;
+    /// <summary>
+    /// Quadratic easer (slow at end).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutQuad(float x) => 1f - (1 - x) * (1 - x);
+    /// <summary>
+    /// Quadratic easer (slow at beginning and end).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOQuad(float x) =>
         (x *= 2f) < 1f ?
             0.5f * x * x :
             1 - 0.5f * (x - 2) * (x - 2);
 
+    /// <summary>
+    /// Quartic easer (slow at beginning).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EinQuart(float x) => x * x * x * x;
+    /// <summary>
+    /// Quartic easer (slow at end).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutQuart(float x) => 1 - --x * x * x * x;
+    /// <summary>
+    /// Quartic easer (slow at beginning and end).
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOQuart(float x) =>
         (x *= 2f) < 1f ?
@@ -127,7 +154,14 @@ public static class Easers {
 /// </summary>
 [PublicAPI]
 public static class OffEasers {
+    /// <summary>
+    /// Sine wave that goes through half a period in the range [0, 1], starting and ending at 0.
+    /// </summary>
     public static float ESine010(float x) => (float) Math.Sin(Math.PI * x);
+    
+    /// <summary>
+    /// Triangle wave that has F(0) = 0, F(0.5) = 1, F(1) = 0.
+    /// </summary>
     public static float ESoftmod010(float x) => 2 * SoftMod(0.5f, x);
 }
 }

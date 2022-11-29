@@ -5,7 +5,7 @@ using BagoumLib;
 using BagoumLib.Reflection;
 
 namespace BagoumLib.Events {
-public class EventRecord {
+internal class EventRecord {
     public record LogEvent(object controller, string prop, Type propType, object? value) {
         public override string ToString() =>
             $"<{controller.GetType().RName()}>.{prop}<{propType.RName()}> ~ {value}<{value?.GetType().RName() ?? "Null"}>";

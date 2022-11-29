@@ -11,7 +11,7 @@ namespace Tests.Suzunoya {
 /// Tests proxy loading for nested data transfer.
 /// </summary>
 public class _16NestedDataTransfer {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
 	    public _TestScript(VNState? vn = null) : base(vn) { }
 
 	    public BoundedContext<int> RunC() => new(vn, "c", async () => {

@@ -11,7 +11,7 @@ namespace Tests.Suzunoya {
 /// Tests proxy loading.
 /// </summary>
 public class _14SaveLoadTimeInconsistency {
-    public class _TestScript : TestScript {
+    private class _TestScript : TestScript {
 	    public _TestScript(VNState? vn = null) : base(vn) { }
 
 	    public BoundedContext<int> InnerResult() => new(vn, "inner", async () => 9);

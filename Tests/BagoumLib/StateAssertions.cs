@@ -7,6 +7,7 @@ using BagoumLib.Assertions;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using NUnit.Framework;
+#pragma warning disable CS1998
 
 namespace Tests.BagoumLib {
 public class StateAssertions {
