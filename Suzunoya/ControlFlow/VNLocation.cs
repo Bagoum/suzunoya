@@ -12,15 +12,18 @@ namespace Suzunoya.ControlFlow {
 /// A class describing a saveable position within a VN. 
 /// <br/>A position is a script line ID contextualized by the (non-empty) lists of contexts.
 /// <br/>By default, positions are associated with script lines, but
-/// can be manually established via the vn.RecordPosition(VNLocation) function.
+/// can be manually established via vn.OperationID.
 /// </summary>
 [Serializable]
 public class VNLocation {
+    /// <summary>
+    /// The hierarchically-nested bounded context keys for the current position.
+    /// </summary>
     public List<string> Contexts { get; init; }
+    /// <summary>
+    /// The last operation ID (per <see cref="IVNState.OperationID"/>) executed.
+    /// </summary>
     public string LastOperationID { get; init; }
-
-    public override string ToString() => 
-        string.Join(", ", Contexts) + $"; {LastOperationID}";
 
 #pragma warning disable 8618
     /// <summary>
@@ -37,6 +40,9 @@ public class VNLocation {
         this.Contexts = ctxs;
     }
     
+    /// <summary>
+    /// Get the currently executing nested context list, but only if all of them are identifiable.
+    /// </summary>
     public static List<string>? GetContexts(IVNState vn) {
         //Don't save the location if there are no contexts (ie. there is no active script)
         List<string>? lines = null;
@@ -49,6 +55,9 @@ public class VNLocation {
         return lines;
     }
 
+    /// <summary>
+    /// Create a <see cref="VNLocation"/> from the current state of the VN if its current location is identifiable.
+    /// </summary>
     public static VNLocation? Make(IVNState vn) {
         var ctxs = GetContexts(vn);
         if (ctxs == null)
@@ -56,10 +65,14 @@ public class VNLocation {
         return new VNLocation(vn.OperationID, ctxs);
     }
 
-    public VNLocation WithLastOp(string newLastOperation) => new(newLastOperation, Contexts);
-
+    /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is VNLocation b && this == b;
+    /// <inheritdoc/>
     public override int GetHashCode() => Contexts.GetHashCode();
+
+    /// <inheritdoc/>
+    public override string ToString() => 
+        string.Join(", ", Contexts) + $"; {LastOperationID}";
 
     /// <summary>
     /// Return true iff the provided contexts are a nonstrict prefix of this object's contexts.
@@ -73,6 +86,10 @@ public class VNLocation {
         }
         return true;
     }
+    
+    /// <summary>
+    /// Whether or not <see cref="Contexts"/> matches the provided contexts list.
+    /// </summary>
     public bool ContextsMatch(List<OpenedContext> contexts) {
         if (Contexts.Count != contexts.Count)
             return false;
@@ -82,6 +99,10 @@ public class VNLocation {
         }
         return true;
     }
+    
+    /// <summary>
+    /// Whether or not <see cref="Contexts"/> matches the provided contexts list.
+    /// </summary>
     public bool ContextsMatch(List<string> contexts) {
         if (Contexts.Count != contexts.Count)
             return false;
@@ -92,23 +113,28 @@ public class VNLocation {
         return true;
     }
 
+    /// <summary>
+    /// Equality operator.
+    /// </summary>
     public static bool operator ==(VNLocation? a, VNLocation? b) {
         return (a is null && b is null) ||
                (!(a is null) && !(b is null) && a.ContextsMatch(b.Contexts) && a.LastOperationID == b.LastOperationID);
     }
 
+    /// <summary>
+    /// Inequality operator.
+    /// </summary>
     public static bool operator !=(VNLocation? a, VNLocation? b) => !(a == b);
 }
 
 /// <summary>
 /// A wrapper around a cancellation token that also links to the containing VN.
 /// </summary>
-/// <param name="vn"></param>
-/// <param name="cT"></param>
 public record VNCancellee(IVNState vn, ICancellee cT) : ICancellee {
+    /// <inheritdoc/>
     public int CancelLevel => cT.CancelLevel;
+    /// <inheritdoc/>
     public ICancellee Root => cT.Root;
-    public VNLocation? Location => VNLocation.Make(vn);
 
     //public VNCancellee BoundCT(ICancellee ncT) => new(vn, new JointCancellee(cT, ncT));
 }

@@ -1,14 +1,46 @@
 ﻿using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Mathematics {
 /// <summary>
 /// Static class providing low-level math utilities.
 /// </summary>
+[PublicAPI]
 public static class BMath {
-    internal const float HPI = (float)Math.PI * 0.5f;
-    internal const float PI = (float)Math.PI;
+    /// <summary>
+    /// Half of pi.
+    /// </summary>
+    public const float HPI = (float)Math.PI * 0.5f;
+    /// <summary>
+    /// Pi.
+    /// </summary>
+    public const float PI = (float)Math.PI;
+    /// <summary>
+    /// Tau (2*pi).
+    /// </summary>
+    public const float TAU = 2f * PI;
+    /// <summary>
+    /// 2*tau (4*pi).
+    /// </summary>
+    public const float TWAU = 4f * PI;
+    /// <summary>
+    /// Phi (golden ratio, ~1.618)
+    /// </summary>
+    public const float PHI = 1.6180339887498948482045868343656381f;
+    /// <summary>
+    /// Inverse of phi (~.618)
+    /// </summary>
+    public const float IPHI = PHI - 1f;
+    /// <summary>
+    /// pi/180: multiply by this to convert degrees to radians.
+    /// </summary>
+    public const float degRad = PI / 180f;
+    /// <summary>
+    /// 180/pi: multiply by this to convert radians to degrees.
+    /// </summary>
+    public const float radDeg = 180f / PI;
     
     /// <summary>
     /// Mod function. The result will always be zero or have the same sign as `by`.

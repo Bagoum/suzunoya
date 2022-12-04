@@ -123,7 +123,7 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
                 Clear(null);
             Speaker.OnNext((character, flags));
             Run(Say(
-                new DialogueOp(content, character, flags, cT.Location), 
+                new DialogueOp(content, character, flags, VNLocation.Make(cT.vn)), 
                                 WaitingUtils.GetAwaiter(out Task t), this.BindLifetime(cT)));
             return t;
         });

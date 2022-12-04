@@ -53,6 +53,20 @@ public interface IVNState : IConfirmationReceiver {
     IDialogueBox MainDialogueOrThrow { get; }
 
     /// <summary>
+    /// Before loading, the <see cref="VNState"/> should be initialized with the
+    ///  save data that it had *before* running the BCtx being loaded into.
+    /// <br/>The instance data at the time of save, with the BCtx partially executed,
+    ///  should be passed as <see cref="replayer"/> here.
+    /// </summary>
+    public void LoadToLocation(VNLocation target, IInstanceData replayer, Action? onLoaded = null);
+
+    /// <summary>
+    /// Reset the interruption status on the current process layer.
+    /// <br/>Call this after a BCTX is finished running in an ADV context to avoid cross-pollution of interruption.
+    /// </summary>
+    void ResetInterruptStatus();
+
+    /// <summary>
     /// A list of currently-executing nested <see cref="BoundedContext{T}"/>s.
     /// </summary>
     List<OpenedContext> Contexts { get; }
@@ -127,6 +141,11 @@ public interface IVNState : IConfirmationReceiver {
     /// This is called within the RenderGroup constructor. You do not need to call it explicitly.
     /// </summary>
     IDisposable _AddRenderGroup(RenderGroup rg);
+
+    /// <summary>
+    /// Update with a timestep of zero to flush any cancelled coroutines.
+    /// </summary>
+    public void Flush();
     
     /// <summary>
     /// Update all entities controlled by the VNState.
@@ -138,6 +157,25 @@ public interface IVNState : IConfirmationReceiver {
     /// Run a coroutine.
     /// </summary>
     void Run(IEnumerator ienum);
+
+    /// <summary>
+    /// Add a new interruption layer. This hangs the VNOperations on the current layer
+    ///  until it is resumed.
+    /// </summary>
+    public IVNInterruptionToken Interrupt();
+
+    /// <summary>
+    /// Wrap an external task (that does not respect skip/cancel semantics) in a cancellable VNOperation.
+    /// <br/>Note that this cannot be skipped. It will loop. (It can be cancelled.)
+    /// </summary>
+    Task<T> WrapExternal<T>(Task<T> task);
+    
+    /// <summary>
+    /// Wrap an external task (that does not respect skip/cancel semantics) in a <see cref="StrongBoundedContext{T}"/>.
+    /// <br/>Note that this cannot be skipped. It will loop. (It can be cancelled.)
+    /// </summary>
+    StrongBoundedContext<T> WrapExternal<T>(string key, Func<Task<T>> task) =>
+        new(this, key, () => WrapExternal(task()));
 
     /// <summary>
     /// Create a lazy task that completes when a Confirm is sent to the VNState (see <see cref="UserConfirm"/>).
@@ -255,12 +293,7 @@ public class VNState : IVNState {
     /// </summary>
     public (VNLocation location, IInstanceData replayer, Action? onLoaded)? LoadTo { get; private set; }
 
-    /// <summary>
-    /// Before loading, the <see cref="VNState"/> should be initialized with the
-    ///  save data that it had *before* running the BCtx being loaded into.
-    /// <br/>The instance data at the time of save, with the BCtx partially executed,
-    ///  should be passed as <see cref="replayer"/> here.
-    /// </summary>
+    /// <inheritdoc/>
     public void LoadToLocation(VNLocation target, IInstanceData replayer, Action? onLoaded = null) {
         LoadTo = (target, replayer, onLoaded);
         Logs.OnNext(new LogMessage($"Began loading to location {LoadTo}", LogLevel.INFO));
@@ -366,10 +399,7 @@ public class VNState : IVNState {
     private Stack<VNInterruptionLayer> interrupts = new();
     private VNInterruptionLayer CurrentInterrupt => interrupts.Peek();
 
-    /// <summary>
-    /// Reset the interruption status on the current process layer.
-    /// <br/>Call this after a BCTX is finished running in an ADV context to avoid cross-pollution of interruption.
-    /// </summary>
+    /// <inheritdoc/>
     public void ResetInterruptStatus() {
         CurrentInterrupt.Status = InterruptionStatus.Normal;
     }
@@ -479,7 +509,7 @@ public class VNState : IVNState {
         op.userSkipAllowed &= allowUserSkip;
         if (SkippingMode.SkipsOperations())
             SkipOperation();
-        return op.CreateSubOp();
+        return op.CreateOpTracker();
     }
     
     /// <summary>
@@ -634,9 +664,7 @@ public class VNState : IVNState {
     public bool GetFlag(params string[] contextIDs) => GetContextResult<bool>(contextIDs);
 
 
-    /// <summary>
-    /// Update with a timestep of zero to flush any cancelled coroutines.
-    /// </summary>
+    /// <inheritdoc/>
     public void Flush() => Update(0);
     
     /// <inheritdoc/>
@@ -739,12 +767,9 @@ public class VNState : IVNState {
         });
     }
 
-    //TODO LockedBoundedContext, also make this take cT -> Task<T>
-    /// <summary>
-    /// Wrap an external task (that does not respect skip/cancel semantics) in a cancellable VNOperation.
-    /// <br/>Note that this cannot be skipped. It will loop. (It can be cancelled.)
-    /// </summary>
-    public async Task<T> WaitExternal<T>(Task<T> task) {
+    //TODO make this take cT -> Task<T>
+    /// <inheritdoc/>
+    public async Task<T> WrapExternal<T>(Task<T> task) {
         while (true) {
             var vnop = Wait(() => task.IsCompleted);
             var completion = await vnop;
@@ -775,10 +800,7 @@ public class VNState : IVNState {
     /// </summary>
     public ILazyAwaitable Sequential(params ILazyAwaitable[] tasks) => new SequentialLazyAwaitable(tasks);
 
-    /// <summary>
-    /// Add a new interruption layer. This hangs the VNOperations on the current layer
-    ///  until it is resumed.
-    /// </summary>
+    /// <inheritdoc/>
     public IVNInterruptionToken Interrupt() => new InterruptionToken(this, CurrentInterrupt);
 
     private class InterruptionToken : IVNInterruptionToken {

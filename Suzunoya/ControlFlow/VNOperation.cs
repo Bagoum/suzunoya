@@ -52,7 +52,7 @@ public interface ILazyAwaitable<T> : ILazyAwaitable {
 /// </summary>
 public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
     private Task<T>? loadedTask;
-    /// <inheritdoc cref="ILazyAwaitable.Task"/>
+    /// <inheritdoc/>
     public Task<T> Task => loadedTask ??= LazyTask();
 
     private Task<T> LazyTask() {
@@ -65,9 +65,17 @@ public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
         return lazyFunc();
     });*/
 
+    /// <inheritdoc/>
     public TaskAwaiter<T> GetAwaiter() => Task.GetAwaiter();
 
+    /// <summary>
+    /// Implicit constructor for <see cref="LazyFunc{T}"/>.
+    /// </summary>
     public static implicit operator LazyFunc<T>(Func<T> op) => new(op);
+    
+    /// <summary>
+    /// Convert this to a <see cref="VNOperation"/> so it can be sequenced with VNOperation functions.
+    /// </summary>
     public VNOperation AsVnOp(IVNState vn) => new(vn, _ => Task);
 }
 
@@ -83,15 +91,22 @@ public record LazyAction : LazyFunc<Unit> {
     public static implicit operator LazyAction(Action op) => new(op);
 }
 
-
+/// <summary>
+/// A set of lazily-computed tasks run in parallel.
+/// </summary>
 public record ParallelLazyAwaitable(params ILazyAwaitable[] tasks) : ILazyAwaitable {
     private Task? loadedTask;
+    /// <inheritdoc/>
     public Task Task => loadedTask ??= Task.WhenAll(tasks.Select(t => t.Task));
     //public ILazyAwaitable BoundCT(ICancellee cT) => new ParallelLazyAwaitable(tasks.Select(t => t.BoundCT(cT)).ToArray());
 }
 
+/// <summary>
+/// A set of lazily-computed tasks run in sequence.
+/// </summary>
 public record SequentialLazyAwaitable(params ILazyAwaitable?[] tasks) : ILazyAwaitable {
     private Task? loadedTask;
+    /// <inheritdoc/>
     public Task Task => loadedTask ??= LazyTask();
 
     //public ILazyAwaitable BoundCT(ICancellee cT) => new SequentialLazyAwaitable(tasks.Select(t => t?.BoundCT(cT)).ToArray());
@@ -134,8 +149,16 @@ public class VNProcessGroup : ICancellee {
     /// </summary>
     public ICancellee OperationCToken { get; }
     private (Cancellable cTs, IConfirmationReceiver recv)? confirmToken;
+    
+    /// The canceller governing when a confirm input is provided by the player.
     public ICancellee? ConfirmToken => confirmToken?.cTs;
+    /// <summary>
+    /// The object receiving confirmation.
+    /// </summary>
     public IConfirmationReceiver? ConfirmReceiver => confirmToken?.recv;
+    /// <summary>
+    /// The number of <see cref="VNOperation"/>s dependent on this process group.
+    /// </summary>
     public int OperationCTokenDependencies { get; private set; } = 0;
     /// <inheritdoc/>
     public int CancelLevel => Math.Max(OperationCToken.CancelLevel, ProcessLayer.InducedOperationCancelLevel);
@@ -148,10 +171,16 @@ public class VNProcessGroup : ICancellee {
         OperationCToken = new JointCancellee(ih.VN.CToken, OperationCTS);
     }
 
+    /// <summary>
+    /// Indicate that a user-confirmation is required for at least one of the operations in this process group.
+    /// </summary>
     public ICancellee AwaitConfirm() {
         return (confirmToken ??= (new Cancellable(), VN)).cTs;
     }
 
+    /// <summary>
+    /// Send a user-confirmation to all operations dependent on this process group.
+    /// </summary>
     public void DoConfirm() {
         if (confirmToken?.cTs is { Cancelled: false }) {
             confirmToken?.cTs.Cancel(ICancellee.SoftSkipLevel);
@@ -159,10 +188,13 @@ public class VNProcessGroup : ICancellee {
         }
     }
 
-    public IDisposable CreateSubOp() => new SubOperationTracker(this);
-    private class SubOperationTracker : IDisposable {
+    /// <summary>
+    /// Get a token that indicates that a <see cref="VNOperation"/> is dependent on confirmation from this process group.
+    /// </summary>
+    public IDisposable CreateOpTracker() => new OperationTracker(this);
+    private class OperationTracker : IDisposable {
         private readonly VNProcessGroup op;
-        public SubOperationTracker(VNProcessGroup op) {
+        public OperationTracker(VNProcessGroup op) {
             this.op = op;
             ++op.OperationCTokenDependencies;
         }
@@ -181,6 +213,7 @@ public class VNProcessGroup : ICancellee {
 /// </summary>
 public record VNConfirmTask(IVNState VN, VNOperation? Preceding, Func<VNProcessGroup, Task<Completion>> Confirm) : ILazyAwaitable<Completion> {
     private Task<Completion>? loadedTask;
+    /// <inheritdoc/>
     public Task<Completion> Task => loadedTask ??= _AsTask();
 
     private async Task<Completion> _AsTask() {
@@ -190,15 +223,10 @@ public record VNConfirmTask(IVNState VN, VNOperation? Preceding, Func<VNProcessG
         return await Confirm(op);
     }
     
+    /// <inheritdoc/>
     [UsedImplicitly]
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
-
-
-    /// <summary>
-    /// Create a copy of this awaitable that can be cancelled by the provided cancellation token.
-    /// </summary>
-    //public VNConfirmTask BoundCT(ICancellee cT) => new(Preceding?.BoundCT(cT), c => Confirm(JointCancellee.From(c, cT)));
-    //ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);
+    
 }
 
 /// <summary>
@@ -207,22 +235,37 @@ public record VNConfirmTask(IVNState VN, VNOperation? Preceding, Func<VNProcessG
 /// If multiple VNOperations are run at the same time, they may end up sharing the same <see cref="VNProcessGroup"/>.
 /// <br/>Tasks batched under a VNOperation do not need to check cancellation at their start or end.
 /// </summary>
-public record VNOperation : ILazyAwaitable<Completion> {
-    public IVNState VN { get; }
-    public Func<VNCancellee, Task>[] Suboperations { get; init; }
+public record VNOperation(IVNState VN, params Func<VNCancellee, Task>[] Suboperations) : ILazyAwaitable<Completion> {
+    /// <summary>
+    /// The VN on which this operation is running.
+    /// </summary>
+    public IVNState VN { get; } = VN;
+    /// <summary>
+    /// The (sequential) tasks that compose this operation.
+    /// </summary>
+    public Func<VNCancellee, Task>[] Suboperations { get; init; } = Suboperations;
 
+    /// <summary>
+    /// Whether or not this operation can be soft-skipped by user input.
+    /// </summary>
     public bool AllowUserSkip { get; init; } = true;
 
     private Task<Completion>? loadedTask;
+    
+    /// <inheritdoc/>
     public Task<Completion> Task => loadedTask ??= _AsTask();
+    /// <summary>
+    /// Create a task for running this operation on a specific <see cref="VNProcessGroup"/>.
+    /// </summary>
     public Task<Completion> TaskInGroup(VNProcessGroup op) => loadedTask ??= _AsTask(op);
+    /// <summary>
+    /// Create a task for running this operation with an extra cancellation token.
+    /// </summary>
     public Task<Completion> TaskWithCT(ICancellee cT) => loadedTask ??= _AsTask(cT);
+    /// <summary>
+    /// Create a <see cref="VNConfirmTask"/> that runs this task, and then wait for user confirmation.
+    /// </summary>
     public VNConfirmTask C => VN.SpinUntilConfirm(this);
-
-    public VNOperation(IVNState vn, params Func<VNCancellee, Task>[] suboperations) {
-        this.VN = vn;
-        this.Suboperations = suboperations;
-    }
 
     private async Task<Completion> _AsTask(VNProcessGroup op, ICancellee? cT = null) {
         cT = new JointCancellee(op, cT);
@@ -247,12 +290,19 @@ public record VNOperation : ILazyAwaitable<Completion> {
         return await _AsTask(op, cT);
     }
 
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that first runs this task, and then the provided actions.
+    /// </summary>
     public VNOperation Then(Action nxt) {
         var nsubops = Suboperations.ToArray();
         var ft = nsubops[^1];
         nsubops[^1] = ct => ft(ct).ContinueWithSync(nxt);
         return this with {Suboperations = nsubops};
     }
+    
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that first runs this task, and then the provided tasks in sequence.
+    /// </summary>
     public VNOperation Then(params Func<ICancellee, Task>[] nxt) =>
         this with {Suboperations = Suboperations.Concat(nxt).ToArray()};
 
@@ -263,8 +313,14 @@ public record VNOperation : ILazyAwaitable<Completion> {
         }
     }
 
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that runs this task and the provided tasks in parallel.
+    /// </summary>
     public VNOperation And(params VNOperation[] nxt) => Parallel(nxt.Prepend(this).ToArray());
 
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that first runs this task, and then the provided tasks in sequence.
+    /// </summary>
     public VNOperation Then(params VNOperation[] nxt) {
         CheckUniformity(nxt);
         if (VN != nxt[0].VN)
@@ -273,6 +329,10 @@ public record VNOperation : ILazyAwaitable<Completion> {
             AllowUserSkip = nxt.All(v => v.AllowUserSkip)
         };
     }
+    
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that runs the provided tasks in parallel.
+    /// </summary>
     public static VNOperation Parallel(params VNOperation[] vnos) {
         CheckUniformity(vnos);
         return new VNOperation(vnos[0].VN, Parallel(vnos.Select(vno => Sequential(vno.Suboperations)))) {
@@ -280,9 +340,15 @@ public record VNOperation : ILazyAwaitable<Completion> {
         };
     }
 
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that runs the provided tasks in parallel.
+    /// </summary>
     public static Func<T, Task> Parallel<T>(IEnumerable<Func<T, Task>> tasks) =>
         x => System.Threading.Tasks.Task.WhenAll(tasks.Select(t => t(x)));
 
+    /// <summary>
+    /// Create a <see cref="VNOperation"/> that runs the provided tasks in sequence.
+    /// </summary>
     public static Func<CT, Task> Sequential<CT>(IEnumerable<Func<CT, Task>> tasks) where CT : ICancellee {
         async Task inner(CT x) {
             x.ThrowIfHardCancelled();
@@ -294,8 +360,10 @@ public record VNOperation : ILazyAwaitable<Completion> {
         return inner;
     }
 
+    /// <inheritdoc/>
     public override string ToString() => $"VNOp (Len: {Suboperations.Length})";
 
+    /// <inheritdoc/>
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
 
     /// <summary>

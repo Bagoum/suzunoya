@@ -49,4 +49,9 @@ public class GlobalData : IGlobalData {
         Gallery.Add(key);
     }
 }
+
+public interface IGlobalVNDataProvider {
+    public GlobalData GlobalVNData { get; }
+}
+
 }

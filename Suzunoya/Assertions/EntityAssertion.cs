@@ -80,7 +80,7 @@ public record EntityAssertion<C> : EntityAssertion, IChildLinkedAssertion, IAsse
     public Action<C>? ExtraBind { get; init; }
     
     /// <summary>
-    /// Callback to invoke when an actualized object is first create (not during inheritance).
+    /// Callback to invoke when an actualized object is first created (not during inheritance).
     /// </summary>
     public Action<C>? OnActualize { get; init; }
     

@@ -1,7 +1,5 @@
 # About
 
-**Note**: This project is early in development and is not presently usable without a good amount of plumbing.
-
 Suzunoya is a visual novel engine built in C#, designed to be portable between game engines.
 It is free (as in free speech) software. The source code is on Github: https://github.com/Bagoum/suzunoya
 
@@ -33,13 +31,13 @@ Consumes BagoumLib.
 
 ### Suzunoya
 
-Suzunoya is an engine-agnostic visual novel engine, written as a class library. It currently has barebones functionality present.
+Suzunoya is an engine-agnostic visual novel library. It also contains code for state management in ADV games. 
 
 Consumes BagoumLib and Mizuhashi.
 
 ### SuzunoyaUnity
 
-[SuzunoyaUnity](https://github.com/Bagoum/suzunoya-unity) (separate repository) is the Suzunoya adapter for the Unity game engine. It currently has barebones functionality present.
+[SuzunoyaUnity](https://github.com/Bagoum/suzunoya-unity) (separate repository) is the Suzunoya adapter for the Unity game engine.
 
 Consumes BagoumLib, Mizuhashi, and Suzunoya.
 

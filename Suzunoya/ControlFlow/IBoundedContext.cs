@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using BagoumLib.Functional;
 using JetBrains.Annotations;
+using Suzunoya.ADV;
 using Suzunoya.Data;
 using Suzunoya.Entities;
 
@@ -39,7 +40,7 @@ public interface IStrongBoundedContext : IBoundedContext {
     /// <summary>
     /// Whether or not it is safe to save/load inside this BCTX. This may be false in cases where the BCTX
     ///  contains nondeterministic code.
-    /// <br/>Note that this should be consumed by save/load handlers outside the scope of Suzunoya.
+    /// <br/>This should be consumed by game logic handlers to call <see cref="ADVData.LockContext"/>.
     /// </summary>
     public bool LoadSafe { get; }
 }
@@ -53,7 +54,7 @@ public interface IStrongBoundedContext : IBoundedContext {
 /// <param name="InnerTask">Task to run</param>
 /// <typeparam name="T">Type of the return value of the contained task</typeparam>
 [PublicAPI]
-public record BoundedContext<T>(VNState VN, string ID, Func<Task<T>> InnerTask) : IBoundedContext {
+public record BoundedContext<T>(IVNState VN, string ID, Func<Task<T>> InnerTask) : IBoundedContext {
     IVNState IBoundedContext.VN => VN;
     /// <summary>
     /// Task to run
@@ -69,7 +70,10 @@ public record BoundedContext<T>(VNState VN, string ID, Func<Task<T>> InnerTask) 
     public bool IsCompletedInContexts(params string[] parents) => 
         VN.TryGetContextData<T>(out var res, parents.Append(ID).ToArray()) && res.Result.Valid;
 
-    internal Task<T> Execute() => VN.ExecuteContext(this, InnerTask);
+    /// <summary>
+    /// Run the contents of this bounded context on the VN.
+    /// </summary>
+    public Task<T> Execute() => VN.ExecuteContext(this, InnerTask);
 
     /// <summary>
     /// Syntactic sugar for `await ctx.Execute()`.
@@ -102,7 +106,7 @@ public record BoundedContext<T>(VNState VN, string ID, Func<Task<T>> InnerTask) 
 /// <param name="OnFinish">Code to run at the end of the BCTX execution. Also run if short-circuit.
 ///  Useful for encoding state changes without duplicating them in <see cref="ShortCircuit"/>.</param>
 /// <typeparam name="T">Type of the return value of the contained task</typeparam>
-public record StrongBoundedContext<T>(VNState VN, string ID, Func<Task<T>> InnerTask, Action? ShortCircuit = null, Action? OnFinish = null) : BoundedContext<T>(VN, ID, InnerTask), IStrongBoundedContext {
+public record StrongBoundedContext<T>(IVNState VN, string ID, Func<Task<T>> InnerTask, Action? ShortCircuit = null, Action? OnFinish = null) : BoundedContext<T>(VN, ID, InnerTask), IStrongBoundedContext {
 
     /// <summary>
     /// Default value to provide for this bounded context if it needs to be skipped during loading,
