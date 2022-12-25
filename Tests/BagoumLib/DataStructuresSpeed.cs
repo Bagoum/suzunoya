@@ -28,7 +28,6 @@ public class DataStructuresSpeed {
             }
             Console.WriteLine($"A: Set: {t.ElapsedTicks} {t.ElapsedMilliseconds}");
             t.Restart();
-            t.Restart();
             for (int itr = 0; itr < itrs; ++itr) {
                 l.Clear();
                 //var f = r.NextSingle();

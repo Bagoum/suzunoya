@@ -10,6 +10,9 @@ using static BagoumLib.Mathematics.GenericOps;
 using static BagoumLib.Transitions.TransitionHelpers;
 
 namespace BagoumLib.Transitions {
+/// <summary>
+/// Interface for transitions that execute via <see cref="Coroutines"/>.
+/// </summary>
 [PublicAPI]
 public interface ITransition {
     /// <summary>
@@ -23,7 +26,10 @@ public interface ITransition {
     ITransition With(ICancellee cT, Func<float> dTProvider);
 }
 
-
+/// <summary>
+/// Base class for <see cref="ITransition"/>s over type T.
+/// </summary>
+/// <typeparam name="T">Type of the value that is being modified</typeparam>
 public abstract record TransitionBase<T> : ITransition {
     /// <summary>
     /// Amount of time over which to perform tweening.
@@ -40,13 +46,34 @@ public abstract record TransitionBase<T> : ITransition {
     /// Method to retrieve the delta-time of the current frame. Preferably set this via Tween.DefaultDeltaTimeProvider.
     /// </summary>
     public Func<float> DeltaTimeProvider { get; init; } = DefaultDeltaTimeProvider!;
+
+    /// <summary>
+    /// Method to apply an updated tweened value. (Required during initialization.)
+    /// </summary>
+    public Action<T> Apply { get; init; } = null!;
+    
+    /// <summary>
+    /// Easing method used to smooth the tweening process. By default, set to IOSine (not Linear).
+    /// </summary>
+    public Easer Ease { get; init; } = Easers.EIOSine;
+    
     private float DeltaTime => (DeltaTimeProvider ?? throw new Exception(
         "No delta time provider has been set! It is recommended to set TweenHelpers.DefaultDeltaTimeProvider."))();
 
-
-
+    /// <summary>
+    /// Apply the initial value of the transition.
+    /// </summary>
+    /// <returns></returns>
     protected abstract T ApplyStart();
+    
+    /// <summary>
+    /// Apply the value of the transition at a given time.
+    /// </summary>
     protected abstract void ApplyStep(T start, float time);
+    
+    /// <summary>
+    /// Apply the final value of the transition.
+    /// </summary>
     protected abstract void ApplyEnd(T start);
     
     private IEnumerator RunIEnum(T start, Action<Completion> done) {
@@ -61,6 +88,7 @@ public abstract record TransitionBase<T> : ITransition {
         done(CToken?.ToCompletion() ?? Completion.Standard);
     }
 
+    /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
         if (CToken?.IsHardCancelled() == true)
             throw new OperationCanceledException();
@@ -69,6 +97,7 @@ public abstract record TransitionBase<T> : ITransition {
         return await t;
     }
 
+    /// <inheritdoc/>
     public ITransition With(ICancellee cT, Func<float> dTProvider) => this with {CToken = cT, DeltaTimeProvider = dTProvider};
 }
 

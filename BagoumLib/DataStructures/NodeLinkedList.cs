@@ -102,7 +102,7 @@ internal class Node<T> {
         }
 
         /// <summary>
-        /// Remove a node.
+        /// Remove a node. The node may still be used by the caller and later reinserted.
         /// </summary>
         public void Remove(Node<T> n) {
             if (First == n) {
@@ -114,8 +114,15 @@ internal class Node<T> {
             n.Next?.SetPrev(n.Prev);
             n.Prev?.SetNext(n.Next);
             ++n.DeletedCount;
-            cache.Push(n);
             --Count;
+        }
+
+        /// <summary>
+        /// Remove a node and push it to the cache. The node must not be reused after this is called.
+        /// </summary>
+        public void Destroy(Node<T> n) {
+            Remove(n);
+            cache.Push(n);
         }
 
         public void Reset() {

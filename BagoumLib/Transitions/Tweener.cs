@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
+using BagoumLib.Functional;
 using BagoumLib.Mathematics;
 using BagoumLib.Tasks;
 using JetBrains.Annotations;
@@ -13,6 +14,9 @@ using static BagoumLib.Mathematics.GenericOps;
 using static BagoumLib.Transitions.TransitionHelpers;
 
 namespace BagoumLib.Transitions {
+/// <summary>
+/// A transition that lerps a value from <see cref="Start"/> to <see cref="End"/>.
+/// </summary>
 [PublicAPI]
 public record Tweener<T> : TransitionBase<T> {
     //----- Required variables
@@ -20,22 +24,11 @@ public record Tweener<T> : TransitionBase<T> {
     /// <summary>
     /// Initial value of tweening.
     /// </summary>
-    public T Start { get; init; }
+    public Either<T, Func<T>> Start { get; init; }
     /// <summary>
     /// Final value of tweening.
     /// </summary>
-    public T End { get; init; }
-    /// <summary>
-    /// Method to update tweened value.
-    /// </summary>
-    public Action<T> Apply { get; init; }
-    
-    //----- Required variables with defaults provided
-    
-    /// <summary>
-    /// Easing method used to smooth the tweening process. By default, set to IOSine (not Linear).
-    /// </summary>
-    public Easer Ease { get; init; } = Easers.EIOSine;
+    public Either<T, Func<T>> End { get; init; }
 
     //-----Optional variables set via initializer syntax (or possibly fluent API)
     
@@ -44,23 +37,8 @@ public record Tweener<T> : TransitionBase<T> {
     /// </summary>
     private Func<T, T, float, T> Lerp { get; } = GetLerp<T>();
 
-    /// <summary>
-    /// If present, will be executed at task start time to derive the start value.
-    /// Overrides Start.
-    /// </summary>
-    public Func<T>? StartGetter = null;
 
-    /// <summary>
-    /// If present, will be executed throughout task execution time to derive the target value.
-    /// Overrides End.
-    /// </summary>
-    public Func<T>? EndGetter = null;
-    
-    //----- Properties
-    private T effectiveStart => StartGetter == null ? Start : StartGetter();
-    private T effectiveEnd => EndGetter == null ? End : EndGetter();
-
-    public Tweener(T start, T end, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
+    public Tweener(Either<T, Func<T>> start, Either<T, Func<T>> end, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
         Start = start;
         End = end;
         Time = time;
@@ -69,14 +47,18 @@ public record Tweener<T> : TransitionBase<T> {
         Ease = ease ?? Ease;
     }
 
+    /// <inheritdoc/>
     protected override T ApplyStart() {
-        var st = effectiveStart;
+        var st = Start.Resolve();
         Apply(st);
         return st;
     }
 
-    protected override void ApplyStep(T start, float time) => Apply(Lerp(start, effectiveEnd, Ease(time / Time)));
-    protected override void ApplyEnd(T _) => Apply(effectiveEnd);
+    /// <inheritdoc/>
+    protected override void ApplyStep(T start, float time) => Apply(Lerp(start, End.Resolve(), Ease(time / Time)));
+    
+    /// <inheritdoc/>
+    protected override void ApplyEnd(T _) => Apply(End.Resolve());
 
     /// <summary>
     /// TODO a delayed invocation uses startgetter, and should pass that to Reverse, but Reverse won't work with the same startgetter.
@@ -87,9 +69,55 @@ public record Tweener<T> : TransitionBase<T> {
             DeltaTimeProvider = DeltaTimeProvider
         };
 
+    /// <summary>
+    /// Create a yoyo transition from this transition; ie. a transition that runs this, runs this in reverse, and then repeats.
+    /// </summary>
+    /// <param name="reverseEase">True if the easing function should be reversed for the reverse section.</param>
+    /// <param name="times">Number of times to repeat the joined transition; null for indefinite.</param>
     public ITransition Yoyo(bool reverseEase = true, int? times = null) => this.Then(this.Reverse(reverseEase)).Loop(times);
 }
 
+/// <summary>
+/// A transition that scales in a value using scalar multiplication.
+/// </summary>
+public record ScaleInTweener<T> : TransitionBase<T> {
+    /// <summary>
+    /// The value to be scaled in by the tweener.
+    /// </summary>
+    public T Target { get; init; }
+
+    //-----Optional variables set via initializer syntax (or possibly fluent API)
+    
+    /// <summary>
+    /// Multiplier function specific to type T. Add handling for types via Tween.RegisterMultiplier.
+    /// </summary>
+    private Func<T, float, T> Scaler { get; } = GetMulOp<T>();
+
+    public ScaleInTweener(T target, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
+        Target = target;
+        Time = time;
+        Apply = apply;
+        CToken = cT;
+        Ease = ease ?? Ease;
+    }
+
+    /// <inheritdoc/>
+    protected override T ApplyStart() {
+        var st = Scaler(Target, 0);
+        Apply(st);
+        return st;
+    }
+
+    /// <inheritdoc/>
+    protected override void ApplyStep(T _, float time) => Apply(Scaler(Target, Ease(time / Time)));
+    
+    /// <inheritdoc/>
+    protected override void ApplyEnd(T _) => Apply(Target);
+}
+
+/// <summary>
+/// A transition that gradually adds a delta to a value.
+/// </summary>
 [PublicAPI]
 public record DeltaTweener<T> : TransitionBase<T> {
     //----- Required variables
@@ -97,23 +125,12 @@ public record DeltaTweener<T> : TransitionBase<T> {
     /// <summary>
     /// Initial value of tweening.
     /// </summary>
-    public T Start { get; init; }
+    public Either<T, Func<T>> Start { get; init; }
     /// <summary>
     /// Delta to apply to initial value.
     /// </summary>
     public T Delta { get; init; }
-    /// <summary>
-    /// Method to update tweened value.
-    /// </summary>
-    public Action<T> Apply { get; init; }
-    
-    //----- Required variables with defaults provided
-    
-    /// <summary>
-    /// Easing method used to smooth the tweening process. By default, set to IOSine (not Linear).
-    /// </summary>
-    public Easer Ease { get; init; } = Easers.EIOSine;
-    
+
     //-----Optional variables set via initializer syntax (or possibly fluent API)
     
     /// <summary>
@@ -122,16 +139,7 @@ public record DeltaTweener<T> : TransitionBase<T> {
     private static readonly Func<T, T, float, T> Lerp = GetLerp<T>();
     private static readonly Func<T, T, T> Add = GetAddOp<T>().add;
     
-    /// <summary>
-    /// If present, will be executed at task start time to derive the start value.
-    /// Overrides Start.
-    /// </summary>
-    public Func<T>? StartGetter = null;
-    
-    //----- Properties
-    private T effectiveStart => StartGetter == null ? Start : StartGetter();
-    
-    public DeltaTweener(T start, T delta, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
+    public DeltaTweener(Either<T, Func<T>> start, T delta, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
         Start = start;
         Delta = delta;
         Time = time;
@@ -140,18 +148,23 @@ public record DeltaTweener<T> : TransitionBase<T> {
         Ease = ease ?? Ease;
     }
     
+    /// <inheritdoc/>
     protected override T ApplyStart() {
-        var st = effectiveStart;
+        var st = Start.Resolve();
         Apply(st);
         return st;
     }
 
+    /// <inheritdoc/>
     protected override void ApplyStep(T start, float time) => Apply(Lerp(start, Add(start, Delta), Ease(time / Time)));
+    
+    /// <inheritdoc/>
     protected override void ApplyEnd(T start) => Apply(Add(start, Delta));
     
 }
 
 public record SequentialTransition(params Func<ITransition>[] states) : ITransition {
+    /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
         var c = Completion.Standard;
         for (int ii = 0; ii < states.Length; ++ii) {
@@ -166,12 +179,13 @@ public record SequentialTransition(params Func<ITransition>[] states) : ITransit
         return c;
     }
 
+    /// <inheritdoc/>
     public ITransition With(ICancellee cT, Func<float> dTProvider) =>
         new SequentialTransition(states.Select<Func<ITransition>, Func<ITransition>>(s => () => s().With(cT, dTProvider)).ToArray());
 }
 
 public record ParallelTransition(params ITransition[] states) : ITransition {
-
+    /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
         if (states.Length == 1)
             return await states[0].Run(cors, options);
@@ -185,11 +199,13 @@ public record ParallelTransition(params ITransition[] states) : ITransition {
         return c;
     }
     
+    /// <inheritdoc/>
     public ITransition With(ICancellee cT, Func<float> dTProvider) =>
         new ParallelTransition(states.Select(s => s.With(cT, dTProvider)).ToArray());
 }
 
 public record LoopTransition(ITransition subj, int? count = null) : ITransition {
+    /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
         var c = Completion.Standard;
         for (int ii = 0; count == null || ii < count.Value; ++ii) {
@@ -205,6 +221,7 @@ public record LoopTransition(ITransition subj, int? count = null) : ITransition 
         return c;
     }
 
+    /// <inheritdoc/>
     public ITransition With(ICancellee cT, Func<float> dTProvider) =>
         new LoopTransition(subj.With(cT, dTProvider));
 }

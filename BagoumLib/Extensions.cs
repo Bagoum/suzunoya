@@ -247,12 +247,12 @@ public static class ArrayExtensions {
     /// <summary>
     /// Try to get the object at the given index.
     /// </summary>
-    public static bool Try<T>(this T[] arr, int index, out T res) where T : class {
+    public static bool Try<T>(this T[] arr, int index, out T res) {
         if (index >= 0 && index < arr.Length) {
             res = arr[index];
             return true;
         }
-        res = null!;
+        res = default!;
         return false;
     }
 

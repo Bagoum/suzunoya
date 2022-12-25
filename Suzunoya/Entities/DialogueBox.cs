@@ -8,12 +8,19 @@ using BagoumLib.Cancellation;
 using BagoumLib.Culture;
 using BagoumLib.Events;
 using BagoumLib.Tasks;
+using JetBrains.Annotations;
 using Suzunoya.ControlFlow;
 using Suzunoya.Dialogue;
 
 namespace Suzunoya.Entities {
+/// <summary>
+/// Flags describing features for dialogue execution.
+/// </summary>
 [Flags]
 public enum SpeakFlags {
+    /// <summary>
+    /// No special features required.
+    /// </summary>
     None = 0,
     /// <summary>
     /// By default, every text command will reset all visible text and the speaker. To avoid this,
@@ -26,46 +33,108 @@ public enum SpeakFlags {
     /// </summary>
     Anonymous = 1 << 1,
     
+    /// <summary>
+    /// Default value- <see cref="None"/>
+    /// </summary>
     Default = None,
 }
 
+/// <summary>
+/// Interface for dialogue boxes.
+/// </summary>
+[PublicAPI]
 public interface IDialogueBox : IEntity {
+    /// <summary>
+    /// A dialogue request starts with a DialogueStarted proc containing all information of the dialogue request.
+    /// It then unrolls the text one character at a time into <see cref="Dialogue"/>.
+    /// Finally, it procs <see cref="DialogueFinished"/>.
+    /// <br/>Note: the VNContainer should be listening to this event to accumulate the dialogue log.
+    /// </summary>
     AccEvent<DialogueOp> DialogueStarted { get; }
+    
+    /// <summary>
+    /// All text fragments currently visible in the dialogue box. Cleared when <see cref="Clear"/> is called.
+    /// </summary>
     AccEvent<(SpeechFragment frag, string lookahead)> Dialogue { get; }
+    
+    /// <summary>
+    /// Event procced when a line of dialogue is finished unrolling.
+    /// </summary>
+    Event<Unit> DialogueFinished { get; }
+    
+    /// <summary>
+    /// Event procced when <see cref="Clear"/> is called.
+    /// </summary>
     Event<Unit> DialogueCleared { get; }
+    
+    /// <summary>
+    /// The current character speaking in the dialogue box.
+    /// </summary>
     Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; }
+    
+    /// <summary>
+    /// Clear the dialogue box.
+    /// </summary>
     void Clear(SpeakFlags? speakerClear = null);
+    
+    /// <summary>
+    /// Have a character speak into the dialogue box.
+    /// </summary>
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default);
 }
 
+/// <summary>
+/// A line of dialogue to be printed into the dialogue box.
+/// </summary>
 public class DialogueOp {
+    /// <summary>
+    /// Dialogue text.
+    /// </summary>
     public Speech Line { get; }
+    /// <summary>
+    /// The character that is speaking.
+    /// </summary>
     public ICharacter? Speaker { get; }
+    
+    /// <inheritdoc cref="SpeakFlags"/>
     public SpeakFlags Flags { get; }
+    
+    /// <summary>
+    /// The <see cref="VNLocation"/> produced by the dialogue operation.
+    /// </summary>
     public VNLocation? Location { get; }
+    
+    /// <summary>
+    /// Create a new <see cref="DialogueOp"/>.
+    /// </summary>
     public DialogueOp(LString line, ICharacter? speaker, SpeakFlags flags, VNLocation? loc) {
         this.Line = new Speech(line, speaker?.Container.GlobalData.Settings, speaker?.SpeechCfg);
         this.Speaker = speaker;
         this.Flags = flags;
         this.Location = loc;
     }
-
+    
+    /// <inheritdoc/>
     public override string ToString() => $"{Speaker?.Name ?? "???"}:{Line.Readable}";
 }
+
+/// <summary>
+/// An entity representing a dialogue box.
+/// </summary>
+[PublicAPI]
 public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
-    /// <summary>
-    /// A dialogue request starts with a DialogueStarted proc containing all information of the dialogue request.
-    /// It then unrolls the text one character at a time over many Dialogue procs.
-    /// Finally, it procs DialogueFinished.
-    /// Note: DialogueStarted and Dialogue are accumulated until a clear command is issued (which also procs DialogueCleared and nullifies Speaker). AllDialogue is never cleared.
-    /// Note: the VNContainer should be listening to DialogueStarted to accumulate the dialogue log.
-    /// </summary>
+    /// <inheritdoc/>
     public AccEvent<DialogueOp> DialogueStarted { get; } = new();
+    /// <inheritdoc/>
     public AccEvent<(SpeechFragment frag, string lookahead)> Dialogue { get; } = new();
+    /// <inheritdoc/>
     public Event<Unit> DialogueFinished { get; } = new();
+    /// <inheritdoc/>
     public Event<Unit> DialogueCleared { get; } = new();
+    /// <inheritdoc/>
     public Evented<(ICharacter? speaker, SpeakFlags flags)> Speaker { get; } = new((default, SpeakFlags.Default));
 
+    /// <inheritdoc/>
     public void Clear(SpeakFlags? speakerClear = null) {
         Dialogue.Clear();
         DialogueStarted.Clear();
@@ -116,6 +185,7 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
         done();
     }
 
+    /// <inheritdoc/>
     public VNOperation Say(LString content, ICharacter? character = default, SpeakFlags flags = SpeakFlags.Default) =>
         this.MakeVNOp(cT => {
             Container.OperationID.OnNext(content.ID ?? content.defaultValue);

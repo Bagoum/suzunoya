@@ -45,6 +45,16 @@ public static class ReflectionUtils {
         return mi.MakeGenericMethod(typeParams.ToArray());
     }
 
+    /// <inheritdoc cref="ConstructedGenericTypeMatch(System.Type,System.Type,out System.Collections.Generic.Dictionary{System.Type,System.Type})"/>
+    public static bool ConstructedGenericTypeMatch(IEnumerable<(Type realized, Type generic)> types,
+        out Dictionary<Type, Type> mapper) {
+        mapper = new Dictionary<Type, Type>();
+        foreach (var (realized, generic) in types)
+            if (!_ConstructedGenericTypeMatch(realized, generic, mapper))
+                return false;
+        return true;
+    }
+
     private static bool _ConstructedGenericTypeMatch(Type realized, Type generic, Dictionary<Type, Type> genericMap) {
         if (generic.IsGenericParameter) {
             if (genericMap.TryGetValue(generic, out var x) && x != realized) return false;

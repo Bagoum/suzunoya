@@ -28,6 +28,7 @@ If you are making use of this project, please reproduce this license file or lin
 With the exception of the testing subproject, this project consumes the following packages:
 - [JetBrains.Annotations](https://www.nuget.org/packages/JetBrains.Annotations/) ([MIT](https://github.com/JetBrains/JetBrains.Annotations/blob/ac4bd278f1e8ccd15c28a62310a4ff5e5274df7e/license.md))
 - [System.Reactive](https://www.nuget.org/packages/System.Reactive/) ([MIT](https://github.com/dotnet/reactive/blob/85f1eb7c53e27cccdbeee3e0b044916168843fcc/LICENSE))
+- [System.Collections.Immutable](https://www.nuget.org/packages/System.Collections.Immutable/) ([MIT](https://github.com/dotnet/runtime/blob/71adfb003aa57f4c8801fc9079c9339342c58524/LICENSE.TXT))
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) ([MIT](https://github.com/JamesNK/Newtonsoft.Json/blob/4dc9af66e07dea321ad101bfb379326127251a80/LICENSE.md))
 - [FluentIL](https://github.com/Bagoum/FluentIL) ([MIT](https://github.com/Bagoum/FluentIL/blob/master/LICENSE.md))
 

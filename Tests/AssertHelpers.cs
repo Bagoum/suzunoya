@@ -8,6 +8,10 @@ using NUnit.Framework;
 
 namespace Tests {
 public static class AssertHelpers {
+    public static bool AssertStringEq(string expect, object obj) {
+        Assert.AreEqual(expect, obj.ToString());
+        return true;
+    }
     public static void StringsApproxEqual(string expected, string observed) {
         expected = expected.Trim().Replace("\r", "");
         observed = observed.Trim().Replace("\r", "");

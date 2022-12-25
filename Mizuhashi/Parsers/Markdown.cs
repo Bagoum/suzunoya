@@ -119,7 +119,17 @@ public abstract record Markdown {
 
             public IEnumerable<TextRun> Values => Pieces;
         }
-        public record Atom(string Text) : TextRun;
+
+        public record Atom : TextRun {
+            public Atom(string Text) {
+                this.Text = Text;
+            }
+            public override string ToString() => $"\"{Text}\"";
+            public string Text { get; init; }
+            public void Deconstruct(out string Text) {
+                Text = this.Text;
+            }
+        }
 
         public record Bold(TextRun Bolded) : TextRun;
 
@@ -146,14 +156,34 @@ public static class MarkdownParser {
     public record Settings(int Indent = 0, int IndentBy = 2) {
         public Settings AddIndent => this with { Indent = Indent + 1 };
         private readonly ParserError.Expected err = new($"{Indent} indents");
-        public Parser<Unit> ParseIndent => inp => 
+        public Parser<char, Unit> ParseIndent => inp => 
             TrySkipIndent(inp.Source, inp.Index).Try(out var end) ?
                 new(Unit.Default, null, inp.Index, inp.Step(end - inp.Index)) :
                 new(err, inp.Index);
 
-        public bool IsAligned(InputStream inp) => 
-            TrySkipIndent(inp.Source, inp.Index + 1 - inp.Stative.Position.Column) == inp.Index;
+        public bool IsAligned(InputStream<char> inp) {
+            for (int ii = inp.Index - 1; ii >= 0; --ii) {
+                if (inp.Source[ii] == '\n')
+                    return TrySkipIndent(inp.Source, ii + 1) == inp.Index;
+            }
+            return TrySkipIndent(inp.Source, 0) == inp.Index;
+        }
 
+        public int? TrySkipIndent(char[] source, int fromIndex) {
+            var oddSpaces = 0;
+            var indentsRead = 0;
+            int ii = fromIndex;
+            for (; ii < source.Length && indentsRead < Indent; ++ii) {
+                if (!source.Try(ii, out var c) || c == '\n' || !char.IsWhiteSpace(c))
+                    return null;
+                if (c == '\t' || ++oddSpaces == IndentBy) {
+                    ++indentsRead;
+                    oddSpaces = 0;
+                }
+            }
+            return (Indent == indentsRead && oddSpaces == 0) ? ii : null;
+        }
+        
         public int? TrySkipIndent(string source, int fromIndex) {
             var oddSpaces = 0;
             var indentsRead = 0;
@@ -176,7 +206,7 @@ public static class MarkdownParser {
     /// Parses the URL link, assuming the opening ( has already been parsed.
     /// <br/>If it fails, it does not consume.
     /// </summary>
-    private static readonly Parser<string> ParseURLLink = inp => {
+    private static readonly Parser<char, string> ParseURLLink = inp => {
         var openParens = 0;
         for (int ii = 0; inp.TryCharAt(ii, out var c) && c != '\n'; ++ii) {
             if (c == ')')
@@ -228,7 +258,7 @@ public static class MarkdownParser {
             public TextRun Resolve(string linkURL) => new TextRun.Link(CompilePieces(Parts), linkURL);
         }
     }
-    public static readonly Parser<TextRun> ParseTextRun = inp => {
+    public static readonly Parser<char, TextRun> ParseTextRun = inp => {
         var start = inp.Index;
         List<Either<char, TextRun>>? topLevelParts = null;
         StackList<TextContext>? contexts = null;
@@ -354,7 +384,7 @@ public static class MarkdownParser {
     /// <summary>
     /// Returns true if there exists a newline, false if there exists an EOF, after any amount of inline whitespace.
     /// </summary>
-    public static readonly Parser<bool> ParseNLOrEOF = inp => {
+    public static readonly Parser<char, bool> ParseNLOrEOF = inp => {
         int ii = 0;
         for (; inp.TryCharAt(ii, out var c); ++ii) {
             if (c == '\n')
@@ -364,7 +394,7 @@ public static class MarkdownParser {
         }
         return new(false, null, inp.Index, inp.Step(ii));
     };
-    private static Parser<string> ParseNLiner(char c, int n) {
+    private static Parser<char, string> ParseNLiner(char c, int n) {
         var err = new ParserError.Expected($"at least {n} copies of {c} followed by whitespace and newline");
         return inp => {
             int ii = 0;
@@ -386,10 +416,10 @@ public static class MarkdownParser {
     /// If you need to enforce whitespace, then do Spaces(indent).IgThen(block(indent)).
     /// <br/>The parser WILL consume the newline that ends the block.
     /// </summary>
-    public static Parser<Block> ParseBlock(Settings s) => 
+    public static Parser<char, Block> ParseBlock(Settings s) => 
         Choice(
             //empty
-            ParseNLOrEOF.Bind(b => b ? PReturn<Block>(new Block.Empty()) : Error<Block>("EOF")),
+            ParseNLOrEOF.Bind(b => b ? PReturn<char, Block>(new Block.Empty()) : Error<char, Block>("EOF")),
             
             //Code block
             Sequential(
@@ -426,8 +456,8 @@ public static class MarkdownParser {
             Many1Satisfy(c => c == '#', "#").ThenIg(Satisfy(char.IsWhiteSpace, "whitespace"))
                 .Then(ParseTextRun).ThenIg(ParseNLOrEOF).Bind(tuple => 
                 tuple.Item1.Length > 6 ? 
-                    Error<Block>($"headers can have a maximum 6 hashtags, found {tuple.Item1.Length}") :
-                    PReturn<Block>(new Block.Header(tuple.Item1.Length, tuple.Item2))
+                    Error<char, Block>($"headers can have a maximum 6 hashtags, found {tuple.Item1.Length}") :
+                    PReturn<char, Block>(new Block.Header(tuple.Item1.Length, tuple.Item2))
             ).Attempt(),
             
             //Horizontal rule
@@ -446,7 +476,7 @@ public static class MarkdownParser {
                     Block onelinePara = new Block.Paragraph(x.line1);
                     return !x.nl ? 
                         //If we are at EOF, then the paragraph is complete
-                        PReturn(onelinePara) :
+                        PReturn<char, Block>(onelinePara) :
                         Choice(
                             //If the next line has no content, then the paragraph is complete
                             ParseNLOrEOF.ThenPReturn(onelinePara),
@@ -468,14 +498,14 @@ public static class MarkdownParser {
                                 })
                             )),
                             //Otherwise, assume a dedent broke the current context
-                            PReturn(onelinePara)
+                            PReturn<char, Block>(onelinePara)
                         );
                 })
         );
 
-    private static Parser<List<List<Block>>> ParseListOptions(bool ordered, Settings s) {
+    private static Parser<char, List<List<Block>>> ParseListOptions(bool ordered, Settings s) {
         var err = new ParserError.Expected("at least one list entry");
-        Parser<List<Block>>? lazyBlocksParser = null;
+        Parser<char, List<Block>>? lazyBlocksParser = null;
         var prefix = ordered ? 
             Many1Satisfy(char.IsDigit, "digit").ThenIg(StringIg(". ")).Attempt().Ignore() : 
             StringIg("- ");
@@ -508,7 +538,7 @@ public static class MarkdownParser {
         };
     }
 
-    private static Parser<List<Block>> ParseManyBlocks(Settings s) => input => {
+    private static Parser<char, List<Block>> ParseManyBlocks(Settings s) => input => {
         var results = new List<Block>();
         var start = input.Index;
         var b = ParseBlock(s);
@@ -559,7 +589,7 @@ public static class MarkdownParser {
         if (prev != null)
             yield return prev;
     }
-    public static Parser<List<Block>> ParseDocument(Settings s) =>
+    public static Parser<char, List<Block>> ParseDocument(Settings s) =>
         ParseManyBlocks(s).ThenEOF().FMap(bs => Reformat(bs).ToList());
 
     /// <summary>
@@ -572,7 +602,7 @@ public static class MarkdownParser {
     public static List<Block> Parse(string markdownText, Settings? settings = null) {
         markdownText = markdownText.Replace("\r\n", "\n").Replace("\r", "\n");
         return ParseDocument(settings ?? new())
-            .ResultOrErrorString(new("Markdown text", markdownText, null!))
+            .ResultOrErrorString(new("Markdown text", markdownText.ToCharArray(), null!))
             .Map(l => l, err => throw new Exception(err));
     }
 }

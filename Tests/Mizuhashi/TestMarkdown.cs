@@ -28,7 +28,7 @@ public class TestMarkdown {
         Link l => new Link(Flatten(l.Title), l.URL),
         _ => tr
     };
-    private static readonly Parser<TextRun> TextRunF = MarkdownParser.ParseTextRun.FMap(Flatten);
+    private static readonly Parser<char, TextRun> TextRunF = MarkdownParser.ParseTextRun.FMap(Flatten);
     
     private static Paragraph P(params TextRun[] lines) => Paragraph.FromArray(lines);
     private static Sequence S(params TextRun[] lines) => Sequence.FromArray(lines);
@@ -94,6 +94,10 @@ public class TestMarkdown {
         ParseBlock(s).AssertSuccess("###hello   \nworld", 
             P(S("###hello   "), S("world")));
     }
+
+    private static Parser<char, List<Block>> ParseDocument(Settings s) => inp =>
+        MarkdownParser.ParseDocument(s)(new(inp.Description,
+            new string(inp.Source).Replace("\r\n", "\n").Replace("\r", "\n").ToCharArray(), inp.Stative.State));
 
     [Test]
     public void TestParagraph() {

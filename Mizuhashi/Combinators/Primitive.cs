@@ -9,13 +9,13 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec preturn
     /// </summary>
-    public static Parser<R> PReturn<R>(R val) => input => 
+    public static Parser<T, R> PReturn<T, R>(R val) => input =>
         new ParseResult<R>(new(val), null, input.Index, input.Index);
 
     /// <summary>
     /// FParsec >>%
     /// </summary>
-    public static Parser<B> ThenPReturn<A, B>(this Parser<A> p, B val) => input => {
+    public static Parser<T, B> ThenPReturn<T, A, B>(this Parser<T, A> p, B val) => input => {
         var result = p(input);
         return new(result.Result.Valid ? Maybe<B>.Of(val) : Maybe<B>.None,
             result.Error, result.Start, result.End);
@@ -24,9 +24,12 @@ public static partial class Combinators {
     /// <summary>
     /// PReturn(Unit.Default)
     /// </summary>
-    public static Parser<Unit> Ignore() => PReturn(Unit.Default);
+    public static Parser<T, Unit> Ignore<T>() => PReturn<T, Unit>(Unit.Default);
 
-    public static Parser<Unit> Ignore<R>(this Parser<R> p) => input => {
+    /// <summary>
+    /// Run the given parser, then ignore its output.
+    /// </summary>
+    public static Parser<T, Unit> Ignore<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
         return new(result.Result.Valid ? Maybe<Unit>.Of(default) : Maybe<Unit>.None,
             result.Error, result.Start, result.End);
@@ -36,32 +39,33 @@ public static partial class Combinators {
     /// Fails (fatally) with the given failure string.
     /// <br/>Note: this consumes a character and constructs a fatal error.
     /// </summary>
-    public static Parser<R> Fail<R>(string reason) => input => 
-        new ParseResult<R>(new ParserError.Failure(reason), input.Index, input.Index + 1);
+    public static Parser<T, R> Fail<T, R>(string reason) => Fail<T, R>(new ParserError.Failure(reason));
+   
+    /// <inheritdoc cref="Fail{T,R}(string)"/>
+    public static Parser<T, R> Fail<T, R>(ParserError reason) => 
+        input => new ParseResult<R>(reason, input.Index, input.Index + 1);
 
-    /// <summary>
-    /// See <see cref="Error{R}(ParserError)"/>
-    /// </summary>
-    public static Parser<R> Error<R>(string reason) => Error<R>(new ParserError.Failure(reason));
+    /// <inheritdoc cref="Error{T,R}(ParserError)"/>
+    public static Parser<T, R> Error<T, R>(string reason) => Error<T, R>(new ParserError.Failure(reason));
     
     /// <summary>
     /// Fails (non-fatally) with the given failure string.
     /// <br/>Note: this does not consume, and therefore constructs a non-fatal error.
     /// </summary>
-    public static Parser<R> Error<R>(ParserError reason) => input => 
+    public static Parser<T, R> Error<T, R>(ParserError reason) => input => 
         new ParseResult<R>(reason, input.Index);
 
     /// <summary>
-    /// If the provided value is R, then <see cref="PReturn{R}"/> it;
-    /// else <see cref="Error{R}(ParserError)"/> it.
+    /// If the provided value is R, then <see cref="PReturn{T,R}"/> it;
+    /// else <see cref="Error{T,R}(ParserError)"/> it.
     /// </summary>
-    public static Parser<R> ReturnOrError<R>(Either<R, ParserError> result) =>
-        result.IsLeft ? PReturn(result.Left) : Error<R>(result.Right);
+    public static Parser<T, R> ReturnOrError<T, R>(Either<R, ParserError> result) =>
+        result.IsLeft ? PReturn<T, R>(result.Left) : Error<T, R>(result.Right);
 
     /// <summary>
     /// FParsec .>>
     /// </summary>
-    public static Parser<A> ThenIg<A, B>(this Parser<A> first, Parser<B> second) => input => {
+    public static Parser<T, A> ThenIg<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var rx = first(input);
         if (rx.Result.Valid) {
             var ry = second(input);
@@ -73,7 +77,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec >>.
     /// </summary>
-    public static Parser<B> IgThen<A, B>(this Parser<A> first, Parser<B> second) => input => {
+    public static Parser<T, B> IgThen<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var rx = first(input);
         if (rx.Result.Valid) {
             var ry = second(input);
@@ -85,7 +89,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec .>>.
     /// </summary>
-    public static Parser<(A a, B b)> Then<A, B>(this Parser<A> first, Parser<B> second) => input => {
+    public static Parser<T, (A a, B b)> Then<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var rx = first(input);
         if (rx.Result.Try(out var x)) {
             var ry = second(input);
@@ -98,7 +102,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec between
     /// </summary>
-    public static Parser<B> Between<A, B, C>(this Parser<A> left, Parser<B> middle, Parser<C> right) => input => {
+    public static Parser<T, B> Between<T, A, B, C>(this Parser<T, A> left, Parser<T, B> middle, Parser<T, C> right) => input => {
         var rx = left(input);
         if (!rx.Result.Valid) 
             return rx.CastFailure<B>();
@@ -115,31 +119,41 @@ public static partial class Combinators {
     /// Parse the outer parser, then the middle parse, then the outer parser again, and return
     /// the result from the middle parser.
     /// </summary>
-    public static Parser<B> Between<A, B>(this Parser<A> outer, Parser<B> middle) => Between(outer, middle, outer);
+    public static Parser<T, B> Between<T, A, B>(this Parser<T, A> outer, Parser<T, B> middle) => Between(outer, middle, outer);
 
     /// <summary>
     /// FParsec &lt;??&gt;
     /// </summary>
-    public static Parser<R> Label<R>(this Parser<R> p, string label) => input => 
+    public static Parser<T, R> Label<T, R>(this Parser<T, R> p, string label) => input => 
         p(input).WithWrapError(label);
 
     /// <summary>
+    /// Match any token (except end-of-file).
+    /// </summary>
+    public static Parser<T, T> Any<T>() {
+        var err = new ParserError.Expected("any token");
+        return input => input.Empty ?
+            new(err, input.Index) :
+            new(new(input.Next), null, input.Index, input.Step(1));
+    }
+    
+    
+    /// <summary>
     /// FParsec &lt;|&gt;
     /// </summary>
-    public static Parser<R> Or<R>(this Parser<R> p, Parser<R> other) => input => {
-        var state = input.Stative;
+    public static Parser<T, R> Or<T, R>(this Parser<T, R> p, Parser<T, R> other) => input => {
         var result = p(input);
-        return result.Status switch {
-            ResultStatus.ERROR => other(input).WithPreceding(in result),
-            _ => result
-        };
+        if (result.Status == ResultStatus.ERROR)
+            return other(input).WithPreceding(in result);
+        else //success or fatal
+            return result;
     };
     
     /// <summary>
-    /// FParsec choice
+    /// Parse any of the provided parsers. If no parsers are provided, always fails.
     /// </summary>
-    public static Parser<R> Choice<R>(params Parser<R>[] ps) {
-        if (ps.Length == 0) throw new Exception("No arms provided to choice parser");
+    public static Parser<T, R> Choice<T, R>(params Parser<T, R>[] ps) {
+        if (ps.Length == 0) return Error<T, R>("No choice arms");
         return input => {
             ParseResult<R>? result = default;
             for (int ii = 0; ii < ps.Length; ++ii) {
@@ -186,8 +200,8 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec choiceL
     /// </summary>
-    public static Parser<R> ChoiceL<R>(string label, params Parser<R>[] ps) {
-        if (ps.Length == 0) throw new Exception("No arms provided to choice parser");
+    public static Parser<T, R> ChoiceL<T, R>(string label, params Parser<T, R>[] ps) {
+        if (ps.Length == 0) return Error<T, R>("No choice arms");
         var perr = new ParserError.Labelled(label, new("Couldn't parse any of the arms."));
         return input => {
             var err = new LocatedParserError(input.Index, perr);
@@ -195,7 +209,7 @@ public static partial class Combinators {
             for (int ii = 0; ii < ps.Length; ++ii) {
                 result = ps[ii](input);
                 if (result.Status != ResultStatus.ERROR)
-                    return new(result.Result, err, result.Start, result.End);
+                    return result;
             }
             return new(result.Result, err, result.Start, result.End);
         };
@@ -204,7 +218,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec opt
     /// </summary>
-    public static Parser<Maybe<R>> Opt<R>(this Parser<R> p) => input => {
+    public static Parser<T, Maybe<R>> Opt<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
         return result.Status == ResultStatus.ERROR ? 
             new ParseResult<Maybe<R>>(Maybe<R>.None, result.Error, result.Start, result.End) : 
@@ -214,7 +228,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec optional
     /// </summary>
-    public static Parser<Unit> Optional<R>(this Parser<R> p) => input => {
+    public static Parser<T, Unit> Optional<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
         return result.Status switch {
             ResultStatus.FATAL => result.CastFailure<Unit>(),
@@ -225,7 +239,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec &lt;|&gt;?
     /// </summary>
-    public static Parser<R> OptionalOr<R>(this Parser<R> p, R pret) => input => {
+    public static Parser<T, R> OptionalOr<T, R>(this Parser<T, R> p, R pret) => input => {
         var result = p(input);
         return result.Status switch {
             ResultStatus.ERROR => new ParseResult<R>(new(pret), result.Error, result.Start,
@@ -238,7 +252,7 @@ public static partial class Combinators {
     /// Try to parse an object of type R, and return it as type Maybe&lt;R&gt;.
     /// If it fails (non-catastrophically), then succeed with Maybe.None.
     /// </summary>
-    public static Parser<Maybe<R>> OptionalOrNone<R>(this Parser<R> p) => input => {
+    public static Parser<T, Maybe<R>> OptionalOrNone<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
         return result.Status switch {
             ResultStatus.ERROR => new ParseResult<Maybe<R>>(Maybe<Maybe<R>>.Of(Maybe<R>.None),
@@ -251,7 +265,7 @@ public static partial class Combinators {
     /// Try to parse an object of type R, and return it as type R?.
     /// If it fails (non-catastrophically), then succeed with null(R?).
     /// </summary>
-    public static Parser<R?> OptionalOrNull<R>(this Parser<R> p) where R : struct => input => {
+    public static Parser<T, R?> OptionalOrNull<T, R>(this Parser<T, R> p) where R : struct => input => {
         var result = p(input);
         return result.Status switch {
             ResultStatus.ERROR => new ParseResult<R?>(Maybe<R?>.Of(null), 
@@ -263,7 +277,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec notEmpty
     /// </summary>
-    public static Parser<R> NotEmpty<R>(this Parser<R> p) => input => {
+    public static Parser<T, R> NotEmpty<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
         return result.Status == ResultStatus.OK ?
             result.Consumed ?

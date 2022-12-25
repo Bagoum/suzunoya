@@ -20,6 +20,8 @@ public class IdealOverride<T> : ICSubject<T> {
     private readonly Evented<T> onSet;
 
     private T ComputeValue() => overrider.Value.Try(out var v) ? v : Ideal;
+    
+    /// <inheritdoc />
     public T Value {
         get => onSet.Value;
         set => overrider.Value = value;
@@ -37,17 +39,20 @@ public class IdealOverride<T> : ICSubject<T> {
         _ = overrider.Subscribe(t => onSet.PublishIfNotSame(ComputeValue()));
     }
 
+    /// <inheritdoc />
     public IDisposable Subscribe(IObserver<T> observer) => onSet.Subscribe(observer);
 
-    
+    /// <inheritdoc />
     public void OnCompleted() {
         Ideal.OnCompleted();
     }
 
+    /// <inheritdoc />
     public void OnError(Exception error) {
         Ideal.OnError(error);
     }
 
+    /// <inheritdoc />
     public void OnNext(T value) => Value = value;
 
     public void SetIdeal(T value) => Ideal.Value = value;

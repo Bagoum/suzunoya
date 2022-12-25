@@ -71,7 +71,7 @@ public class TestParsing1 {
         public override string ToString() => $"{name}@{domain}.{tld}";
     }
 
-    private static readonly Parser<Email> parseEmail = Sequential(
+    private static readonly Parser<char, Email> parseEmail = Sequential(
         Many1Satisfy(char.IsLetterOrDigit, "letter or digit").Label("Email name"),
         Char('@'),
         Many1Satisfy(char.IsLetter, "letterA").Label("Email domain"),
@@ -97,7 +97,7 @@ public class TestParsing1 {
     public void TestMany() {
         var parseEmails = parseEmail.ThenIg(Newline).Many();
         var parseEmails1 = parseEmail.ThenIg(Newline).Many1();
-        var parse3Emails = parseEmail.ThenIg(Newline).Repeat(3);
+        var parse3Emails = parseEmail.ThenIg(Newline).Repeat(3, 3);
         parseEmails.AssertSuccess("!!!", new List<Email>());
         parseEmails1.AssertFail("!!!", new IncorrectNumber(1, 0, null,
             new LocatedParserError(0, new Labelled("Email name", new(

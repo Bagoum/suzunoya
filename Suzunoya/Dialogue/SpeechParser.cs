@@ -20,14 +20,14 @@ public static partial class SpeechParser {
     private static bool NotTagChar(char c) => !TagChar(c);
     private static bool NotTagOrEscapeChar(char c) => !TagChar(c) && c != ESCAPER;
 
-    private static readonly Parser<TextUnit> escapedFragment =
+    private static readonly Parser<char, TextUnit> escapedFragment =
         Sequential(Char(ESCAPER), AnyChar(), (_, c) => 
             (TextUnit)new TextUnit.String(c.ToString()));
 
-    private static readonly Parser<TextUnit> normalFragment =
+    private static readonly Parser<char, TextUnit> normalFragment =
         Many1Satisfy(NotTagOrEscapeChar).FMap(s => (TextUnit)new TextUnit.String(s));
 
-    private static readonly Parser<TextUnit> tagFragment =
+    private static readonly Parser<char, TextUnit> tagFragment =
         Between(TAG_OPEN, Many1Satisfy(NotTagChar), TAG_CLOSE).FMap(s => {
             int contInd;
             if (s[0] == TAG_CLOSE_PREFIX)
@@ -39,7 +39,7 @@ public static partial class SpeechParser {
         });
         
 
-    private static readonly Parser<List<TextUnit>> speechParser = Choice(
+    private static readonly Parser<char, List<TextUnit>> speechParser = Choice(
         tagFragment,
         normalFragment,
         escapedFragment
@@ -52,7 +52,7 @@ public static partial class SpeechParser {
     /// <returns>Parsed content</returns>
     /// <exception cref="Exception">Thrown if parsing fails</exception>
     internal static List<TextUnit> Parse(string raw) => 
-        speechParser.ResultOrErrorString(new InputStream("Dialogue text", raw, null!))
+        speechParser.ResultOrErrorString(new InputStream<char>("Dialogue text", raw.ToCharArray(), null!))
             .Map(l => l, r => throw new Exception(r));
     }
 }

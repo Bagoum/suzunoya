@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reactive;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 
@@ -69,6 +70,19 @@ public static class Utilities {
             else if (t.IsFaulted) tcs.SetException(t.Exception ?? new Exception("Unknown task failure"));
             else
                 tcs.SetResult(t.Result);
+        }
+    }
+    /// <summary>
+    /// Put the result of this task into a <see cref="TaskCompletionSource{Unit}"/>.
+    /// </summary>
+    public static async Task Pipe(this Task t, TaskCompletionSource<Unit> tcs) {
+        try {
+            await t;
+        } finally {
+            if (t.IsCanceled) tcs.SetCanceled();
+            else if (t.IsFaulted) tcs.SetException(t.Exception ?? new Exception("Unknown task failure"));
+            else
+                tcs.SetResult(default);
         }
     }
 }

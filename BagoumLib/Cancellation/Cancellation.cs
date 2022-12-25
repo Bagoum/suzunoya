@@ -233,6 +233,9 @@ public class GCancellable<T> : ICancellee<T> {
     /// <inheritdoc/>
     public bool Cancelled(out T value) => obj.Try(out value);
 
+    /// <summary>
+    /// Cancel the token with the provided value.
+    /// </summary>
     public void Cancel(int level, T value) {
         if (level >= CancelLevel) {
             CancelLevel = level;
@@ -240,6 +243,9 @@ public class GCancellable<T> : ICancellee<T> {
         }
     }
 
+    /// <summary>
+    /// Cancel the token with the provided value, setting the cancel level to <see cref="ICancellee.HardCancelLevel"/>.
+    /// </summary>
     public void Cancel(T value) => Cancel(ICancellee.HardCancelLevel, value);
 }
 

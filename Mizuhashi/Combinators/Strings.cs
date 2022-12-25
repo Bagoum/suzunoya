@@ -6,28 +6,35 @@ using BagoumLib.Functional;
 
 namespace Mizuhashi {
 public static partial class Combinators {
+    /// <summary>
+    /// Error when an end-of-file was expected but not found.
+    /// </summary>
     public static readonly ParserError expectedEof = new ParserError.Expected("end of file");
+    /// <summary>
+    /// Error when an end-of-file was found but not expect.
+    /// </summary>
     public static readonly ParserError unexpectedEof = new ParserError.Unexpected("end of file");
+    /// <summary>
+    /// Error when whitespace was expected but not found.
+    /// </summary>
     public static readonly ParserError atleastOneWhitespace = new ParserError.Expected("at least one whitespace");
+    /// <summary>
+    /// Error when a newline was expected but not found.
+    /// </summary>
     public static readonly ParserError expectedNL = new ParserError.Expected("newline");
+    /// <summary>
+    /// Error when \r was found but \n did not follow it.
+    /// </summary>
     public static readonly ParserError partialNLR = 
         new ParserError.Labelled("newline", new("Expected \\r to be followed by \\n."));
     
     /// <summary>
     /// Fails if the stream is not at end-of-file.
     /// </summary>
-    public static readonly Parser<Unit> EOF =
+    public static Parser<T, Unit> EOF<T>() =>
         input => input.Empty ?
             new ParseResult<Unit>(new(Unit.Default), null, input.Index, input.Index) :
             new(expectedEof, input.Index);
-
-    /// <summary>
-    /// Fail if the stream is at end-of-file. If it is not, then run the nested parser.
-    /// </summary>
-    private static Parser<R> NotEOF<R>(this Parser<R> p) =>
-        input => input.Empty ?
-            new ParseResult<R>(unexpectedEof, input.Index) :
-            p(input);
 
     /// <summary>
     /// Parse a specific character.
@@ -36,7 +43,7 @@ public static partial class Combinators {
     /// <param name="expected">Description of character (generally only necessary for characters that are
     /// not well displayed, such as space or tab)</param>
     /// <returns></returns>
-    public static Parser<char> Char(char c, string? expected = null) {
+    public static Parser<char, char> Char(char c, string? expected = null) {
         var err = expected == null ? 
             (ParserError)new ParserError.ExpectedChar(c) : 
             new ParserError.Expected(expected);
@@ -55,7 +62,7 @@ public static partial class Combinators {
     /// <param name="expected">Description of character (generally only necessary for characters that are
     /// not well displayed, such as space or tab)</param>
     /// </summary>
-    public static Parser<char> NotChar(char c, string? expected = null) {
+    public static Parser<char, char> NotChar(char c, string? expected = null) {
         var err = expected == null ? 
             (ParserError)new ParserError.ExpectedChar(c) : 
             new ParserError.Expected(expected);
@@ -70,13 +77,13 @@ public static partial class Combinators {
     /// Return the next character in the stream, or null if it empty, without advancing the stream.
     /// <br/>This parser does not fail.
     /// </summary>
-    public static Parser<char?> SoftScan = input =>
+    public static Parser<char, char?> SoftScan = input =>
         new(input.Empty ? null : input.Next, null, input.Index, input.Index);
     
     /// <summary>
     /// Parse any character (but not EOF).
     /// </summary>
-    public static Parser<char> AnyChar() {
+    public static Parser<char, char> AnyChar() {
         var err = new ParserError.Expected("any character");
         return input => input.Empty ?
             new(err, input.Index) :
@@ -86,7 +93,7 @@ public static partial class Combinators {
     /// <summary>
     /// Parse any of the provided characters.
     /// </summary>
-    public static Parser<char> AnyOf(IReadOnlyList<char> chars) {
+    public static Parser<char, char> AnyOf(IReadOnlyList<char> chars) {
         var expected = new ParserError.Expected($"any of {string.Join(", ", chars)}");
         var set = chars.ToHashSet();
         return input => {
@@ -99,7 +106,7 @@ public static partial class Combinators {
     /// <summary>
     /// Parse any character except the provided characters.
     /// </summary>
-    public static Parser<char> NoneOf(IReadOnlyList<char> chars) {
+    public static Parser<char, char> NoneOf(IReadOnlyList<char> chars) {
         var expected = new ParserError.Expected($"any except {string.Join(", ", chars)}");
         var set = chars.ToHashSet();
         return input => {
@@ -109,37 +116,42 @@ public static partial class Combinators {
         };
     }
 
+
     /// <summary>
-    /// Parse a character that satisfies the predicate.
+    /// Parse a token that satisfies the predicate.
     /// </summary>
     /// <param name="pred">Predicate</param>
     /// <param name="expected">Description of what the predicate does</param>
-    public static Parser<char> Satisfy(Func<char, bool> pred, string? expected = null) {
+    public static Parser<T, T> Satisfy<T>(Func<T, bool> pred, string? expected = null) {
         var err = expected == null ? null : new ParserError.Expected(expected);
         return input => {
             if (input.Empty || !pred(input.Next))
                 //In general, it is more informative to say "Expected X, Y, or Z" than to say "Didn't expect EOF".
                 return new(err ?? (input.Empty ? 
                     unexpectedEof : 
-                    new ParserError.UnexpectedChar(input.Next)), input.Index);
+                    input.TokenWitness.Unexpected(input.Index)), input.Index);
             else
                 return new(new(input.Next), null, input.Index, input.Step(1));
         };
     }
+
+    /// <inheritdoc cref="Satisfy{T}(System.Func{T,bool},string?)"/>
+    public static Parser<char, char> Satisfy(Func<char, bool> pred, string? expected = null) =>
+        Satisfy<char>(pred, expected);
     
     /// <summary>
     /// Parse the next character when the input stream satisfies the predicate.
     /// </summary>
     /// <param name="pred">Predicate</param>
     /// <param name="expected">Description of what the predicate does</param>
-    public static Parser<char> Satisfy(Func<InputStream, bool> pred, string? expected = null) {
+    public static Parser<T, T> Satisfy<T>(Func<InputStream<T>, bool> pred, string? expected = null) {
         var err = expected == null ? null : new ParserError.Expected(expected);
         return input => {
             if (input.Empty || !pred(input))
                 //In general, it is more informative to say "Expected X, Y, or Z" than to say "Didn't expect EOF".
                 return new(err ?? (input.Empty ? 
                     unexpectedEof : 
-                    new ParserError.UnexpectedChar(input.Next)), input.Index);
+                    input.TokenWitness.Unexpected(input.Index)), input.Index);
             else
                 return new(new(input.Next), null, input.Index, input.Step(1));
         };
@@ -152,7 +164,7 @@ public static partial class Combinators {
     /// <param name="pred">Predicate</param>
     /// <param name="atleastOne">If true, will require at least one match</param>
     /// <param name="expected">Description of what the predicate does</param>
-    public static Parser<string> ManySatisfy(Func<char, bool> pred, bool atleastOne = false, string? expected = null) {
+    public static Parser<char, string> ManySatisfy(Func<char, bool> pred, bool atleastOne = false, string? expected = null) {
         var atleastErr = new ParserError.Expected($"at least one {expected}");
         return input => {
             var len = 0;
@@ -162,7 +174,7 @@ public static partial class Combinators {
             }
             if (len == 0 && atleastOne)
                 return new(atleastErr, input.Index);
-            return new(new(input.Substring(len)),
+            return new(new(Substring(input, len)),
                 len == 0 ? input.MakeError(expected) : null, input.Index, input.Step(len));
         };
     }
@@ -174,7 +186,7 @@ public static partial class Combinators {
     /// <param name="pred">Predicate</param>
     /// <param name="atleastOne">If true, will require at least one match</param>
     /// <param name="expected">Description of what the predicate does</param>
-    public static Parser<string> ManySatisfyI(Func<InputStream, bool> pred, bool atleastOne = false, string? expected = null) {
+    public static Parser<char, string> ManySatisfyI(Func<InputStream<char>, bool> pred, bool atleastOne = false, string? expected = null) {
         var atleastErr = new ParserError.Expected($"at least one {expected}");
         return input => {
             var len = 0;
@@ -186,7 +198,7 @@ public static partial class Combinators {
             }
             if (len == 0 && atleastOne)
                 return new(atleastErr, start);
-            return new(new(input.Substring(-len, len)),
+            return new(new(Substring(input, -len, len)),
                 len == 0 ? input.MakeError(expected) : null, start, input.Index);
         };
     }
@@ -194,7 +206,7 @@ public static partial class Combinators {
     /// <summary>
     /// ManySatisfy with atleastOne set to true.
     /// </summary>
-    public static Parser<string> Many1Satisfy(Func<char, bool> pred, string? expected = null) =>
+    public static Parser<char, string> Many1Satisfy(Func<char, bool> pred, string? expected = null) =>
         ManySatisfy(pred, true, expected);
 
     
@@ -205,7 +217,7 @@ public static partial class Combinators {
     /// <param name="pred">Predicate</param>
     /// <param name="atleastOne">If true, will require at least one match</param>
     /// <param name="expected">Description of what the predicate does</param>
-    public static Parser<Unit> SkipManySatisfy(Func<char, bool> pred, bool atleastOne = false, string? expected = null) {
+    public static Parser<char, Unit> SkipManySatisfy(Func<char, bool> pred, bool atleastOne = false, string? expected = null) {
         var atleastErr = new ParserError.Expected($"at least one {expected}");
         return input => {
             var len = 0;
@@ -223,10 +235,10 @@ public static partial class Combinators {
     /// <summary>
     /// SkipManySatisfy with atleastOne set to true.
     /// </summary>
-    public static Parser<Unit> SkipMany1Satisfy(Func<char, bool> pred, string? expected = null) =>
+    public static Parser<char, Unit> SkipMany1Satisfy(Func<char, bool> pred, string? expected = null) =>
         SkipManySatisfy(pred, true, expected);
 
-    private static Parser<Unit> _Whitespace(bool allowNewline, bool atleastOne) => input => {
+    private static Parser<char, Unit> _Whitespace(bool allowNewline, bool atleastOne) => input => {
         var skip = 0;
         for (; skip < input.Remaining; ++skip) {
             if (!char.IsWhiteSpace(input.CharAt(skip)) || (!allowNewline && input.CharAt(skip) == '\n'))
@@ -242,27 +254,27 @@ public static partial class Combinators {
     /// This parser cannot fail.
     /// <br/>FParsec spaces
     /// </summary>
-    public static readonly Parser<Unit> Whitespace = _Whitespace(true, false);
+    public static readonly Parser<char, Unit> Whitespace = _Whitespace(true, false);
     /// <summary>
     /// Parses zero or more whitespaces (not including newlines).
     /// This parser cannot fail.
     /// </summary>
-    public static readonly Parser<Unit> WhitespaceIL = _Whitespace(false, false);
+    public static readonly Parser<char, Unit> WhitespaceIL = _Whitespace(false, false);
 
     /// <summary>
     /// Parses one or more whitespaces (including newlines).
     /// <br/>FParsec spaces1
     /// </summary>
-    public static readonly Parser<Unit> Whitespace1 = _Whitespace(true, true);
+    public static readonly Parser<char, Unit> Whitespace1 = _Whitespace(true, true);
     /// <summary>
     /// Parses one or more whitespaces (not including newlines).
     /// </summary>
-    public static readonly Parser<Unit> WhitespaceIL1 = _Whitespace(false, true);
+    public static readonly Parser<char, Unit> WhitespaceIL1 = _Whitespace(false, true);
 
     /// <summary>
     /// Parses \r\n or \n, and returns \n.
     /// </summary>
-    public static readonly Parser<char> Newline =
+    public static readonly Parser<char, char> Newline =
         input => {
             return input.MaybeNext switch {
                 '\n' => new(new('\n'), null, input.Index, input.Step(1)),
@@ -278,66 +290,69 @@ public static partial class Combinators {
     /// <summary>
     /// Parses \t.
     /// </summary>
-    public static Parser<char> Tab() => Char('\t', "Tab");
+    public static Parser<char, char> Tab() => Char('\t', "Tab");
 
+    /// <summary>
+    /// True iff a character is [a-zA-Z].
+    /// </summary>
     public static bool IsAsciiLetter(char c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     /// <summary>
     /// Parse a-z.
     /// </summary>
-    public static readonly Parser<char> AsciiLower = 
+    public static readonly Parser<char, char> AsciiLower = 
         Satisfy(c => c >= 'a' && c <= 'z', "lowercase ASCII");
     /// <summary>
     /// Parse A-Z.
     /// </summary>
-    public static readonly Parser<char> AsciiUpper = 
+    public static readonly Parser<char, char> AsciiUpper = 
         Satisfy(c => c >= 'A' && c <= 'Z', "uppercase ASCII");
     /// <summary>
     /// Parse a-zA-Z.
     /// </summary>
-    public static readonly Parser<char> AsciiLetter = 
+    public static readonly Parser<char, char> AsciiLetter = 
         Satisfy(IsAsciiLetter, "ASCII");
     /// <summary>
     /// Parse any lowercase character.
     /// </summary>
-    public static readonly Parser<char> Lower = 
+    public static readonly Parser<char, char> Lower = 
         Satisfy(char.IsLower, "lowercase character");
     /// <summary>
     /// Parse any uppercase character.
     /// </summary>
-    public static readonly Parser<char> Upper = 
+    public static readonly Parser<char, char> Upper = 
         Satisfy(char.IsUpper, "uppercase character");
     /// <summary>
     /// Parse any letter.
     /// </summary>
-    public static readonly Parser<char> Letter = 
+    public static readonly Parser<char, char> Letter = 
         Satisfy(char.IsLetter, "letter");
     /// <summary>
     /// Parse any letter or digit.
     /// </summary>
-    public static readonly Parser<char> LetterOrDigit = 
+    public static readonly Parser<char, char> LetterOrDigit = 
         Satisfy(char.IsLetterOrDigit, "letter or digit");
     /// <summary>
     /// Parse any digit.
     /// </summary>
-    public static readonly Parser<char> Digit = 
+    public static readonly Parser<char, char> Digit = 
         Satisfy(char.IsDigit, "digit");
     /// <summary>
     /// Parse a-fA-F0-9.
     /// </summary>
-    public static readonly Parser<char> Hex = 
+    public static readonly Parser<char, char> Hex = 
         Satisfy(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c>= 'A' && c <= 'F'), "hex");
     /// <summary>
     /// Parse 0-7.
     /// </summary>
-    public static readonly Parser<char> Octal = 
+    public static readonly Parser<char, char> Octal = 
         Satisfy(c => c >= '0' && c <= '7', "octal");
 
 
     /// <summary>
     /// Parses a string.
     /// </summary>
-    public static Parser<string> String(string s) {
-        if (s.Length == 0) return PReturn(s);
+    public static Parser<char, string> String(string s) {
+        if (s.Length == 0) return PReturn<char, string>(s);
         var err = new ParserError.Expected($"\"{s}\"");
         return inp => {
             if (inp.Remaining < s.Length)
@@ -354,8 +369,8 @@ public static partial class Combinators {
     /// <summary>
     /// Parses a string, but returns nothing.
     /// </summary>
-    public static Parser<Unit> StringIg(string s) {
-        if (s.Length == 0) return Ignore();
+    public static Parser<char, Unit> StringIg(string s) {
+        if (s.Length == 0) return Ignore<char>();
         var err = new ParserError.Expected($"\"{s}\"");
         return inp => {
             if (inp.Remaining < s.Length)
@@ -371,8 +386,8 @@ public static partial class Combinators {
     /// <summary>
     /// Matches a string (case-insensitive). Returns the parsed string.
     /// </summary>
-    public static Parser<string> StringCI(string s) {
-        if (s.Length == 0) return PReturn<string>(s);
+    public static Parser<char, string> StringCI(string s) {
+        if (s.Length == 0) return PReturn<char, string>(s);
         var err = new ParserError.Expected($"\"{s}\"");
         return inp => {
             s = s.ToLower();
@@ -382,15 +397,25 @@ public static partial class Combinators {
                 if (char.ToLower(inp.CharAt(ii)) != s[ii])
                     return new(err, inp.Index);
             }
-            return new(new(inp.Substring(s.Length)), null, inp.Index, inp.Step(s.Length));
+            return new(new(Substring(inp, s.Length)), null, inp.Index, inp.Step(s.Length));
         };
     }
 
     /// <summary>
     /// Parse a sequence of digits and converts them into an integer.
     /// </summary>
-    public static readonly Parser<int> ParseInt = Many1Satisfy(char.IsDigit, "digit").FMap(int.Parse);
+    public static readonly Parser<char, int> ParseInt = Many1Satisfy(char.IsDigit, "digit").FMap(int.Parse);
 
-
+    /// <summary>
+    /// Get a substring from a string stream.
+    /// </summary>
+    public static string Substring(this InputStream<char> stream, int len) =>
+        new(stream.Source.AsSpan(stream.Index, len));
+    
+    /// <summary>
+    /// Get a substring from a string stream.
+    /// </summary>
+    public static string Substring(this InputStream<char> stream, int offset, int len) =>
+        new(stream.Source.AsSpan(stream.Index + offset, len));
 }
 }

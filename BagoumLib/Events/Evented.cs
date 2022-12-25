@@ -33,11 +33,6 @@ public class Evented<T> : ICSubject<T> {
         onSet.OnNext(_value);
     }
 
-    /// <summary>
-    /// Gets <see cref="Value"/>
-    /// </summary>
-    public static implicit operator T(Evented<T> evo) => evo._value;
-
     /// <inheritdoc />
     public IDisposable Subscribe(IObserver<T> observer) {
         observer.OnNext(_value);
@@ -60,5 +55,10 @@ public class Evented<T> : ICSubject<T> {
         if (!Equals(value, _value))
             OnNext(value);
     }
+
+    /// <summary>
+    /// Gets <see cref="Value"/>.
+    /// </summary>
+    public static implicit operator T(Evented<T> evo) => evo._value;
 }
 }

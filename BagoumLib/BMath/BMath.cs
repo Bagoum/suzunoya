@@ -58,7 +58,7 @@ public static class BMath {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Mod(int by, int x) {
         x %= by;
-        return (x < 0) ? x + by : x;
+        return x < 0 ? x + by : x;
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public static class BMath {
     public static float SoftMod(float by, float x) {
         float vd = Mod(2 * by, x);
         return vd > by ? 
-            (2 * by - vd) : 
+            2 * by - vd : 
             vd;
     }
     
@@ -116,8 +116,141 @@ public static class BMath {
     /// </summary>
     public static float GetClosestAroundBound(float mod, float src, float target) {
         var t = (float)Math.Floor(src / mod) * mod + Mod(mod, target);
-        var t1 = (t > src) ? (t - mod) : (t + mod);
+        var t1 = t > src ? t - mod : t + mod;
         return Math.Abs(src - t) < Math.Abs(src - t1) ? t : t1;
     }
+
+    /// <summary>
+    /// Rotate a vector by a quaternion. Note that the quaternion should already have its angle halved.
+    /// Generating a quaternion via <see cref="Quaternion.CreateFromAxisAngle"/> will automatically halve the axis.
+    /// <br/>Equal to rotator * Quaternion(vec, 0) * rotator.Conjugate()
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Vector3 Rotate(in this Vector3 vec, in Quaternion rotator) {
+        Quaternion qv;
+        qv.X = vec.X;
+        qv.Y = vec.Y;
+        qv.Z = vec.Z;
+        qv.W = 0;
+        Quaternion rotConj;
+        rotConj.X = -rotator.X;
+        rotConj.Y = -rotator.Y;
+        rotConj.Z = -rotator.Z;
+        rotConj.W = rotator.W;
+        var result = rotator * qv * rotConj;
+        return new(result.X, result.Y, result.Z);
+    }
+    
+    /// <summary>
+    /// Slerp between two quaternions via the closest path between them. Same as Quaternion.Slerp.
+    /// </summary>
+    public static Quaternion SlerpNear(in Quaternion q1, in Quaternion q2, float t) => Quaternion.Slerp(q1, q2, t);
+
+    //From Quaternion
+    private const float SlerpEpsilon = 1e-6f;
+    
+    /// <summary>
+    /// Slerp between two quaternions via the farthest path between them.
+    /// </summary>
+    public static Quaternion SlerpFar(in Quaternion q1, in Quaternion q2, float t) {
+        //Code based on C# implementation of Quaternion.Slerp
+        
+        float cosOmega = q1.X * q2.X + q1.Y * q2.Y +
+                         q1.Z * q2.Z + q1.W * q2.W;
+
+        bool flip = false;
+
+        // THE ONLY DIFFERENCE between SlerpNear and SlerpFar is this check; for SlerpNear it is cosOmega < 0
+        if (cosOmega > 0.0f) {
+            flip = true;
+            cosOmega = -cosOmega;
+        }
+
+        float s1, s2;
+
+        if (cosOmega > 1.0f - SlerpEpsilon) {
+            // Too close, do straight linear interpolation.
+            s1 = 1.0f - t;
+            s2 = flip ? -t : t;
+        } else {
+            float omega = MathF.Acos(cosOmega);
+            float invSinOmega = 1 / MathF.Sin(omega);
+
+            s1 = MathF.Sin((1.0f - t) * omega) * invSinOmega;
+            s2 = flip
+                ? -MathF.Sin(t * omega) * invSinOmega
+                : MathF.Sin(t * omega) * invSinOmega;
+        }
+
+        Quaternion ans;
+
+        ans.X = s1 * q1.X + s2 * q2.X;
+        ans.Y = s1 * q1.Y + s2 * q2.Y;
+        ans.Z = s1 * q1.Z + s2 * q2.Z;
+        ans.W = s1 * q1.W + s2 * q2.W;
+
+        return ans;
+    }
+
+    /// <summary>
+    /// Slerp between two quaternions.
+    /// <br/>Note that this is not the same as Quaternion.Slerp, which always takes the shortest path.
+    /// </summary>
+    public static Quaternion Slerp(in Quaternion q1, in Quaternion q2, float t) {
+        float dot = q1.X * q2.X + q1.Y * q2.Y + q1.Z * q2.Z + q1.W * q2.W;
+        float s1, s2;
+
+        if (dot > 0.9995f) {
+            // Too close, do straight linear interpolation.
+            s1 = 1.0f - t;
+            s2 = t;
+        } else {
+            float omega = MathF.Acos(dot);
+            float invSinOmega = 1 / MathF.Sin(omega);
+
+            s1 = MathF.Sin((1.0f - t) * omega) * invSinOmega;
+            s2 = MathF.Sin(t * omega) * invSinOmega;
+        }
+
+        Quaternion ans;
+
+        ans.X = s1 * q1.X + s2 * q2.X;
+        ans.Y = s1 * q1.Y + s2 * q2.Y;
+        ans.Z = s1 * q1.Z + s2 * q2.Z;
+        ans.W = s1 * q1.W + s2 * q2.W;
+
+        return ans;
+    }
+
+    /// <summary>
+    /// Check if two quaternions are (approximately) equal using their dot product.
+    /// </summary>
+    public static bool EqualsByDot(this in Quaternion q1, in Quaternion q2) =>
+        Quaternion.Dot(q1, q2) > 0.9999989867f;
+
+    /// <summary>
+    /// Convert a half-angled quaternion to euler angles (in degrees).
+    /// </summary>
+    public static Vector3 ToEulersD(this in Quaternion q1) => new(
+        radDeg * MathF.Atan2(2 * (q1.W * q1.X + q1.Y * q1.Z), q1.W * q1.W + q1.Z * q1.Z - q1.X * q1.X - q1.Y * q1.Y),
+        radDeg * MathF.Asin(2 * (q1.W * q1.Y - q1.X * q1.Z)),
+        radDeg * MathF.Atan2(2 * (q1.W * q1.Z + q1.X * q1.Y), q1.W * q1.W + q1.X * q1.X - q1.Y * q1.Y - q1.Z * q1.Z));
+
+    /// <summary>
+    /// Convert euler angles (in degrees) to a half-angled quaternion, with order ZXY.
+    /// </summary>
+    public static Quaternion ToQuaternionD(this in Vector3 rot) =>
+        Quaternion.CreateFromYawPitchRoll(rot.Y * degRad, rot.X * degRad, rot.Z * degRad);
+
+    /// <summary>
+    /// Create a half-angled quaternion to rotate a given number of degrees around an axis.
+    /// </summary>
+    public static Quaternion RotateAroundD(this Vector3 axis, float rotDeg) =>
+        Quaternion.CreateFromAxisAngle(axis, rotDeg * degRad);
+
+    /// <summary>
+    /// Create a half-angled quaternion to rotate a given number of degrees around the Z-axis.
+    /// </summary>
+    public static Quaternion RotateAroundZ(this float rotDeg) => Vector3.UnitZ.RotateAroundD(rotDeg);
 }
 }

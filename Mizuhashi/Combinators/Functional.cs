@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using BagoumLib.Functional;
 
 namespace Mizuhashi {
@@ -10,18 +11,18 @@ public static partial class Combinators {
     /// Parses an object of type A and then map it to type B.
     /// <br/>Equivalent to FParsec |>>
     /// </summary>
-    public static Parser<B> FMap<A, B>(this Parser<A> p, Func<A, B> f) => input =>
+    public static Parser<T, B> FMap<T, A, B>(this Parser<T, A> p, Func<A, B> f) => input =>
         p(input).FMap(f);
     
     /// <summary>
     /// Alias for FMap for LINQ compatibility.
     /// </summary>
-    public static Parser<B> Select<A, B>(this Parser<A> p, Func<A, B> f) => FMap(p, f);
+    public static Parser<T, B> Select<T, A, B>(this Parser<T, A> p, Func<A, B> f) => FMap(p, f);
 
     /// <summary>
     /// Parses a function of type A->B, then an argument of type A, and returns type B.
     /// </summary>
-    public static Parser<B> Apply<A, B>(this Parser<Func<A, B>> p, Parser<A> arg) => input => {
+    public static Parser<T, B> Apply<T, A, B>(this Parser<T, Func<A, B>> p, Parser<T, A> arg) => input => {
         var rFunc = p(input);
         if (rFunc.Result.Try(out var func)) {
             var rArg = arg(input);
@@ -35,7 +36,7 @@ public static partial class Combinators {
     ///  then returns the object of type B.
     /// <br/>Equivalent to FParsec >>=
     /// </summary>
-    public static Parser<B> Bind<A, B>(this Parser<A> p, Func<A, Parser<B>> f) => input => {
+    public static Parser<T, B> Bind<T, A, B>(this Parser<T, A> p, Func<A, Parser<T, B>> f) => input => {
         var rx = p(input);
         if (rx.Result.Try(out var x)) {
             var ry = f(x)(input);
@@ -47,7 +48,7 @@ public static partial class Combinators {
     /// <summary>
     /// Parses an object of type A, then returns a result of type B depending on the value of A.
     /// </summary>
-    public static Parser<B> Bind<A, B>(this Parser<A> p, Func<A, ParseResult<B>> b) => input => {
+    public static Parser<T, B> Bind<T, A, B>(this Parser<T, A> p, Func<A, ParseResult<B>> b) => input => {
         var rx = p(input);
         if (rx.Result.Try(out var x)) {
             return b(x);
@@ -60,7 +61,7 @@ public static partial class Combinators {
     /// Parses an object of type A, then parses an object of type B depending on the value of A,
     ///  then finally combines the objects according to the project function.
     /// </summary>
-    public static Parser<R> Bind<A, B, R>(this Parser<A> p, Func<A, Parser<B>> f, Func<A, B, R> project)
+    public static Parser<T, R> Bind<T, A, B, R>(this Parser<T, A> p, Func<A, Parser<T, B>> f, Func<A, B, R> project)
         => input => {
             var rx = p(input);
             if (rx.Result.Try(out var x)) {
@@ -74,7 +75,7 @@ public static partial class Combinators {
     /// <summary>
     /// Alias for Bind for LINQ compatibility.
     /// </summary>
-    public static Parser<R> SelectMany<A, B, R>(this Parser<A> p, Func<A, Parser<B>> f, Func<A, B, R> project)
+    public static Parser<T, R> SelectMany<T, A, B, R>(this Parser<T, A> p, Func<A, Parser<T, B>> f, Func<A, B, R> project)
         => p.Bind(f, project);
     
     /// <summary>
@@ -82,7 +83,7 @@ public static partial class Combinators {
     ///  then finally combines the objects using the project function.
     /// <br/>FParsec pipe2
     /// </summary>
-    public static Parser<R> Pipe<A, B, R>(this Parser<A> p, Parser<B> p2, Func<A, B, R> project)
+    public static Parser<T, R> Pipe<T, A, B, R>(this Parser<T, A> p, Parser<T, B> p2, Func<A, B, R> project)
         => input => {
             var ra = p(input);
             if (!ra.Result.Try(out var a))
@@ -98,7 +99,7 @@ public static partial class Combinators {
     /// Sequentially parses objects of type A, B, C, then combines them using the project function.
     /// <br/>FParsec pipe3
     /// </summary>
-    public static Parser<R> Pipe3<A, B, C, R>(this Parser<A> p, Parser<B> p2, Parser<C> p3, Func<A, B, C, R> project)
+    public static Parser<T, R> Pipe3<T, A, B, C, R>(this Parser<T, A> p, Parser<T, B> p2, Parser<T, C> p3, Func<A, B, C, R> project)
         => input => {
             var ra = p(input);
             if (!ra.Result.Try(out var a))
@@ -118,7 +119,7 @@ public static partial class Combinators {
     /// Sequentially parses objects of type A, B, C, D, then combines them using the project function.
     /// <br/>FParsec pipe4
     /// </summary>
-    public static Parser<R> Pipe4<A, B, C, D, R>(this Parser<A> p, Parser<B> p2, Parser<C> p3, Parser<D> p4, Func<A, B, C, D, R> project)
+    public static Parser<T, R> Pipe4<T, A, B, C, D, R>(this Parser<T, A> p, Parser<T, B> p2, Parser<T, C> p3, Parser<T, D> p4, Func<A, B, C, D, R> project)
         => input => {
             var ra = p(input);
             if (!ra.Result.Try(out var a))
@@ -142,7 +143,7 @@ public static partial class Combinators {
     /// Sequentially parses objects of type A, B, C, D, E, then combines them using the project function.
     /// <br/>FParsec pipe5
     /// </summary>
-    public static Parser<R> Pipe5<A, B, C, D, E, R>(this Parser<A> p, Parser<B> p2, Parser<C> p3, Parser<D> p4, Parser<E> p5, Func<A, B, C, D, E, R> project)
+    public static Parser<T, R> Pipe5<T, A, B, C, D, E, R>(this Parser<T, A> p, Parser<T, B> p2, Parser<T, C> p3, Parser<T, D> p4, Parser<T, E> p5, Func<A, B, C, D, E, R> project)
         => input => {
             var ra = p(input);
             if (!ra.Result.Try(out var a))
@@ -167,7 +168,7 @@ public static partial class Combinators {
     /// <summary>
     /// Sequentially parses objects of type A, B, C, D, E, F, then combines them using the project function.
     /// </summary>
-    public static Parser<R> Pipe6<A, B, C, D, E, F, R>(this Parser<A> p, Parser<B> p2, Parser<C> p3, Parser<D> p4, Parser<E> p5, Parser<F> p6, Func<A, B, C, D, E, F, R> project)
+    public static Parser<T, R> Pipe6<T, A, B, C, D, E, F, R>(this Parser<T, A> p, Parser<T, B> p2, Parser<T, C> p3, Parser<T, D> p4, Parser<T, E> p5, Parser<T, F> p6, Func<A, B, C, D, E, F, R> project)
         => input => {
             var ra = p(input);
             if (!ra.Result.Try(out var a))
@@ -195,23 +196,27 @@ public static partial class Combinators {
     /// Allocation-efficient syntax for SelectMany when parsers do not depend on the return value of previous parsers.
     /// <br/>Delegates to Pipe when possible, as it is more efficient than SelectMany.
     /// </summary>
-    public static Parser<T> Sequential<T1, T2, T>(Parser<T1> p1, Parser<T2> p2, Func<T1, T2, T> map) =>
+    public static Parser<Token, T> Sequential<Token, T1, T2, T>(Parser<Token, T1> p1, Parser<Token, T2> p2, Func<T1, T2, T> map) =>
         Pipe(p1, p2, map);
 
-    public static Parser<T> Sequential<T1, T2, T3, T>(Parser<T1> p1, Parser<T2> p2, Parser<T3> p3, Func<T1, T2, T3, T> map) =>
+    /// <inheritdoc cref="Sequential{Token,T1,T2,T}"/>
+    public static Parser<Token, T> Sequential<Token, T1, T2, T3, T>(Parser<Token, T1> p1, Parser<Token, T2> p2, Parser<Token, T3> p3, Func<T1, T2, T3, T> map) =>
         Pipe3(p1, p2, p3, map);
 
-    public static Parser<T> Sequential<T1, T2, T3, T4, T>(Parser<T1> p1, Parser<T2> p2, Parser<T3> p3, Parser<T4> p4,
+    /// <inheritdoc cref="Sequential{Token,T1,T2,T}"/>
+    public static Parser<Token, T> Sequential<Token, T1, T2, T3, T4, T>(Parser<Token, T1> p1, Parser<Token, T2> p2, Parser<Token, T3> p3, Parser<Token, T4> p4,
         Func<T1, T2, T3, T4, T> map) =>
         Pipe4(p1, p2, p3, p4, map);
 
-    public static Parser<T> Sequential<T1, T2, T3, T4, T5, T>(Parser<T1> p1, Parser<T2> p2, Parser<T3> p3,
-        Parser<T4> p4, Parser<T5> p5, Func<T1, T2, T3, T4, T5, T> map) =>
+    /// <inheritdoc cref="Sequential{Token,T1,T2,T}"/>
+    public static Parser<Token, T> Sequential<Token, T1, T2, T3, T4, T5, T>(Parser<Token, T1> p1, Parser<Token, T2> p2, Parser<Token, T3> p3,
+        Parser<Token, T4> p4, Parser<Token, T5> p5, Func<T1, T2, T3, T4, T5, T> map) =>
         Pipe5(p1, p2, p3, p4, p5, map);
 
 
-    public static Parser<T> Sequential<T1, T2, T3, T4, T5, T6, T>(Parser<T1> p1, Parser<T2> p2, Parser<T3> p3,
-        Parser<T4> p4, Parser<T5> p5, Parser<T6> p6, Func<T1, T2, T3, T4, T5, T6, T> map) =>
+    /// <inheritdoc cref="Sequential{Token,T1,T2,T}"/>
+    public static Parser<Token, T> Sequential<Token, T1, T2, T3, T4, T5, T6, T>(Parser<Token, T1> p1, Parser<Token, T2> p2, Parser<Token, T3> p3,
+        Parser<Token, T4> p4, Parser<Token, T5> p5, Parser<Token, T6> p6, Func<T1, T2, T3, T4, T5, T6, T> map) =>
         Pipe6(p1, p2, p3, p4, p5, p6, map);
 
 }

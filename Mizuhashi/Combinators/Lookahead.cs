@@ -7,7 +7,7 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec attempt
     /// </summary>
-    public static Parser<R> Attempt<R>(this Parser<R> p) => input => {
+    public static Parser<T, R> Attempt<T, R>(this Parser<T, R> p) => input => {
         var state = input.Stative;
         var result = p(input);
         if (result.Status == ResultStatus.FATAL) {
@@ -21,9 +21,9 @@ public static partial class Combinators {
     /// FParsec .>>?
     /// <br/>Backtracks only if the second parser hits a non-fatal error.
     /// </summary>
-    public static Parser<A> ThenTryIg<A, B>(this Parser<A> first, Parser<B> second) => input => {
+    public static Parser<T, A> ThenTryIg<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var state = input.Stative;
-        var i = state.Position.Index;
+        var i = state.Index;
         var rx = first(input);
         if (rx.Result.Valid) {
             var ry = second(input);
@@ -40,9 +40,9 @@ public static partial class Combinators {
     /// FParsec >>? (which should be >>.?)
     /// <br/>Backtracks only if the second parser hits a non-fatal error.
     /// </summary>
-    public static Parser<B> IgThenTry<A, B>(this Parser<A> first, Parser<B> second) => input => {
+    public static Parser<T, B> IgThenTry<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var state = input.Stative;
-        var i = state.Position.Index;
+        var i = state.Index;
         var rx = first(input);
         if (rx.Result.Valid) {
             var ry = second(input);
@@ -59,9 +59,9 @@ public static partial class Combinators {
     /// FParsec .>>.?
     /// <br/>Backtracks only if the second parser hits a non-fatal error.
     /// </summary>
-    public static Parser<(A a, B b)> ThenTry<A, B>(this Parser<A> first, Parser<B> second) => input => {
+    public static Parser<T, (A a, B b)> ThenTry<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var state = input.Stative;
-        var i = state.Position.Index;
+        var i = state.Index;
         var rx = first(input);
         if (rx.Result.Try(out var x)) {
             var ry = second(input);
@@ -81,11 +81,11 @@ public static partial class Combinators {
     /// <br/>Also unlike FParsec, uses the error message from the parser.
     ///  It is usually a good idea to wrap this in a label for clarity.
     /// </summary>
-    public static Parser<R> IsPresent<R>(this Parser<R> p) {
+    public static Parser<T, R> IsPresent<T, R>(this Parser<T, R> p) {
         return input => {
             var state = input.Stative;
             var result = p(input);
-            input.Rollback(state, null);
+            input.RollbackFast(state);
             return new ParseResult<R>(result.Result, result.Error, result.Start, result.Start);
         };
     }
@@ -93,13 +93,13 @@ public static partial class Combinators {
     /// <summary>
     /// FParsec notFollowedBy/notFollowedByL. Attempts to apply the parser, but does not change state.
     /// </summary>
-    public static Parser<Unit> IsNotPresent<R>(this Parser<R> p, string? expected = null) {
+    public static Parser<T, Unit> IsNotPresent<T, R>(this Parser<T, R> p, string? expected = null) {
         var err = new ParserError.Unexpected(expected ?? "(No description provided)");
         return input => {
             var state = input.Stative;
             var result = p(input);
-            var lerr = new LocatedParserError(state.Position.Index, err);
-            input.Rollback(state, null);
+            var lerr = new LocatedParserError(state.Index, err);
+            input.RollbackFast(state);
             return new ParseResult<Unit>(result.Result.Valid ? Maybe<Unit>.None : Maybe<Unit>.Of(default), 
                 result.Error == null ? lerr : null, result.Start, result.Start);
         };

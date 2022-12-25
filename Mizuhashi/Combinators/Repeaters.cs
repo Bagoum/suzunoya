@@ -6,27 +6,33 @@ public static partial class Combinators {
     
 
     /// <summary>
-    /// Applies a parser a specific number of times, and returns the list of all results.
+    /// Applies a parser as many times as possible up to maxTimes, and returns the list of all results.
     /// </summary>
-    public static Parser<List<R>> Repeat<R>(this Parser<R> p, int times) {
-        if (times == 0) return PReturn(new List<R>());
+    /// <param name="p"></param>
+    /// <param name="minTimes">Minimum number of times to apply the parser (inclusive). Will error if fewer results are found.</param>
+    /// <param name="maxTimes">Maximum number of times to apply the parser (inclusive).</param>
+    public static Parser<T, List<R>> Repeat<T, R>(this Parser<T, R> p, int minTimes, int maxTimes) {
+        if (maxTimes == 0) return PReturn<T, List<R>>(new List<R>());
         return input => {
             var results = new List<R>();
             ParseResult<R> next = default;
             var start = input.Index;
-            for (int ii = 0; ii < times; ++ii) {
+            for (int ii = 0; ii < maxTimes; ++ii) {
                 next = p(input);
                 if (next.Status == ResultStatus.FATAL)
                     return next.CastFailure<List<R>>();
                 else if (next.Status == ResultStatus.ERROR)
-                    return new(new ParserError.IncorrectNumber(times, results.Count, 
-                        null, next.Error), next.Start);
+                    if (results.Count >= minTimes)
+                        goto finalize;
+                    else
+                        return new(new ParserError.IncorrectNumber(minTimes, results.Count, null, next.Error), next.Start);
                 else if (!next.Consumed)
                     return new(
                         new ParserError.Failure("Many parser parsed an object without consuming text."), next.Start);
                 else
                     results.Add(next.Result.Value);
             }
+            finalize: ;
             return new(results, next.Error, start, next.End);
         };
     }
@@ -40,7 +46,7 @@ public static partial class Combinators {
     /// <param name="p">Parser to apply repeatedly</param>
     /// <param name="atleastOne">If true, then will require at least one result</param>
     /// <returns></returns>
-    public static Parser<List<R>> Many<R>(this Parser<R> p, bool atleastOne=false) => input => {
+    public static Parser<T, List<R>> Many<T, R>(this Parser<T, R> p, bool atleastOne=false) => input => {
         var results = new List<R>();
         var start = input.Index;
         while (true) {
@@ -60,7 +66,12 @@ public static partial class Combinators {
         }
     };
 
-    public static Parser<List<R>> Many1<R>(this Parser<R> p) => Many(p, true);
+    /// <summary>
+    /// Applies a parser repeatedly until it errors, and returns a list of all results.
+    /// <br/>Requires at least one value to be parsed.
+    /// <br/>See <see cref="Many{T,R}"/>.
+    /// </summary>
+    public static Parser<T, List<R>> Many1<T, R>(this Parser<T, R> p) => Many(p, true);
     
     
     /// <summary>
@@ -72,7 +83,7 @@ public static partial class Combinators {
     /// <param name="p">Parser to apply repeatedly</param>
     /// <param name="atleastOne">If true, then will require at least one result</param>
     /// <returns></returns>
-    public static Parser<Unit> SkipMany<R>(this Parser<R> p, bool atleastOne=false) => input => {
+    public static Parser<T, Unit> SkipMany<T, R>(this Parser<T, R> p, bool atleastOne=false) => input => {
         bool foundOne = false;
         var start = input.Index;
         while (true) {
@@ -91,14 +102,19 @@ public static partial class Combinators {
         }
     };
 
-    public static Parser<Unit> SkipMany1<R>(this Parser<R> p) => SkipMany(p, true);
+    /// <summary>
+    /// Applies a parser repeatedly until it errors.
+    /// <br/>Requires at least one value to be parsed.
+    /// <br/>See <see cref="SkipMany{T,R}"/>.
+    /// </summary>
+    public static Parser<T, Unit> SkipMany1<T, R>(this Parser<T, R> p) => SkipMany(p, true);
 
 
     /// <summary>
     /// Parse `p (sep p)*`. If atleastOne is false, then allows parsing nothing.
     /// <br/>FParsec sepBy
     /// </summary>
-    public static Parser<List<R>> SepBy<R, U>(this Parser<R> ele, Parser<U> sep, bool atleastOne = false) =>
+    public static Parser<T, List<R>> SepBy<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep, bool atleastOne = false) =>
         input => {
             var results = new List<R>();
             var start = input.Index;
@@ -128,14 +144,17 @@ public static partial class Combinators {
             }
         };
 
-    public static Parser<List<R>> SepBy1<R, U>(this Parser<R> ele, Parser<U> sep) => SepBy(ele, sep, true);
+    /// <summary>
+    /// Parse `p (sep p)*`.
+    /// </summary>
+    public static Parser<T, List<R>> SepBy1<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep) => SepBy(ele, sep, true);
     
     
 
     /// <summary>
     /// Parse `p (sep p)*`. Both p and sep are included in the results list.
     /// </summary>
-    public static Parser<List<R>> SepByAll<R>(this Parser<R> ele, Parser<R> sep, int minPs = 0) {
+    public static Parser<T, List<R>> SepByAll<T, R>(this Parser<T, R> ele, Parser<T, R> sep, int minPs = 0) {
         var empty = new List<R>();
         return input => {
             List<R>? results = null;

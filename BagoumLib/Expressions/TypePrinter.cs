@@ -3,7 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace BagoumLib.Expressions {
+/// <summary>
+/// An interface that prints a type into a string.
+/// </summary>
 public interface ITypePrinter {
+    /// <summary>
+    /// Print a type.
+    /// </summary>
     public string Print(Type t);
 }
 /// <summary>
@@ -23,15 +29,19 @@ public class CSharpTypePrinter : ITypePrinter {
         typeof(ValueTuple<,,,,,,>),
         typeof(ValueTuple<,,,,,,,>)
     };
+    
+    /// <inheritdoc/>
     public virtual string Print(Type t) {
         if (SimpleTypeNameMap.TryGetValue(t, out var v))
             return v;
-        string PrependEnclosure(string s) => 
-            t.DeclaringType != null ?
+        string PrependEnclosure(string s) {
+            if (t.IsGenericParameter) return s;
+            return t.DeclaringType != null ?
                 $"{Print(t.DeclaringType)}.{s}" :
                 PrintTypeNamespace(t) && (t.Namespace?.Length > 0) ?
                     $"{t.Namespace}.{s}" :
                     s;
+        }
         if (t.IsArray)
             return PrependEnclosure($"{Print(t.GetElementType()!)}[]");
         if (t.IsConstructedGenericType) {

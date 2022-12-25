@@ -16,6 +16,7 @@ public class LazyEvented<T> : ICSubject<T> {
     private T _value;
     private readonly Func<T> getter;
     
+    /// <inheritdoc/>
     public T Value {
         get => _value;
         set => onSet.OnNext(this._value = value);
@@ -37,8 +38,12 @@ public class LazyEvented<T> : ICSubject<T> {
         Recompute();
     }
 
+    /// <summary>
+    /// Get the value of this event.
+    /// </summary>
     public static implicit operator T(LazyEvented<T> evo) => evo._value;
-
+    
+    /// <inheritdoc/>
     public IDisposable Subscribe(IObserver<T> observer) {
         observer.OnNext(_value);
         return (onSet ?? throw new Exception("Computed event not initialized")).Subscribe(observer);
@@ -53,10 +58,13 @@ public class LazyEvented<T> : ICSubject<T> {
             OnNext(nv);
     }
 
+    /// <inheritdoc/>
     public void OnNext(T value) => Value = value;
 
+    /// <inheritdoc/>
     public void OnError(Exception error) => onSet.OnError(error);
 
+    /// <inheritdoc/>
     public void OnCompleted() => onSet.OnCompleted();
 }
 }

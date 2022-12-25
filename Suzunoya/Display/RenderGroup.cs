@@ -92,7 +92,7 @@ public class RenderGroup : Transform, ITinted {
     /// <summary>
     /// DO NOT CALL THIS. VNState should be provided in the constructor of <see cref="RenderGroup"/>.
     /// </summary>
-    public override void AddToVNState(IVNState container, IDisposable _) =>
+    void IEntity.AddToVNState(IVNState container, IDisposable _) =>
         throw new Exception("Do not call RenderGroup.AddToVNState. Provide the VNState in the constructor.");
 
     /// <summary>

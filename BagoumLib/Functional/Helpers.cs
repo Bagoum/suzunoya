@@ -1,9 +1,38 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Functional {
+/// <summary>
+/// Helpers and extensions for functional types.
+/// </summary>
+[PublicAPI]
 public static class Helpers {
+    /// <summary>
+    /// If the Either is a value (left), return it. If the Either is a delayed value (right), resolve it.
+    /// </summary>
+    public static T Resolve<T>(this Either<T, Func<T>> valueOrDelayed) {
+        if (valueOrDelayed.IsLeft)
+            return valueOrDelayed.Left;
+        else
+            return valueOrDelayed.Right();
+    }
+
+    /// <summary>
+    /// Accumulate many Eithers together.
+    /// If at least one Either is Right, then the result will short-circuit and return that Right.
+    /// </summary>
+    public static Either<List<L>, R> SequenceL<L, R>(this IEnumerable<Either<L, R>> eithers) {
+        List<L> l = new();
+        foreach (var x in eithers) {
+            if (x.IsRight) {
+                return x.Right;
+            } else
+                l.Add(x.Left);
+        }
+        return l;
+    }
     
     /// <summary>
     /// Accumulate many Eithers together.
@@ -16,6 +45,25 @@ public static class Helpers {
         foreach (var x in eithers) {
             if (x.IsRight) {
                 (r??=new()).Add(x.Right);
+            } else if (r is null)
+                (l??=new()).Add(x.Left);
+        }
+        return r is null ?
+            l ?? new() :
+            r;
+    }
+    
+    /// <summary>
+    /// Accumulate many Eithers together.
+    /// If at least one Either is Right, then the result will be Right.
+    /// Else the result will be a Left (including in the case when no arguments are provided.)
+    /// </summary>
+    public static Either<List<L>, List<R>> AccFailToR<L, R>(this IEnumerable<Either<L, List<R>>> eithers) {
+        List<L>? l = null;
+        List<R>? r = null;
+        foreach (var x in eithers) {
+            if (x.IsRight) {
+                (r??=new()).AddRange(x.Right);
             } else if (r is null)
                 (l??=new()).Add(x.Left);
         }

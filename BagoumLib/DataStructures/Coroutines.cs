@@ -118,7 +118,7 @@ public class Coroutines : ICoroutineRunner {
                 if (n.Value.parent != null)
                     coroutines.InsertAfter(n, n.Value.parent);
                 nextNode = n.Next;
-                coroutines.Remove(n);
+                coroutines.Destroy(n);
                 changed = true;
             }
         }
@@ -145,7 +145,7 @@ public class Coroutines : ICoroutineRunner {
         } else {
             if (n.Value.parent != null)
                 coroutines.InsertAfter(n, n.Value.parent);
-            coroutines.Remove(n);
+            coroutines.Destroy(n);
         }
         itrNode = lastItrNode;
     }
@@ -172,7 +172,7 @@ public class Coroutines : ICoroutineRunner {
                         coroutines.InsertAfter(n, n.Value.parent);
                     }
                     nextNode = n.Next;
-                    coroutines.Remove(n);
+                    coroutines.Destroy(n);
                     changed = true;
                 } else
                     nextNode = n.Next;

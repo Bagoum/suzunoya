@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reactive;
-using System.Threading;
-using System.Threading.Tasks;
-using BagoumLib;
 using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
@@ -16,6 +12,9 @@ using Suzunoya.ControlFlow;
 namespace Suzunoya.Entities {
 //Not inheriting IEntity : ICoroutineRunner in order to provide more protection around
 // always getting BoundedSuboperationToken when running eg. tweens.
+/// <summary>
+/// Interface representing top-level entities that can be added under <see cref="IVNState"/>.
+/// </summary>
 [PublicAPI]
 public interface IEntity : IDisposable {
     /// <summary>
@@ -23,13 +22,31 @@ public interface IEntity : IDisposable {
     /// However, some entities may not desire mimics (such as unsprited characters).
     /// </summary>
     bool MimicRequested { get; }
+    
+    /// <summary>
+    /// Token representing the life of this entity. When cancelled, the entity is destroyed.
+    /// </summary>
     ICancellee LifetimeToken { get; }
+    
+    /// <summary>
+    /// Run a tweening function on the entity.
+    /// </summary>
     VNOperation Tween(ITransition tweener);
+    
+    /// <summary>
+    /// VN to which this entity is attached.
+    /// </summary>
     IVNState Container { get; }
-    void AddToVNState(IVNState container, IDisposable token);
+    
+    internal void AddToVNState(IVNState container, IDisposable token);
+    
+    /// <summary>
+    /// Update the entity.
+    /// </summary>
+    /// <param name="deltaTime">Time since last update</param>
     void Update(float deltaTime);
     /// <summary>
-    /// Called after Update is complete. Mimics may listen to this.
+    /// Evented procced after Update is complete. Mimics may listen to this.
     /// </summary>
     Event<float> OnUpdate { get; }
     
@@ -49,38 +66,60 @@ public interface IEntity : IDisposable {
     ICObservable<bool> EntityActive { get; }
 }
 
+/// <summary>
+/// A top-level entity that can be added under <see cref="VNState"/>.
+/// </summary>
 public abstract class Entity : IEntity {
+    /// <inheritdoc/>
     public virtual bool MimicRequested => true;
+    /// <inheritdoc/>
     public IVNState Container { get; protected set; } = null!;
+    /// <summary>
+    /// Disposable tokens bounded by the lifetime of this entity.
+    /// </summary>
     protected readonly List<IDisposable> tokens = new();
     private readonly Cancellable lifetimeToken = new();
+    /// <inheritdoc/>
     public ICancellee LifetimeToken => lifetimeToken;
     private readonly Coroutines cors = new();
+    /// <inheritdoc/>
     public Event<float> OnUpdate { get; } = new();
 
     private Evented<bool> _EntityActive { get; } = new(true);
+    /// <inheritdoc/>
     public ICObservable<bool> EntityActive => _EntityActive;
 
-    public virtual void AddToVNState(IVNState container, IDisposable token) {
+    void IEntity.AddToVNState(IVNState container, IDisposable token) {
         Container = container;
         tokens.Add(token);
     }
 
+    /// <inheritdoc/>
     public virtual void Update(float deltaTime) {
         this.AssertActive();
         cors.Step();
         OnUpdate.OnNext(deltaTime);
     }
 
-
+    /// <summary>
+    /// Run a corountine on this entity.
+    /// </summary>
     public void Run(IEnumerator ienum, CoroutineOptions? opts = null) {
         this.AssertActive();
         cors.Run(ienum, opts);
     }
 
+    /// <summary>
+    /// Add a token to <see cref="tokens"/>.
+    /// </summary>
     protected void AddToken(IDisposable token) => tokens.Add(token);
+    
+    /// <summary>
+    /// Subscribe to an event.
+    /// </summary>
     public void Listen<T>(IObservable<T> obs, Action<T> listener) => AddToken(obs.Subscribe(listener));
-
+    
+    /// <inheritdoc/>
     public VNOperation Tween(ITransition tweener) => this.AssertActive().MakeVNOp(ct => 
         tweener.With(this.BindLifetime(ct), () => Container.dT).Run(cors));
 
@@ -95,6 +134,8 @@ public abstract class Entity : IEntity {
                                 $"{this} has {cors.Count} remaining.");
         Delete();
     }
+    
+    /// <inheritdoc/>
     public virtual void Delete() {
         if (_EntityActive.Value == false) return;
         lifetimeToken.Cancel(ICancellee.HardCancelLevel);
@@ -115,6 +156,7 @@ public abstract class Entity : IEntity {
         return this;
     }
     
+    /// <inheritdoc/>
     public override string ToString() => $"<{GetType().RName()}>";
 }
 

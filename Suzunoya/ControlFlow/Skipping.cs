@@ -1,4 +1,9 @@
 ﻿namespace Suzunoya.ControlFlow {
+/// <summary>
+/// An enum describing skip modes in Suzunoya VN control flow.
+/// Note that "skipping not active" is not a member of this enum;
+///  use SkipMode? if that is required.
+/// </summary>
 public enum SkipMode {
     /// <summary>
     /// Loading state during backlogging or loading a save file.

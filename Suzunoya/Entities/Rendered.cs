@@ -25,7 +25,8 @@ public interface ITinted : IEntity {
 /// </summary>
 public interface IRendered : ITransform, ITinted {
     /// <summary>
-    /// A basic plugin setup would be to associate a RenderGroup  with an engine camera and game-object layer,
+    /// The render group under which this object renders.
+    /// <br/>A basic plugin setup would be to associate a RenderGroup with an engine camera and game-object layer,
     ///  then treat RenderLayer and SortingID as equivalent to engine "sorting layer" / "order in layer".
     /// </summary>
     Evented<RenderGroup?> RenderGroup { get; }
@@ -47,7 +48,8 @@ public interface IRendered : ITransform, ITinted {
     DisturbedAnd Visible { get; }
     
     /// <summary>
-    /// If the object is already associated with a render group,
+    /// Set that this object should be rendered under the provided rendering group.
+    /// <br/>If the object is already associated with a render group,
     /// then it should deattach from the existing render group.
     /// </summary>
     void AddToRenderGroup(RenderGroup group, int? sortingID = null);
