@@ -9,7 +9,7 @@ namespace BagoumLib.DataStructures {
 /// A class with a dictionary interface that is implemented without hashing by iterating over an array.
 /// <br/>This is sometimes faster than a dictionary when the number of keys is very small (&lt;10).
 /// </summary>
-public class ArrayDictionary<V> : IEnumerable<(int Key, V Value)> {
+internal class ArrayDictionary<V> : IEnumerable<(int Key, V Value)> {
     private int[] keys;
     private V[] values;
     private int count;

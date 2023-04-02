@@ -25,11 +25,13 @@ public class LinearizeVisitor : ExpressionVisitor {
     /// </summary>
     public bool SafeExecution { get; set; } = false;
 
-    private static bool MightThrow(Expression? ex) => ex switch {
+    private static bool MightThrowOrChange(Expression? ex) => ex switch {
         null => false,
         ConstantExpression => false,
-        ParameterExpression => false,
         DefaultExpression => false,
+        //Parameters may be reassigned, but the $flat vars we use for linearization
+        // are only assigned once
+        ParameterExpression pex => pex.Name?.StartsWith("$flat") is not true,
         _ => true
     };
     private Expression Linearize(Func<Expression, Expression> combiner, Expression? piece) =>
@@ -43,21 +45,36 @@ public class LinearizeVisitor : ExpressionVisitor {
         var lastStatements = new Expression?[linearized.Length];
         var consumes = new EnumerateVisitor();
 
-        var useTemp = allowTempAssign && (SafeExecution || linearized.Any(l => {
-            if (l == null) return false;
-            var checkForThrow = l is BlockExpression bex ? bex.Expressions[bex.Expressions.Count - 1] : l;
-            return consumes.Enumerate(checkForThrow).Any(e => e is UnaryExpression {NodeType: ExpressionType.Throw});
-        }));
+        var useTemp = allowTempAssign && (SafeExecution || linearized.Any(l => 
+            l is not null && consumes.Enumerate(l)
+                .Any(e => {
+                    if (e.NodeType.IsAssign()) {
+                        ParameterExpression? assignTo;
+                        if (e is BinaryExpression { Left: ParameterExpression pex })
+                            assignTo = pex;
+                        else if (e is UnaryExpression { Operand: ParameterExpression pex_ })
+                            assignTo = pex_;
+                        else
+                            return true;
+                        //assignment operations in blocks require full linearization,
+                        // unless the assignment is block-local
+                        //eg. x + { x = 2; x + 3 } requires tempvars
+                        //    x + { int y = 2; x + y } does not require tempvars
+                        return !(l is BlockExpression bex && bex.Variables.Contains(assignTo));
+                    }
+                    //order of method calls and throws must be preserved
+                    return e is MethodCallExpression or UnaryExpression { NodeType: ExpressionType.Throw };
+                })));
 
         for (int i = 0; i < linearized.Length; ++i) {
             if (linearized[i] is BlockExpression bex) {
                 parameters.AddRange(bex.Variables);
                 statements.AddRange(bex.Expressions.Take(bex.Expressions.Count - 1));
-                lastStatements[i] = bex.Expressions[bex.Expressions.Count - 1];
+                lastStatements[i] = bex.Expressions[^1];
             } else
                 lastStatements[i] = linearized[i];
-            if (useTemp && linearized[i] != null && MightThrow(lastStatements[i])) {
-                var tmp = Expression.Parameter(linearized[i]!.Type, $"blockTmp{counter++}");
+            if (useTemp && linearized[i] != null && MightThrowOrChange(lastStatements[i])) {
+                var tmp = Expression.Parameter(linearized[i]!.Type, $"$flatBlock{counter++}");
                 parameters.Add(tmp);
                 statements.Add(Ex.Assign(tmp, lastStatements[i]!));
                 lastStatements[i] = tmp;
@@ -144,7 +161,7 @@ public class LinearizeVisitor : ExpressionVisitor {
             //This handling is more complex than the standard handling since it'd be incorrect
             // to just evaluate both branches and return the correct one.
             //Instead, we declare a variable outside an if statement, and write to it in the branches.
-            var prm = Ex.Parameter(node.Type, $"flatTernary{counter++}");
+            var prm = Ex.Parameter(node.Type, $"$flatTernary{counter++}");
             return Ex.Block(new[] {prm},
                 Linearize(cond => Ex.Condition(cond, WithAssign(ifT, prm), WithAssign(ifF, prm), typeof(void)), node.Test),
                 prm
@@ -235,7 +252,7 @@ public class LinearizeVisitor : ExpressionVisitor {
             return Linearize(cond => Ex.Switch(node.Type, cond, 
                 Visit(node.DefaultBody), node.Comparison, cases), node.SwitchValue);
         
-        var prm = Ex.Parameter(node.Type, $"flatSwitch{counter++}");
+        var prm = Ex.Parameter(node.Type, $"$flatSwitch{counter++}");
         return Ex.Block(new[] {prm},
             Linearize(cond => Ex.Switch(typeof(void), cond,
                 WithAssign(Visit(node.DefaultBody ?? throw new Exception(
@@ -252,7 +269,7 @@ public class LinearizeVisitor : ExpressionVisitor {
         if (node.Type == typeof(void))
             return base.VisitTry(node);
         
-        var prm = Ex.Parameter(node.Type, $"flatTry{counter++}");
+        var prm = Ex.Parameter(node.Type, $"$flatTry{counter++}");
         return Ex.Block(new[] {prm},
             Ex.MakeTry(typeof(void),
                 WithAssign(Visit(node.Body), prm),

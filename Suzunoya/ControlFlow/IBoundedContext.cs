@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Reactive;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
@@ -59,10 +60,16 @@ public record BoundedContext<T>(IVNState VN, string ID, Func<Task<T>> InnerTask)
     /// <summary>
     /// Task to run
     /// </summary>
-    protected Func<Task<T>> InnerTask { get; } = InnerTask;
+    protected Func<Task<T>> InnerTask { get; init; } = InnerTask;
     
     /// <inheritdoc/>
     public bool Identifiable => !string.IsNullOrWhiteSpace(ID);
+
+    /// <summary>
+    /// True iff there are no save-data changes in the body of the bounded context.
+    /// <br/>This allows speed optimizations during ADV execution.
+    /// </summary>
+    public bool Trivial { get; init; } = false;
 
     /// <summary>
     /// Return true if the context has been executed and completed in the given parentage path.

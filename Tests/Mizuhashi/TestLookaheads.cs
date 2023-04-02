@@ -42,12 +42,10 @@ public class TestLookaheads {
         parserC.AssertSuccess("123", 123);
         parserA.AssertFail("red", new Expected("at least one digit"));
         parserB.AssertFail("red", new Expected("at least one digit"));
-        parserC.AssertFail("red", new Labelled("int without leading zero", 
-            new(new LocatedParserError(0, new Expected("at least one digit")))));
+        parserC.AssertFail("red", new Labelled("int without leading zero", new Expected("at least one digit")));
         parserA.AssertFail("0123", new Unexpected("leading zero"));
         parserB.AssertFail("0123", new UnexpectedChar('0'));
-        parserC.AssertFail("0123", new Labelled("int without leading zero", 
-            new(new LocatedParserError(0, new UnexpectedChar('0')))));
+        parserC.AssertFail("0123", new Labelled("int without leading zero", new UnexpectedChar('0')));
     }
     
 

@@ -11,7 +11,7 @@ namespace Mizuhashi.Lexers {
 /// A handler for creating a token from a source string using regex parsing.
 /// </summary>
 /// <param name="RegexPattern">A regex pattern describing the token. The lexer will automatically prepend \G to this pattern to ensure that it generates contiguous tokens.</param>
-/// <param name="Tokenizer">A function that converts a regex match from RegexPattern into a token, with the option of failing and forcing a different match. Returns the token and the length of the match that was actually used.</param>
+/// <param name="Tokenizer">A function that converts a regex match from RegexPattern into a token, with the option of failing and forcing a different match. Returns the token and the length of the match that was actually used. If length is negative, parsing will stop.</param>
 /// <typeparam name="T">Type of result token.</typeparam>
 public record RegexTokenizer<T>([RegexPattern] string RegexPattern, Func<Position, Match, Maybe<(T token, int consumed)>> Tokenizer) {
     /// <summary>
@@ -74,6 +74,8 @@ public class RegexLexer<T> {
                 if (match.Success) {
                     var token = tokenizers[it].Tokenizer(position, match);
                     if (token.Try(out var t)) {
+                        if (t.consumed < 0)
+                            goto end;
                         prevIndex = index;
                         index += t.consumed;
                         position = position.Step(match.Value, t.consumed);
@@ -92,6 +94,7 @@ public class RegexLexer<T> {
             throw new Exception(sb.ToString());
             nextLoop: ;
         }
+        end: ;
         return tokens;
     }
 }

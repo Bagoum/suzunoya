@@ -8,8 +8,7 @@ namespace BagoumLib.DataStructures {
 /// <summary>
 /// Implementation of List that supports Add(in T). This is probably not faster than List.
 /// </summary>
-[PublicAPI]
-public class ArrayList<T> : ICollection<T> {
+internal class ArrayList<T> : ICollection<T> {
     private int count;
     private T[] arr;
 

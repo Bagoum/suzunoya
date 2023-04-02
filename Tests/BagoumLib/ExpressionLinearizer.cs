@@ -39,7 +39,7 @@ public class ExpressionLinearizer {
             yi.Add(x)
         ));
 
-        //Block on RHS is not printable
+        //Block on RHS is not directly printable
         Assert.Throws<Exception>(() => ExPrinter.Print(ex));
         LinPrints(ex, @"
 float y = 5f;
@@ -154,19 +154,19 @@ switch (x) {
         var y = Prm<int>("y");
         var z = Prm<int>("z");
         var a = Prm<int>("a");
-        LinPrints(Ex.Block(new[]{a, y}, 
-            y.Is(ExC(2)),
+        LinPrints(Ex.Block(new[]{a}, 
             a.Is(ExC(1).Add(Ex.Block(new[]{z}, 
-                z.Is(ExC(4).Add(Ex.Block(new[]{x}, 
+                z.Is(ExC(4).Add(Ex.Block(new[]{x, y}, 
                     x.Is(ExC(-1)),
+                    y.Is(ExC(2)),
                     x.Is(x.Add(ExC(6))),
                     y.Is(x.Add(ExC(2)))
                     ))),
                 z.Add(ExC(3))
                 )))
             ), @"
-int y = 2;
 int x = -1;
+int y = 2;
 x = (x + 6);
 int z = (4 + (y = (x + 2)));
 int a = (1 + (z + 3));
@@ -189,6 +189,7 @@ int a = (1 + (z + 3));
         LinPrints(Ex.Lambda<Func<int, int, int>>(x.Add(tryBlock), x, y), @"
 (Func<int, int, int>) ((int x, int y) => {
     int flatTry0;
+    int flatBlock1 = x;
     try {
         throw new Exception();
     } catch (InvalidOperationException ioExc) when (ioExc.Message == ""hello"") {
@@ -199,11 +200,12 @@ int a = (1 + (z + 3));
     } finally {
         x = 5;
     }
-    return x + flatTry0;
+    return flatBlock1 + flatTry0;
 })");
         SafeLinPrints(Ex.Lambda<Func<int, int, int>>(x.Add(tryBlock), x, y), @"
 (Func<int, int, int>) ((int x, int y) => {
     int flatTry0;
+    int flatBlock1 = x;
     try {
         throw new Exception();
     } catch (InvalidOperationException ioExc) when (ioExc.Message == ""hello"") {
@@ -214,7 +216,7 @@ int a = (1 + (z + 3));
     } finally {
         x = 5;
     }
-    return x + flatTry0;
+    return flatBlock1 + flatTry0;
 })");
     }
 
@@ -229,19 +231,19 @@ x = ((2 + 5) + (7 - 2));
 ");
         SafeLinPrints(ex, @"
 3;
-int blockTmp0 = (2 + 5);
+int flatBlock0 = (2 + 5);
 6;
-int blockTmp1 = (7 - 2);
-x = (blockTmp0 + blockTmp1);
+int flatBlock1 = (7 - 2);
+x = (flatBlock0 + flatBlock1);
 ");
         var tex = x.Is(Ex.Block(ExC(3), ExC(2).Add(ExC(5))).Add(Ex.Block(ExC(6), 
             Ex.Throw(Ex.New(typeof(Exception)), typeof(int)))));
         LinPrints(tex, @"
 3;
-int blockTmp0 = (2 + 5);
+int flatBlock0 = (2 + 5);
 6;
-int blockTmp1 = (throw new Exception());
-x = (blockTmp0 + blockTmp1);
+int flatBlock1 = (throw new Exception());
+x = (flatBlock0 + flatBlock1);
 ");
     }
 
@@ -268,5 +270,48 @@ x ?
     y;
 ");
     }
+
+
+    [Test]
+    public void TestInterference() {
+        var x = Prm<float>("x");
+        var y = Prm<float>("y");
+        var ex1 = x.Add(Ex.Block(x.Is(ExC(5f)), x.Add(2)));
+        //x is reassigned in the block
+        LinPrints(ex1, @"
+float flatBlock0 = x;
+x = 5f;
+float flatBlock1 = (x + 2f);
+flatBlock0 + flatBlock1;
+");
+        var ex2 = x.Add(Ex.Block(Ex.PostIncrementAssign(x)));
+        LinPrints(ex2, @"x + (x++)");
+        
+        var ex3 = x.Add(Ex.Block(new[]{y}, y.Is(ExC(5f)), Ex.PostIncrementAssign(x)));
+        LinPrints(ex3, @"
+float flatBlock0 = x;
+float y = 5f;
+float flatBlock1 = (x++);
+flatBlock0 + flatBlock1;
+");
+        
+        //methods are assumed to cause interference
+        var ex4 = x.Add(Ex.Block(new[]{y}, y.Is(ExC(5f)), 
+            Expression.Call(null, typeof(Math).GetMethod("Abs", new[]{typeof(float)})!, x)));
+        LinPrints(ex4, @"
+float flatBlock0 = x;
+float y = 5f;
+float flatBlock1 = Math.Abs(x);
+flatBlock0 + flatBlock1;
+");
+        
+        //local assignments are ok
+        var ex5 = x.Add(Ex.Block(new[]{y}, y.Is(ExC(5f)), x));
+        LinPrints(ex5, @"
+float y = 5f;
+x + x;
+");
+    }
+    
 }
 }

@@ -127,10 +127,13 @@ public class _4SaveLoadLocationTest {
         "<VNState>.OperationID ~ C",
         //"<Reimu>.ComputedLocation ~ <2, 2, 2>",
         //"<Reimu>.ComputedLocation ~ <2, 2, 2>", //The last process is the beginning of the move location from 2 to 0.
-        "<TestDialogueBox>.EntityActive ~ False",
+        "<RenderGroup>.EntityActive ~ Predeletion",
+        "<TestDialogueBox>.EntityActive ~ Predeletion",
+        "<Reimu>.EntityActive ~ Predeletion",
+        "<TestDialogueBox>.EntityActive ~ Deleted",
         "<VNState>.ContextFinished ~ Context:test4",
-        "<Reimu>.EntityActive ~ False",
-        "<RenderGroup>.EntityActive ~ False",
+        "<Reimu>.EntityActive ~ Deleted",
+        "<RenderGroup>.EntityActive ~ Deleted",
         "<VNState>.VNStateActive ~ False"
     };
 

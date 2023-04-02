@@ -16,6 +16,11 @@ public interface IObjectPrinter {
 public class CSharpObjectPrinter : IObjectPrinter {
     public CSharpTypePrinter TypePrinter { get; set; } = new CSharpTypePrinter();
 
+    /// <summary>
+    /// Set this to true to use .ToString() if the value cannot be printed.
+    /// </summary>
+    public bool FallbackToToString { get; init; } = false;
+
     private static readonly HashSet<Type> CastTypes = new() {
         typeof(byte), typeof(sbyte), typeof(short), typeof(ushort)
     };
@@ -58,7 +63,10 @@ public class CSharpObjectPrinter : IObjectPrinter {
             string s => $"\"{string.Join("", s.Select(PrintChar))}\"",
             Exception e => $"new {TypePrinter.Print(e.GetType())}({Print(e.Message)})",
             Type t => $"typeof({TypePrinter.Print(t)})",
-            { } obj => throw new Exception($"Couldn't print object {obj} of type {typ}")
+            { } obj => 
+                FallbackToToString ? 
+                    (FormattableString)$"{obj.ToString()}" :
+                    throw new Exception($"Couldn't print object {obj} of type {typ}")
         });
     }
 }

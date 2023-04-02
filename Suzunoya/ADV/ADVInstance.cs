@@ -50,6 +50,7 @@ public interface IADVInstanceRequest {
     /// Save data to load from.
     /// </summary>
     public ADVData ADVData { get; }
+    
     /// <summary>
     /// When loading into an in-progress BoundedContext, this contains the "true" save data,
     ///  that is replayed onto the "blank" save data in <see cref="ADVData"/>.

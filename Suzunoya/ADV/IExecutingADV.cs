@@ -23,6 +23,12 @@ public interface IExecutingADV : IDisposable {
     /// Run the ADV. Returns an <see cref="IADVCompletion"/> when the entirety of the ADV is complete.
     /// </summary>
     Task<IADVCompletion> Run();
+
+    /// <summary>
+    /// Called when <see cref="ADVData"/> is finalized; ie. after the proxy-loading process is complete.
+    /// <br/>Any dependencies on fields on <see cref="ADVData"/> should be set up in this function.
+    /// </summary>
+    void ADVDataFinalized();
 }
 
 /// <summary>
@@ -66,9 +72,15 @@ public class BarebonesExecutingADV<D> : IExecutingADV<ADVIdealizedState, D> wher
         if (Inst.Request.LoadProxyData?.VNData is { Location: { } l} replayer)
             Inst.VN.LoadToLocation(l, replayer, () => {
                 Inst.Request.FinalizeProxyLoad();
+                ADVDataFinalized();
             });
+        else
+            ADVDataFinalized();
         await executor();
         return new UnitADVCompletion();
     }
+
+    /// <inheritdoc/>
+    public virtual void ADVDataFinalized() { }
 }
 }

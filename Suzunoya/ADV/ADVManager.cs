@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using BagoumLib;
 using BagoumLib.Cancellation;
 using BagoumLib.Events;
+using BagoumLib.Tasks;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Suzunoya.ControlFlow;
@@ -25,7 +26,7 @@ public class ADVManager : ITokenized {
         /// </summary>
         Investigation = 0,
         /// <summary>
-        /// Dialogue state: the VN is executing dialogue.
+        /// Dialogue state: the VN is executing dialogue. Generally corresponds with <see cref="ADVManager.VNIsExecuting"/>.
         /// </summary>
         Dialogue = 100,
         /// <summary>
@@ -33,6 +34,17 @@ public class ADVManager : ITokenized {
         /// </summary>
         Waiting = 200
     }
+
+    /// <summary>
+    /// All valid values of <see cref="State"/>.
+    /// </summary>
+    public static readonly State[] AllStates = { State.Investigation, State.Dialogue, State.Waiting };
+
+    /// <summary>
+    /// True if a VN segment is currently playing. 
+    /// </summary>
+    public bool VNIsExecuting => ExecAdv?.VN.ContextExecuting ?? false;
+    
     /// <inheritdoc cref="IExecutingADV.ADVData"/>
     public ADVData ADVData => ExecAdv!.ADVData;
     /// <inheritdoc cref="IExecutingADV.VN"/>
@@ -55,6 +67,8 @@ public class ADVManager : ITokenized {
     /// Event invoked right before VN execution begins. Bool: whether or not parallel investigation is permitted.
     /// </summary>
     public Event<bool> VNExecutionStarting { get; } = new();
+
+    private Queue<Action> pendingVNExecutions = new();
 
     /// <summary>
     /// Destroy the currently running ADV instance, if it exists.
@@ -93,9 +107,20 @@ public class ADVManager : ITokenized {
     /// </summary>
     public Task<T>? TryExecuteVN<T>(BoundedContext<T> task, bool allowParallelInvestigation = false) {
         VNState.Flush();
-        if (VNState.Contexts.Count > 0)
+        if (VNIsExecuting)
             return null;
         return ExecuteVN(task, allowParallelInvestigation);
+    }
+
+    /// <summary>
+    /// Execute a top-level VN segment. If one is already executing, then execute this after the previous one is complete.
+    /// </summary>
+    public void TryOrDelayExecuteVN<T>(BoundedContext<T> task, bool allowParallelInvestigation = false) {
+        VNState.Flush();
+        if (VNIsExecuting) {
+            pendingVNExecutions.Enqueue(() => _ = ExecuteVN(task, allowParallelInvestigation).ContinueWithSync());
+        } else
+            _ = ExecuteVN(task, allowParallelInvestigation).ContinueWithSync();
     }
 
     /// <summary>
@@ -104,32 +129,36 @@ public class ADVManager : ITokenized {
     public async Task<T> ExecuteVN<T>(BoundedContext<T> task, bool allowParallelInvestigation = false) {
         //Do this first in order to dispose dependencies on investigation state, such as interactable mimics
         // running BCTX on hover
-        using var _ = ADVState.AddConst(allowParallelInvestigation ? State.Investigation : State.Dialogue);
+        var stateToken = ADVState.AddConst(allowParallelInvestigation ? State.Investigation : State.Dialogue);
         var vn = VNState;
         vn.Flush();
-        if (vn.Contexts.Count > 0)
+        if (VNIsExecuting)
             throw new Exception($"Executing a top-level VN segment {task.ID} when one is already active");
         if (ADVData.UnmodifiedSaveData != null)
             throw new Exception($"Executing a top-level VN segment {task.ID} when unmodifiedSaveData is non-null");
         vn.ResetInterruptStatus();
         var inst = ExecAdv ?? throw new Exception();
         VNExecutionStarting.OnNext(allowParallelInvestigation);
-        vn.Logs.OnNext($"Starting VN segment {task.ID}");
-        ADVData.PreserveData();
+        vn.Logs.Log($"Starting VN segment {task.ID}");
+        if (!task.Trivial)
+            ADVData.PreserveData();
         try {
             var res = await task;
             vn.UpdateInstanceData();
             return res;
         } catch (Exception e) {
             if (e is OperationCanceledException)
-                vn.Logs.OnNext($"Cancelled VN segment {task.ID}");
+                vn.Logs.Log($"Cancelled VN segment {task.ID}");
             else
-                vn.Logs.OnNext(e);
+                vn.Logs.Error(e);
             throw;
         } finally {
             vn.ResetInterruptStatus();
             ADVData.RemovePreservedData();
-            vn.Logs.OnNext($"Completed VN segment {task.ID}. Final state: {inst.Inst.Tracker.ToCompletion()}");
+            vn.Logs.Log($"Completed VN segment {task.ID}. Final state: {inst.Inst.Tracker.ToCompletion()}");
+            stateToken.Dispose();
+            if (pendingVNExecutions.TryDequeue(out var action))
+                action();
             //TODO: require a smarter way to handle "reverting to previous state"
         }
     }

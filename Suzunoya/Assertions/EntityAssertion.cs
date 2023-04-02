@@ -31,7 +31,7 @@ public abstract record EntityAssertion {
     /// </summary>
     public List<IAssertion> Children { get; } = new();
     /// <summary>
-    /// Bound to <see cref="ITransform.Location"/>
+    /// Bound to <see cref="ITransform.LocalLocation"/>
     /// </summary>
     public Vector3 Location { get; init; }
     /// <summary>
@@ -148,7 +148,7 @@ public record EntityAssertion<C> : EntityAssertion, IChildLinkedAssertion, IAsse
     /// </summary>
     protected virtual void Bind(C ent) {
         Bound = ent;
-        ent.Location.SetIdeal(Location);
+        ent.LocalLocation.SetIdeal(Location);
         ent.EulerAnglesD.SetIdeal(EulerAnglesD);
         ent.Scale.SetIdeal(Scale);
         ent.Tint.SetIdeal(Tint);

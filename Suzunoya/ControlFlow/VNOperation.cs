@@ -83,11 +83,13 @@ public record LazyFunc<T>(Func<T> lazyFunc) : ILazyAwaitable<T> {
 /// An action predenting to be a task.
 /// </summary>
 public record LazyAction : LazyFunc<Unit> {
+    /// <inheritdoc cref="LazyAction"/>
     public LazyAction(Action lazyOp) : base(() => {
         lazyOp();
         return Unit.Default;
     }) { }
     
+    /// <inheritdoc cref="LazyAction"/>
     public static implicit operator LazyAction(Action op) => new(op);
 }
 
@@ -165,6 +167,7 @@ public class VNProcessGroup : ICancellee {
     /// <inheritdoc/>
     public ICancellee Root => this;
         
+    /// <inheritdoc cref="VNProcessGroup"/>
     public VNProcessGroup(VNInterruptionLayer ih, bool allowUserSkip) {
         ProcessLayer = ih;
         userSkipAllowed = allowUserSkip;
@@ -365,13 +368,5 @@ public record VNOperation(IVNState VN, params Func<VNCancellee, Task>[] Subopera
 
     /// <inheritdoc/>
     public TaskAwaiter<Completion> GetAwaiter() => Task.GetAwaiter();
-
-    /// <summary>
-    /// Create a copy of this awaitable that can be cancelled by the provided cancellation token.
-    /// </summary>
-    /*public VNOperation BoundCT(ICancellee cT) => this with {
-        Suboperations = Suboperations.Select(f => (Func<VNCancellee, Task>)(o => f(o.BoundCT(cT)))).ToArray()
-    };
-    ILazyAwaitable<Completion> ILazyAwaitable<Completion>.BoundCT(ICancellee cT) => BoundCT(cT);*/
 }
 }

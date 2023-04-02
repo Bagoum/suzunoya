@@ -67,7 +67,7 @@ public class DataStructures {
         arr.SafeAssign(6, 400);
         Assert.AreEqual(arr.SafeGet(6), 400);
         Assert.AreEqual(arr.SafeGet(24), 0);
-        arr.Empty();
+        arr.EmptyAndReset();
         Assert.AreEqual(arr.SafeGet(6), 0);
     }
 

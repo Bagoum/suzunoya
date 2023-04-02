@@ -7,11 +7,12 @@ namespace BagoumLib.DataStructures {
 /// </summary>
 [PublicAPI]
 public class SafeResizableArray<T> {
+    private int baseSize;
     private int count;
     private T[] arr;
 
     public SafeResizableArray(int size = 8) {
-        arr = new T[size];
+        arr = new T[baseSize = size];
         count = 0;
     }
 
@@ -34,7 +35,10 @@ public class SafeResizableArray<T> {
         return arr[index];
     }
 
-    public void Empty() {
+    /// <summary>
+    /// Clear all elements in the array and reset it to its base size.
+    /// </summary>
+    public void EmptyAndReset() {
         Array.Clear(arr, 0, arr.Length);
         count = 0;
     }

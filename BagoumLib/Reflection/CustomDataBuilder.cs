@@ -172,11 +172,14 @@ public class CustomDataBuilder {
                     $"Preconstructed base typedoes not have custom data getter function {FieldReaderMethodName(t)} for type {t.RName()}");
         }
         CustomDataBaseType = baseType;
-        customDataDescriptors[baseType] = new(CustomDataDescriptor.Empty, baseType, baseType.GetConstructor(Type.EmptyTypes) ?? throw new Exception("Preconstructed base type is missing empty constructor"), baseType.GetMethod(CopyIntoMethod) ?? throw new Exception($"Preconstructed base type does not have {CopyIntoMethod}"));
+        customDataDescriptors[baseType] = MakeForEmpty(baseType);
         customDataTypes[CustomDataDescriptor.Empty] = baseType;
         
         SetReservedKeys();
     }
+    
+    private BuiltCustomDataDescriptor MakeForEmpty(Type baseType) => 
+        new(CustomDataDescriptor.Empty, baseType, baseType.GetConstructor(Type.EmptyTypes) ?? throw new Exception("Preconstructed base type is missing empty constructor"), baseType.GetMethod(CopyIntoMethod) ?? throw new Exception($"Preconstructed base type does not have {CopyIntoMethod}"));
     
     /// <summary>
     /// Constructor that can be used when there is no fixed base type.
@@ -247,6 +250,18 @@ public class CustomDataBuilder {
         customDataTypes[CustomDataDescriptor.Empty] = CustomDataBaseType;
 
         SetReservedKeys();
+    }
+
+    
+    /// <summary>
+    /// A degenerate constructor for cases where type-building is not actually used. Note that <see cref="CreateCustomDataType"/> will throw unless you are requesting the base type.
+    /// </summary>
+    public CustomDataBuilder(Type baseType) {
+        Factory = null!;
+        this.byIdAccessible = Array.Empty<Type>();
+        CustomDataBaseType = baseType;
+        customDataDescriptors[baseType] = MakeForEmpty(baseType);
+        customDataTypes[CustomDataDescriptor.Empty] = baseType;
     }
 
     /// <summary>
@@ -327,6 +342,9 @@ public class CustomDataBuilder {
             built = customDataDescriptors[customType];
             return customType;
         }
+        if (Factory == null)
+            throw new Exception(
+                "This instance of CustomDataBuilder is degenerate and does not support type construction");
         if (baseType != CustomDataBaseType && !baseType.IsSubclassOf(CustomDataBaseType))
             throw new Exception(
                 $"Provided base type {baseType.Name} is not a subclass of builder base type {CustomDataBaseType.Name}");

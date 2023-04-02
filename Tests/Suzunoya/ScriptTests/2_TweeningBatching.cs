@@ -22,7 +22,7 @@ public class _2TweeningBatchingTest {
         public async Task Run() {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
-            reimu.Location.Value = Vector3.Zero;
+            reimu.LocalLocation.Value = Vector3.Zero;
             var exc = vn.Contexts[^1];
             await vn.Wait(0);
 

@@ -45,7 +45,7 @@ public record ADVIdealizedState : IdealizedState {
     }
 
     /// <summary>
-    /// Set a visual novel segment to be run when this idealized state is actualized.
+    /// Set a visual novel segment to be run when this idealized state is first actualized (doesn't work on inherit).
     /// </summary>
     public bool SetEntryVN(BoundedContext<Unit> bctx, RunOnEntryVNPriority priority = RunOnEntryVNPriority.MAP_ENTER) {
         if (runOnEnterVN == null || runOnEnterVN?.priority > priority) {

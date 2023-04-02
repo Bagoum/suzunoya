@@ -74,34 +74,54 @@ public static partial class Combinators {
         } else
             return rx.CastFailure<(A, B)>();
     };
+    
+    /// <summary>
+    /// Backtracks only if the second parser hits a non-fatal error, but does not record the backtrack.
+    /// </summary>
+    public static Parser<T, (A a, B b)> ThenTryFast<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
+        var state = input.Stative;
+        var i = state.Index;
+        var rx = first(input);
+        if (rx.Result.Try(out var x)) {
+            var ry = second(input);
+            if (ry.Status == ResultStatus.ERROR) {
+                input.RollbackFast(state);
+                return new(Maybe<(A, B)>.None, rx.MergeErrors(in ry), i, i);
+            }
+            return new(ry.Result.Try(out var y) ? new((x, y)) : Maybe<(A, B)>.None, 
+                rx.MergeErrors(in ry), rx.Start, ry.End);
+        } else
+            return rx.CastFailure<(A, B)>();
+    };
 
     /// <summary>
     /// FParsec followedBy/followedByL. Attempts to apply the parser, but does not change state.
     /// <br/>Unlike FParsec, returns the parsed value.
-    /// <br/>Also unlike FParsec, uses the error message from the parser.
-    ///  It is usually a good idea to wrap this in a label for clarity.
+    /// <br/>Also unlike FParsec, uses the error message from the parser (if `expected` is not provided).
     /// </summary>
-    public static Parser<T, R> IsPresent<T, R>(this Parser<T, R> p) {
+    public static Parser<T, R> IsPresent<T, R>(this Parser<T, R> p, string? expected = null) {
+        var err = expected == null ? null : new ParserError.Expected(expected);
         return input => {
             var state = input.Stative;
             var result = p(input);
+            var lerr = result.Error == null ? default(LocatedParserError?) : 
+                new LocatedParserError(state.Index, err ?? result.Error.Value.Error);
             input.RollbackFast(state);
-            return new ParseResult<R>(result.Result, result.Error, result.Start, result.Start);
+            return new ParseResult<R>(result.Result, lerr, result.Start, result.Start);
         };
     }
     
     /// <summary>
     /// FParsec notFollowedBy/notFollowedByL. Attempts to apply the parser, but does not change state.
     /// </summary>
-    public static Parser<T, Unit> IsNotPresent<T, R>(this Parser<T, R> p, string? expected = null) {
-        var err = new ParserError.Unexpected(expected ?? "(No description provided)");
+    public static Parser<T, Unit> IsNotPresent<T, R>(this Parser<T, R> p, string? unexpected = null) {
+        var err = new ParserError.Unexpected(unexpected ?? "(No description provided)");
         return input => {
             var state = input.Stative;
             var result = p(input);
-            var lerr = new LocatedParserError(state.Index, err);
             input.RollbackFast(state);
             return new ParseResult<Unit>(result.Result.Valid ? Maybe<Unit>.None : Maybe<Unit>.Of(default), 
-                result.Error == null ? lerr : null, result.Start, result.Start);
+                result.Result.Valid ? new LocatedParserError(state.Index, err) : null, result.Start, result.Start);
         };
     }
     

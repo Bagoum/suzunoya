@@ -16,16 +16,18 @@ namespace Suzunoya.ADV {
 /// <param name="VN">VN process on which this is running.</param>
 /// <typeparam name="E">Type of evidence object.</typeparam>
 [PublicAPI]
-public record EvidenceRequest<E>(IVNState VN) {
+public record EvidenceRequest<E>(IVNState VN, ADVManager? ADV = null) {
     //we push null elements when we interrupt so the lower enclosing context's request
     // can still stick around without being reachable
     private readonly Stack<Token?> requests = new();
     private Token? CurrentRequest => requests.Count > 0 ? requests.Peek() : null;
+    
     /// <summary>
     /// Whether or not there exists a consumer to which evidence can be presented.
+    /// <br/>This does not account for top-level consumers in <see cref="ADVEvidenceRequest{E}"/>.
     /// </summary>
     public bool CanPresent => CurrentRequest is { };
-    
+
     /// <summary>
     /// Event called when the stack of requests has changed. The stack is not publicly visible, but you
     ///  may examine <see cref="CurrentRequest"/>/<see cref="CanPresent"/> to see the top of the stack.
@@ -33,18 +35,31 @@ public record EvidenceRequest<E>(IVNState VN) {
     public Event<Unit> RequestsChanged { get; } = new();
 
     /// <summary>
+    /// Assert that a bounded context is safe to be used as an interruption at the current moment.
+    /// <br/>This is always true if the VN execution stack is already locked.
+    /// <br/>Either the bounded context must be non-identifiable, or it must have LoadSafe set to false.
+    /// </summary>
+    public BoundedContext<T> AssertInterruptionSafe<T>(BoundedContext<T> bcx) {
+        //If saving is not possible, then we don't need any further checks on interruption safety.
+        if (ADV?.ADVData.IsLocked is true)
+            return bcx;
+        if (bcx.Identifiable && bcx is not IStrongBoundedContext { LoadSafe: false })
+            throw new Exception("Interruption BCTXes should not be identifiable, in order to prevent errant save/load. " +
+                                "Either set the ID to an empty string, or use a StrongBoundedContext with LoadSafe = false.");
+        return bcx;
+    }
+
+    /// <summary>
     /// Present evidence that has been requested, and run a continuation based on how the request has been configured
     ///  via <see cref="Request"/> or <see cref="WaitForEvidence"/>.
+    /// <br/>This does not account for top-level consumers in <see cref="ADVEvidenceRequest{E}"/>.
     /// </summary>
     public async Task Present(E evidence) {
         if (CurrentRequest is Token.Interrupt req) {
             var interruption = VN.Interrupt();
             requests.Push(null);
             RequestsChanged.OnNext(default);
-            var bcx = req.WhenEvidenceProvided(evidence);
-            if (bcx.Identifiable && bcx is not IStrongBoundedContext { LoadSafe: false })
-                throw new Exception("Interruption BCTXes should not be identifiable, in order to prevent errant save/load. " +
-                                    "Either set the ID to an empty string, or use a StrongBoundedContext with LoadSafe = false.");
+            var bcx = AssertInterruptionSafe(req.WhenEvidenceProvided(evidence));
             var rct = requests.Count;
             var result = InterruptionStatus.Abort;
             //try/finally in case the interruption BCTX is cancelled or has an exception (in which case we use Abort)

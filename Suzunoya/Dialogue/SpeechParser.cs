@@ -13,7 +13,7 @@ internal abstract record TextUnit {
     public record CloseTag(string name) : TextUnit;
 }
 
-public static partial class SpeechParser {
+internal static partial class SpeechParser {
     private static bool TagChar(char c) =>
         c == TAG_OPEN || c == TAG_CLOSE;
 
@@ -31,9 +31,9 @@ public static partial class SpeechParser {
         Between(TAG_OPEN, Many1Satisfy(NotTagChar), TAG_CLOSE).FMap(s => {
             int contInd;
             if (s[0] == TAG_CLOSE_PREFIX)
-                return (TextUnit)new TextUnit.CloseTag(s.Substring(1));
+                return (TextUnit)new TextUnit.CloseTag(s[1..]);
             else if ((contInd = s.IndexOf(TAG_CONTENT)) > 0)
-                return new TextUnit.OpenTag(s.Substring(0, contInd), s.Substring(contInd + 1));
+                return new TextUnit.OpenTag(s[..contInd], s[(contInd + 1)..]);
             else
                 return new TextUnit.OpenTag(s, null);
         });
@@ -52,7 +52,8 @@ public static partial class SpeechParser {
     /// <returns>Parsed content</returns>
     /// <exception cref="Exception">Thrown if parsing fails</exception>
     internal static List<TextUnit> Parse(string raw) => 
-        speechParser.ResultOrErrorString(new InputStream<char>("Dialogue text", raw.ToCharArray(), null!))
+        speechParser.ResultOrErrorString(new InputStream<char>("Dialogue text", raw.ToCharArray(), null!, 
+                new CharTokenWitnessCreator(raw)))
             .Map(l => l, r => throw new Exception(r));
     }
 }

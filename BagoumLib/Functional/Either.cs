@@ -171,8 +171,8 @@ public readonly struct Either<L, R> {
     
     /// <inheritdoc cref="Equals(Either{L,R})"/>
     public static bool operator ==(in Either<L, R> a, in Either<L, R> b) =>
-        (a.IsLeft && b.IsLeft && Equals(a.Left, b.Left)) ||
-        (!a.IsLeft && !b.IsLeft && Equals(a.Right, b.Right));
+        (a.IsLeft && b.IsLeft && EqualityComparer<L>.Default.Equals(a.Left, b.Left)) ||
+        (!a.IsLeft && !b.IsLeft && EqualityComparer<R>.Default.Equals(a.Right, b.Right));
 
     /// <summary>
     /// Inverted equality operator.

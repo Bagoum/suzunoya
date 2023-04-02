@@ -99,6 +99,11 @@ public readonly struct Position {
     }
 
     /// <summary>
+    /// new PositionRange(this, this)
+    /// </summary>
+    public PositionRange CreateEmptyRange() => new(this, this);
+
+    /// <summary>
     /// Creates a position range between this position and `steps` characters ahead, using
     /// `over` to determine the locations of newlines.
     /// <br/>Assumes that `over` is some substring Source[Index..].
@@ -141,8 +146,13 @@ public readonly struct Position {
     /// <summary>
     /// Show the contents of this position in a user-friendly way by combining ShowLine and ShowLineUpToPosition. 
     /// </summary>
-    public string PrettyPrintLocation(string source) => $"{ShowLine(source)}\n" +
-                                                 $"{ShowLineUpToPosition(source)}| <- at this location";
+    public string PrettyPrintLocation(string source) => PrettyPrintLocation(source, "| <- at this location");
+    
+    /// <summary>
+    /// Show the contents of this position in a user-friendly way by combining ShowLine and ShowLineUpToPosition. 
+    /// </summary>
+    public string PrettyPrintLocation(string source, string suffix) => $"{ShowLine(source)}\n" +
+                                                        $"{ShowLineUpToPosition(source)}{suffix}";
 
     /// <summary>
     /// Equality operator.
@@ -271,11 +281,6 @@ public interface IInputStream {
     /// Witness describing how to display the tokens over some user-facing source string.
     /// </summary>
     public ITokenWitness TokenWitness { get; }
-    
-    /// <summary>
-    /// Returns an error string for an error.
-    /// </summary>
-    public string ShowError(LocatedParserError err);
 }
 
 /// <summary>
@@ -358,15 +363,12 @@ public class InputStream<Token> : IInputStream {
     /// Returns an error string containing all rollback information and the final error.
     /// </summary>
     public string ShowAllFailures(LocatedParserError final) {
-        var errs = new List<string> {ShowError(final)};
+        var errs = new List<string> {final.Show(this)};
         errs.AddRange(Rollbacks
             .Select(err => 
-                $"The parser backtracked after the following error:\n\t{ShowError(err).Replace("\n", "\n\t")}"));
+                $"The parser backtracked after the following error:\n\t{err.Show(this).Replace("\n", "\n\t")}"));
         return string.Join("\n\n", errs);
     }
-
-    /// <inheritdoc/>
-    public string ShowError(LocatedParserError err) => TokenWitness.ShowError(err);
 }
 
 /// <summary>
@@ -455,10 +457,6 @@ public readonly struct ParseResult<R> {
         End = end ?? start;
     }
 
-    public ParseResult<R> WithWrapError(string label) => 
-        new(Result, Error.Try(out var e) ? new LocatedParserError(e.Index, 
-            new ParserError.Labelled(label, new(Error))) : null, Start, End);
-
     public LocatedParserError? MergeErrors<B>(in ParseResult<B> second) {
         if (second.Consumed)
             return second.Error;
@@ -520,9 +518,24 @@ public delegate ParseResult<R> Parser<T, R>(InputStream<T> input);
 /// </summary>
 public interface ITokenWitness {
     /// <summary>
-    /// Display an error in the source stream.
+    /// Display the position prelude of an error.
+    /// <br/>The output looks something like:
+    /// <br/>Error at Line 1, Col 5:
+    /// <br/>  foo bar
+    /// <br/>  foo | &lt;- at this location
     /// </summary>
-    public string ShowError(LocatedParserError error);
+    public string ShowErrorPosition(LocatedParserError error);
+
+    public static string ShowErrorPositionInSource(ParserError error, PositionRange errPos, string source) {
+        if (error.StartingFrom.Try(out var start)) {
+            return ($"Error between {start} and {errPos}:\n" +
+                   start.PrettyPrintLocation(source, "| <- starting from here\n") +
+                   errPos.Start.PrettyPrintLocation(source, "| <- up until here")).Replace("\n", "\n  ");
+        } else {
+            return ($"Error at {errPos.ToString()}:\n" +
+                   errPos.Start.PrettyPrintLocation(source)).Replace("\n", "\n  ");
+        }
+    }
 
     /// <summary>
     /// Create an error showing that the token at the given index was unexpected.
@@ -572,16 +585,13 @@ public interface ITokenWitnessCreator<T> {
 /// <summary>
 /// A degenerate class that defines how to display string (char[]) streams.
 /// </summary>
-public record CharTokenWitness(InputStream<char> Stream) : ITokenWitness {
-    private readonly string source = new(Stream.Source);
+public record CharTokenWitness(InputStream<char> Stream, string? Source = null) : ITokenWitness {
+    private string Source { get; } = Source ?? new(Stream.Source);
 
     /// <inheritdoc/>
-    public string ShowError(LocatedParserError error) {
-        var pos = new Position(source, error.Index);
-        return $"Error at {pos.ToString()}:\n" +
-               pos.PrettyPrintLocation(source) +
-               $"\n{error.Error.Flatten().Show(Stream)}";
-    }
+    public string ShowErrorPosition(LocatedParserError error) =>
+        ITokenWitness.ShowErrorPositionInSource(error.Error, 
+            new Position(Source, error.Index).CreateEmptyRange(), Source);
 
     /// <inheritdoc/>
     public ParserError Unexpected(int index) => new ParserError.UnexpectedChar(Stream.Source[index]);
@@ -604,22 +614,22 @@ public record CharTokenWitness(InputStream<char> Stream) : ITokenWitness {
 
     /// <inheritdoc/>
     public PositionRange ToPosition(int start, int end) {
-        return new(new(source, start), new(source, end));
+        return new(new(Source, start), new(Source, end));
     }
 
     /// <inheritdoc/>
     public string ShowConsumed(int start, int end) {
-        return new string(source[start..end]);
+        return new string(Source[start..end]);
     }
 }
 
 /// <summary>
 /// A degenerate class that defines how to create <see cref="CharTokenWitness"/>.
 /// </summary>
-public class CharTokenWitnessCreator : ITokenWitnessCreator<char> {
+public record CharTokenWitnessCreator(string? Source = null) : ITokenWitnessCreator<char> {
     /// <inheritdoc/>
     public ITokenWitness Create(InputStream<char> stream)
-        => new CharTokenWitness(stream);
+        => new CharTokenWitness(stream, Source);
 }
 
 }

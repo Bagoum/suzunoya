@@ -25,10 +25,12 @@ public static partial class Combinators {
                     if (results.Count >= minTimes)
                         goto finalize;
                     else
-                        return new(new ParserError.IncorrectNumber(minTimes, results.Count, null, next.Error), next.Start);
+                        return new((results.Count == 0 && next.Error != null) ? 
+                            next.Error?.Error! :
+                            new ParserError.IncorrectNumber(minTimes, results.Count, null, next.Error), next.Start);
                 else if (!next.Consumed)
                     return new(
-                        new ParserError.Failure("Many parser parsed an object without consuming text."), next.Start);
+                        new ParserError.Failure("`Many` parser parsed an object without consuming text."), next.Start);
                 else
                     results.Add(next.Result.Value);
             }
@@ -55,12 +57,12 @@ public static partial class Combinators {
                 return next.CastFailure<List<R>>();
             else if (next.Status == ResultStatus.ERROR)
                 return (results.Count == 0 && atleastOne) ?
-                    new(new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count, 
+                    new(next.Error?.Error ?? new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count, 
                         null, next.Error), start) :
                     new(results, next.Error, start, next.End);
             else if (!next.Consumed)
                 return new(
-                    new ParserError.Failure("Many parser parsed an object without consuming text."), next.Start);
+                    new ParserError.Failure("`Many` parser parsed an object without consuming text."), next.Start);
             else
                 results.Add(next.Result.Value);
         }
@@ -96,7 +98,7 @@ public static partial class Combinators {
                     new(Unit.Default, next.Error, start, next.End);
             else if (!next.Consumed)
                 return new(
-                    new ParserError.Failure("SkipMany parser parsed an object without consuming text."), next.Start);
+                    new ParserError.Failure("`SkipMany` parser parsed an object without consuming text."), next.Start);
             else
                 foundOne = true;
         }
@@ -111,7 +113,7 @@ public static partial class Combinators {
 
 
     /// <summary>
-    /// Parse `p (sep p)*`. If atleastOne is false, then allows parsing nothing.
+    /// Parse `p (sep p)*`. If atleastOne is false, then allows parsing nothing. `sep` may be non-consuming.
     /// <br/>FParsec sepBy
     /// </summary>
     public static Parser<T, List<R>> SepBy<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep, bool atleastOne = false) =>
@@ -123,8 +125,9 @@ public static partial class Combinators {
                 return next.CastFailure<List<R>>();
             else if (next.Status == ResultStatus.ERROR)
                 return atleastOne ?
-                    new(new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count, 
-                        null, next.Error), start) :
+                    new(next.Error?.Error ?? 
+                        new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count, null, next.Error), 
+                        start, next.End) :
                     new(results, next.Error, start, next.End);
             else
                 results.Add(next.Result.Value);
@@ -134,11 +137,13 @@ public static partial class Combinators {
                 if (sepParsed.Status == ResultStatus.FATAL)
                     return sepParsed.CastFailure<List<R>>();
                 else if (sepParsed.Status == ResultStatus.ERROR)
-                    return new(results, next.Error, start, next.End);
+                    return new(results, next.MergeErrors(sepParsed), start, next.End);
 
                 next = ele(input);
                 if (next.Status == ResultStatus.OK)
                     results.Add(next.Result.Value);
+                else if (next.Status == ResultStatus.ERROR && !sepParsed.Consumed)
+                    return new(results, sepParsed.MergeErrors(next), start, next.End);
                 else
                     return next.CastFailure<List<R>>();
             }
@@ -163,7 +168,9 @@ public static partial class Combinators {
             int ps = 0;
             ParseResult<List<R>> ReturnOnError() =>
                 minPs > ps ?
-                    new(new ParserError.IncorrectNumber(minPs, ps, null, next.Error), start, next.End) :
+                    new((ps == 0 && next.Error != null) ? next.Error?.Error! : 
+                        new ParserError.IncorrectNumber(minPs, ps, null, next.Error), 
+                        start, next.End) :
                     new(results ??= empty, next.Error, start, next.End);
 
             if (next.Status == ResultStatus.FATAL)

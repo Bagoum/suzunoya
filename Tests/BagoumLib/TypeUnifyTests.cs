@@ -5,26 +5,32 @@ using System.Reflection;
 using BagoumLib;
 using BagoumLib.Functional;
 using BagoumLib.Reflection;
+using BagoumLib.Unification;
 using NUnit.Framework;
-using static BagoumLib.Reflection.TypeDesignation;
-using static Tests.BagoumLib.TypeUnifyTests.Tree;
+using static BagoumLib.Unification.TypeDesignation;
+using static BagoumLib.Unification.TypeTree;
 
 namespace Tests.BagoumLib {
-public class TypeUnifyTests {
+public static class TypeUnifyTests {
+    public static Either<List<(TypeDesignation, Unifier)>, TypeUnifyErr> PossibleUnifiers(this ITree t) =>
+        t.PossibleUnifiers(new TypeResolver(), Unifier.Empty);
 
     private static TypeDesignation Call(params TypeDesignation[] argsAndRet)
-        => new Dummy("method", argsAndRet);
+        => new Dummy(Dummy.METHOD_KEY, argsAndRet);
 
     private static Variable Unknown => new();
     private static ITree UnknownTree => new AtomicWithType(Unknown);
+    private static Variable Types(params Known[] k) => new() { RestrictedTypes = k };
     private static TypeDesignation Type<T>() => TypeDesignation.FromType(typeof(T));
+    private static Known K<T>() => TypeDesignation.FromType(typeof(T)) as Known ?? 
+                                                 throw new Exception($"Type {typeof(T).RName()} is not known");
     private static Known Fixed(Type t, params TypeDesignation[] args) => 
         new(t, args);
 
     private static void AssertSuccess<T>(TypeDesignation left, TypeDesignation right) {
         Console.WriteLine(left.ToString());
         Console.WriteLine(right.ToString());
-        var u = left.Unify(right);
+        var u = left.Unify(right, Unifier.Empty);
         if (u.IsRight)
             Assert.Fail($"Unification failed: {u.Right}");
         var lt = left.Resolve(u.Left);
@@ -58,7 +64,7 @@ public class TypeUnifyTests {
         Console.WriteLine("Beginning failure test");
         Console.WriteLine(left.ToString());
         Console.WriteLine(right.ToString());
-        var u = left.Unify(right);
+        var u = left.Unify(right, Unifier.Empty);
         TypeUnifyErr err = null!;
         if (u.IsRight) {
             Console.WriteLine("Failed at unification step");
@@ -112,7 +118,7 @@ public class TypeUnifyTests {
     public static void TestUnification() {
         AssertSuccess<List<int>>(FromMethodN("Generic0"), Call(Type<int>(), Unknown));
         
-        AssertFailure<TypeUnifyErr.KnownNotEqual>(FromMethodN("Generic0"), Call(Unknown, Type<int>()));
+        AssertFailure<TypeUnifyErr.NotEqual<Known>>(FromMethodN("Generic0"), Call(Unknown, Type<int>()));
         
         AssertSuccess<List<int>>(FromMethodN("Generic0"), Call(Unknown, Type<List<int>>()));
         
@@ -121,7 +127,7 @@ public class TypeUnifyTests {
             Fixed(typeof(Func<,>), Type<float>(), Unknown),
             Unknown));
         
-        AssertFailure<TypeUnifyErr.KnownNotEqual>(FromMethodN("Generic1"), Call(
+        AssertFailure<TypeUnifyErr.NotEqual<Known>>(FromMethodN("Generic1"), Call(
             Unknown, 
             Fixed(typeof(Func<,>), Type<float>(), Type<int>()),
             Unknown));
@@ -164,7 +170,7 @@ public class TypeUnifyTests {
         Assert.AreEqual(typeof(string[][]), cb.SelectedOverloadReturnType.Resolve(Unifier.Empty).LeftOrThrow);
 
         ue = ca.ResolveUnifiers(Type<string>(), new(), Unifier.Empty); //string doesnt match T[]
-        Assert.IsInstanceOf<TypeUnifyErr.KnownNotEqual>(ue.Right);
+        Assert.IsInstanceOf<TypeUnifyErr.NotEqual<Known>>(ue.Right);
 
 
     }
@@ -179,16 +185,12 @@ public class TypeUnifyTests {
     private static readonly Dummy addG2 = FromMethod(M("AddG2"));
     [Test]
     public static void TestOverloading() {
-        //what is the type designation of Add? I guess it is:
-        // method(int|string, float|string, int|string)
-        //However, this doesn't embed the knowledge that,
-        // say, if the first arg is resolved to int, then the second must resolve to float
         ITree ast = new Method(new[] {
             add1, add2
         }, new AtomicWithType(Type<int>()), 
             new AtomicWithType(Type<int>()));
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers().Right);
-        
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().Right);
+
         ast = new Method(new[] {
             add1, add2
         }, new AtomicWithType(Unknown), 
@@ -202,7 +204,7 @@ public class TypeUnifyTests {
             new AtomicWithType(Unknown));
         //Both functions take a second argument of int, so this is ambiguous
         AssertPossibleTypes(ast, typeof(string), typeof(int));
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty).Right);
+        Assert.IsInstanceOf<TypeUnifyErr.NoResolvableOverload>(ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty).Right);
         var u = ast.ResolveUnifiers(Type<int>(), new(), Unifier.Empty).LeftOrThrow;
         Assert.AreEqual(typeof(int), ast.SelectedOverloadReturnType.Resolve(Unifier.Empty).Left);
 
@@ -242,7 +244,7 @@ public class TypeUnifyTests {
                 new AtomicWithType(Unknown),
                 new AtomicWithType(Type<string>(), Type<double>())
             ));
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers().Right);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().Right);
         
         ast = new Method(new[] { addG }, 
             new AtomicWithType(Type<float>(), Type<double>()),
@@ -261,11 +263,73 @@ public class TypeUnifyTests {
             ),
             new AtomicWithType(Unknown));
         AssertPossibleTypes(ast, null as Type);
-
-        ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty);
-
-        int w = 5;
+        
     }
+
+    public static char AddList1(float[] a, double[] b) => default!;
+    public static T[] ConcatList<T>(float[] a, T[] b) => default!;
+    [Test]
+    public static void TestRestrictedVarTypes() {
+        var sdv = Types(K<string>(), K<double>());
+        //simple method usage
+        IMethodTree ast = new Method(new[] { add1 },
+            new AtomicWithType(Types(K<float>(), K<int>())),
+            new AtomicWithType(sdv)
+        );
+        AssertPossibleTypes(ast, typeof(string));
+        var u = ast.ResolveUnifiers(K<string>(), new(), Unifier.Empty).LeftOrThrow;
+        Assert.AreEqual(K<int>(), ast.Arguments[0].SelectedOverloadReturnType);
+        Assert.AreEqual(K<string>(), ast.Arguments[1].SelectedOverloadReturnType);
+        
+        //now let's add list generic casts
+        var tEle = new Variable();
+        var res = new TypeResolver(new ImplicitTypeConverter(Dummy.Method(tEle.MakeArrayType(), tEle)));
+        ast = new Method(new[] { FromMethodN("AddList1") },
+            new AtomicWithType(Types(K<float>(), K<int>())),
+            new AtomicWithType(sdv)
+        );
+        AssertPossibleTypes(ast, res, typeof(char));
+        u = ast.ResolveUnifiers(K<char>(), res, Unifier.Empty).LeftOrThrow;
+        Assert.AreEqual(K<float[]>(), ast.Arguments[0].SelectedOverloadReturnType);
+        Assert.AreEqual(K<double[]>(), ast.Arguments[1].SelectedOverloadReturnType);
+
+        ast = new Method(new[] { FromMethodN("ConcatList") },
+            new AtomicWithType(Types(K<float>(), K<int>())),
+            new AtomicWithType(sdv)
+        );
+        //our return type is now (string|double)[]
+        AssertHelpers.ListEq(new[]{sdv.MakeArrayType()}, 
+            ast.PossibleUnifiers(res, Unifier.Empty).LeftOrThrow.Select(x => x.Item1).ToArray());
+        u = ast.ResolveUnifiers(sdv.MakeArrayType(), res, Unifier.Empty).LeftOrThrow;
+        Assert.AreEqual(K<float[]>(), ast.Arguments[0].SelectedOverloadReturnType);
+        Assert.AreEqual(sdv.MakeArrayType(), ast.Arguments[1].SelectedOverloadReturnType);
+        Assert.IsFalse(ast.IsFullyResolved);
+        
+        //we can avoid the ambiguity if any of the restricted types don't require implicit casts,
+        // since implicit casts are conservative
+        var sdav = Types(K<string>(), K<double[]>());
+        ast = new Method(new[] { FromMethodN("ConcatList") },
+            new AtomicWithType(Types(K<float>(), K<int>())),
+            new AtomicWithType(sdav)
+        );
+        AssertPossibleTypes(ast, res, typeof(double[]));
+        u = ast.ResolveUnifiers(K<double[]>(), res, Unifier.Empty).LeftOrThrow;
+        Assert.AreEqual(K<float[]>(), ast.Arguments[0].SelectedOverloadReturnType);
+        Assert.AreEqual(K<double[]>(), ast.Arguments[1].SelectedOverloadReturnType);
+        Assert.IsTrue(ast.IsFullyResolved);
+
+        //intersection
+        ast = new Method(new[] { addG }, //t->t->t
+            new AtomicWithType(Types(K<float>(), K<double>())),
+            new Method(new[] { addG2 } , //float->t->t
+                new AtomicWithType(Unknown),
+                new AtomicWithType(Types(K<string>(), K<double>()))
+            ));
+        AssertPossibleTypes(ast, typeof(double));
+        u = ast.ResolveUnifiers(K<double>(), new(), Unifier.Empty).LeftOrThrow;
+    }
+    
+    
 
     [Test]
     public static void TestImplicitCast() {
@@ -277,7 +341,7 @@ public class TypeUnifyTests {
         ITree ast = new Method(new[] { add2 }, 
             new AtomicWithType(Unknown),
             addG2Ast);
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers().RightOrThrow);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().RightOrThrow);
         var resolver = new TypeResolver(new Dictionary<Type, Type[]> {
             { typeof(int), new[] { typeof(float) } }
         });
@@ -301,7 +365,7 @@ public class TypeUnifyTests {
             { typeof(int), new[] { typeof(string) } },
             { typeof(double), new[] { typeof(float) } }
         });
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers(dResolver, Unifier.Empty).RightOrThrow);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers(dResolver, Unifier.Empty).RightOrThrow);
 
 
         ITree nB = new Method(new[] { FromMethodN("NestB") }, // t->t[]
@@ -310,9 +374,9 @@ public class TypeUnifyTests {
         ast = new Method(new[] { addG },  // t->t->t
             new AtomicWithType(Type<float[]>()),
             nB);
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers().RightOrThrow);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().RightOrThrow);
         
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers(resolver, Unifier.Empty).RightOrThrow);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers(resolver, Unifier.Empty).RightOrThrow);
         //The above call doesn't work even with a resolver
         //This is because it requires "callee-internal" casting, as opposed to "callee-external" casting
         //Consider this tree:
@@ -338,12 +402,33 @@ public class TypeUnifyTests {
                 new AtomicWithType(Type<float>()),
                 new AtomicWithType(Type<int>()) //this gets cast to float
             ));
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers().RightOrThrow);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().RightOrThrow);
         AssertPossibleTypes(ast, isResolver, typeof(float));
         u = ast.ResolveUnifiers(Type<float>(), isResolver, Unifier.Empty).LeftOrThrow;
         Assert.IsNotNull((ast as Method).Arguments[0].ImplicitCast);
         Assert.IsNotNull(((ast as Method).Arguments[1] as Method).Arguments[1].ImplicitCast);
         int w = 5;
+    }
+
+    public static string FloatArr(float[] fs) => default!;
+    public static int StringArr(string[] ss) => default!;
+    private static readonly Dummy floatarr = FromMethod(M("FloatArr"));
+    private static readonly Dummy stringarr = FromMethod(M("StringArr"));
+
+    [Test]
+    public static void TestGenericImplicitCast() {
+        ITree ast = new Method(new[] { floatarr }, new AtomicWithType(Type<float>()));
+        var tArrEle = new Variable();
+        var isResolver = new TypeResolver(new ImplicitTypeConverter(Dummy.Method(tArrEle.MakeArrayType(), tArrEle)));
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().RightOrThrow);
+        AssertPossibleTypes(ast, isResolver, typeof(string));
+        var u = ast.ResolveUnifiers(Type<string>(), isResolver, Unifier.Empty).LeftOrThrow;
+
+        //ensure that the same implicit generic converter can be used multiple times with different types
+        ast = new Method(new[] { stringarr }, ast);
+        AssertPossibleTypes(ast, isResolver, typeof(int));
+        u = ast.ResolveUnifiers(Type<int>(), isResolver, Unifier.Empty).LeftOrThrow;
+        int k = 5;
     }
 
     
@@ -393,6 +478,16 @@ public class TypeUnifyTests {
         ue = ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty);
         Assert.AreEqual(typeof(float), ue.LeftOrThrow.Item1.Resolve(Unifier.Empty).LeftOrThrow);
         Assert.IsTrue(ast.IsFullyResolved);
+
+        var v1 = UnknownTree;
+        ast = new Method(new[] { consumeInt, consumeStr },
+            v1
+        );
+        AssertPossibleTypes(ast, typeof(float), typeof(float));
+        Assert.IsInstanceOf<TypeUnifyErr.MultipleOverloads>(ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty).RightOrThrow);
+        (ast as Method).PreferFirstOverload = true;
+        var u = ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty).LeftOrThrow.Item2;
+        Assert.AreEqual(typeof(int), v1.SelectedOverloadReturnType.Resolve(u).LeftOrThrow);
         
         
         /* consume t>t>float
@@ -440,7 +535,7 @@ public class TypeUnifyTests {
                 new AtomicWithType(Type<float>()))
         );
         //obviously, doesn't compile by default
-        Assert.IsInstanceOf<TypeUnifyErr.NoOverload>(ast.PossibleUnifiers().RightOrThrow);
+        Assert.IsInstanceOf<TypeUnifyErr.NoPossibleOverload>(ast.PossibleUnifiers().RightOrThrow);
         //let's add a generic cast...
         var v1 = Unknown;
         var resolver = new TypeResolver(new ImplicitTypeConverter(Dummy.Method(
@@ -469,23 +564,5 @@ public class TypeUnifyTests {
             typs);
     }
 
-
-    public interface ITree : ITypeTree {
-    }
-    public abstract record Tree {
-        public record Method(Dummy[] Overloads, params ITree[] Arguments) : Tree, ITree, IMethodTypeTree {
-            public Dummy? SelectedOverload { get; set; }
-            public IRealizedImplicitCast? ImplicitCast { get; set; }
-            public List<Dummy>? RealizableOverloads { get; set; }
-            IReadOnlyList<ITypeTree> IMethodTypeTree.Arguments => Arguments;
-        }
-
-        public record AtomicWithType(params TypeDesignation[] PossibleTypes) : Tree, ITree, IAtomicTypeTree {
-            public TypeDesignation? SelectedOverload { get; set; }
-
-            public IRealizedImplicitCast? ImplicitCast { get; set; }
-        }
-    }
-    
 }
 }

@@ -31,6 +31,10 @@ public record ADVData(InstanceData VNData) {
     ///  put the save data at that point in time in this field.
     /// </summary>
     [JsonIgnore] public (List<string> ParentContexts, string Data)? LockedContextData { get; private set; } = null;
+    /// <summary>
+    /// True iff the VN is currently executing a context where save/load is not allowed.
+    /// </summary>
+    [JsonIgnore] public bool IsLocked => LockedContextData != null;
     
     //Json usage
     [Obsolete]
@@ -41,14 +45,22 @@ public record ADVData(InstanceData VNData) {
     ///  then use UnmodifiedSaveData as the replayee save data, and use this data (or locked save data) as a loading proxy.
     /// </summary>
     public (ADVData main, ADVData? loadProxy) GetLoadProxyInfo() {
-        if (UnmodifiedSaveData != null) {
-            if (VNData.Location is null) {
-                Logging.Log(new("Load proxy info was stored without a VNLocation. Please report this.", level: LogLevel.WARNING));
+        if (VNData.Location is null) {
+            if (UnmodifiedSaveData != null)
+                //cases where save is during an unidenfitable/unsaveable top-level BCTX 
+                // in this case just use the unmodified data and trash this
+                return (GetUnmodifiedSaveData()!, null);
+            else
+                //nothing to load into
                 return (this, null);
-            }
-            return (GetUnmodifiedSaveData()!, this);
+        } else {
+            if (UnmodifiedSaveData != null)
+                //basic proxy load case
+                return (GetUnmodifiedSaveData()!, this);
+            else
+                //load when the top-level BCTX is marked as Trivial
+                return (this, this);
         }
-        return (this, null);
     }
 
     private static ADVData Deserialize(string data) {
@@ -94,7 +106,8 @@ public record ADVData(InstanceData VNData) {
         if (LockedContextData == null) {
             bctx.BCtx.VN.UpdateInstanceData();
             var keys = ContextKeys(bctx);
-            Logging.Log($"Locking save data for keys {string.Join("::", keys)} and locked context {bctx.ID}");
+            if (!Logging.Logs.CanSkipMessage(LogLevel.DEBUG2))
+                Logging.Logs.Log($"Locking save data for keys {string.Join("::", keys)} and locked context {bctx.ID}", LogLevel.DEBUG2);
             LockedContextData = (keys, Serialization.SerializeJson(this, Formatting.None));
         }
     }
@@ -106,7 +119,8 @@ public record ADVData(InstanceData VNData) {
     public void UnlockContext(OpenedContext bctx) {
         var keys = ContextKeys(bctx);
         if (LockedContextData?.ParentContexts is { } ctxs && ctxs.AreSame(keys)) {
-            Logging.Log($"Unlocking save data for keys {string.Join("::", keys)} and locked context {bctx.ID}");
+            if (!Logging.Logs.CanSkipMessage(LogLevel.DEBUG2))
+                Logging.Logs.Log($"Unlocking save data for keys {string.Join("::", keys)} and locked context {bctx.ID}", LogLevel.DEBUG2);
             LockedContextData = null;
         }
     }

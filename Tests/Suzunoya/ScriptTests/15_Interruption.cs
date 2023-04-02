@@ -138,7 +138,8 @@ public class _15InterruptionScriptTest {
 	    "<VNState>.$UpdateCount ~ 20",
 	    "<VNState>.AwaitingConfirm ~ ",
 	    "<VNState>.$UpdateCount ~ 21",
-	    "<Yukari>.EntityActive ~ False"
+	    "<Yukari>.EntityActive ~ Predeletion",
+	    "<Yukari>.EntityActive ~ Deleted",
     };
 
     private static readonly string[] stored2 = {
@@ -181,7 +182,8 @@ public class _15InterruptionScriptTest {
 	    "<VNState>.ContextFinished ~ Context:interruptor",
 	    "<VNState>.InterruptionEnded ~ Suzunoya.ControlFlow.VNInterruptionLayer",
 	    "<VNState>.$UpdateCount ~ 12",
-	    "<Yukari>.EntityActive ~ False"
+	    "<Yukari>.EntityActive ~ Predeletion",
+	    "<Yukari>.EntityActive ~ Deleted",
     };
 }
 }

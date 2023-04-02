@@ -78,22 +78,14 @@ public class RenderGroup : Transform, ITinted {
     /// </summary>
     public Event<IRendered> RendererAdded { get; } = new();
 
-    public RenderGroup(IVNState container, string key = DEFAULT_KEY, int priority = 0, bool visible = false) {
-        ZoomTransformOffset = new(() => (Zoom - 1) / Zoom * (ZoomTarget.Value - ComputedLocation), 
+    public RenderGroup(string key = DEFAULT_KEY, int priority = 0, bool visible = false) {
+        ZoomTransformOffset = new(() => (Zoom - 1) / Zoom * (ZoomTarget.Value - ComputedLocalLocation), 
             Zoom.Erase(), ZoomTarget.Erase());
-        Container = container;
         Key = key;
         Priority = new(priority);
         Visible = new(visible);
         ComputedTint = new(Tint);
-        tokens.Add(Container._AddRenderGroup(this));
     }
-
-    /// <summary>
-    /// DO NOT CALL THIS. VNState should be provided in the constructor of <see cref="RenderGroup"/>.
-    /// </summary>
-    void IEntity.AddToVNState(IVNState container, IDisposable _) =>
-        throw new Exception("Do not call RenderGroup.AddToVNState. Provide the VNState in the constructor.");
 
     /// <summary>
     /// Add a new element to this rendering group.
@@ -138,6 +130,21 @@ public class RenderGroup : Transform, ITinted {
                 Contents[ii].Delete();
         }
         base.Delete();
+    }
+    
+    /// <inheritdoc />
+    public override void ClearEvents() {
+        base.ClearEvents();
+        NestedRenderGroup.OnCompleted();
+        RenderLayer.OnCompleted();
+        Priority.OnCompleted();
+        Visible.OnCompleted();
+        ComputedTint.OnCompleted();
+        Tint.OnCompleted();
+        ZoomTransformOffset.OnCompleted();
+        Zoom.OnCompleted();
+        ZoomTarget.OnCompleted();
+        RendererAdded.OnCompleted();
     }
 }
 

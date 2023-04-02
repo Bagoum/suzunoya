@@ -134,6 +134,25 @@ public static partial class Combinators {
                 return new(new(input.Next), null, input.Index, input.Step(1));
         };
     }
+    
+
+    /// <summary>
+    /// Parse a token that doesn't satisfy the predicate.
+    /// </summary>
+    /// <param name="pred">Predicate</param>
+    /// <param name="unexpected">Description of what the predicate does</param>
+    public static Parser<T, T> DontSatisfy<T>(Func<T, bool> pred, string? unexpected = null) {
+        var err = unexpected == null ? null : new ParserError.Unexpected(unexpected);
+        return input => {
+            if (input.Empty || pred(input.Next))
+                //In general, it is more informative to say "Unexpected X, Y, or Z" than to say "Didn't expect EOF".
+                return new(err ?? (input.Empty ? 
+                    unexpectedEof : 
+                    input.TokenWitness.Unexpected(input.Index)), input.Index);
+            else
+                return new(new(input.Next), null, input.Index, input.Step(1));
+        };
+    }
 
     /// <inheritdoc cref="Satisfy{T}(System.Func{T,bool},string?)"/>
     public static Parser<char, char> Satisfy(Func<char, bool> pred, string? expected = null) =>

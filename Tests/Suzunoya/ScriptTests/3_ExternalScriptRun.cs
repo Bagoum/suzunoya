@@ -34,7 +34,7 @@ public class _3ExternalScriptRunExample {
             await vn.Wait(0);
             
             //example code
-            reimu.Location.Value = Vector3.One;
+            reimu.LocalLocation.Value = Vector3.One;
             reimu.Alpha = 0;
             reimu.SetEmote(Emote.Happy);
             reimu.Hide();

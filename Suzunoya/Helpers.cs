@@ -56,13 +56,13 @@ public static class Helpers {
     /// Create a tweener for moving an entity to a target position.
     /// </summary>
     public static VNOperation MoveTo(this ITransform c, Vector3 target, float time, Easer? ease = null) =>
-        c.Tween(new Tweener<Vector3>(new(() => c.Location.Value), target, time, c.Location.OnNext, ease));
+        c.Tween(new Tweener<Vector3>(new(() => c.LocalLocation.Value), target, time, c.LocalLocation.OnNext, ease));
 
     /// <summary>
     /// Create a tweener for moving an entity by a delta.
     /// </summary>
     public static VNOperation MoveBy(this ITransform c, Vector3 delta, float time, Easer? ease = null) =>
-        c.Tween(new DeltaTweener<Vector3>(new(() => c.Location.Value), delta, time, c.Location.OnNext, ease));
+        c.Tween(new DeltaTweener<Vector3>(new(() => c.LocalLocation.Value), delta, time, c.LocalLocation.OnNext, ease));
 
     /// <summary>
     /// Create a tweener for rotating an entity to a target eulers.
@@ -96,22 +96,40 @@ public static class Helpers {
                 BMath.GetClosestAroundBound(360f, src.Z, targetEulers.Z)).ToQuaternionD();
         }), time, q => c.EulerAnglesD.OnNext(q.ToEulersD()), ease));
 
+    /// <summary>
+    /// Create a tweener for scaling an entity up to a target.
+    /// </summary>
     public static VNOperation ScaleTo(this ITransform c, Vector3 target, float time, Easer? ease = null) =>
             c.Tween(new Tweener<Vector3>(new(() => c.Scale.Value), target, time, c.Scale.OnNext, ease));
 
+    /// <summary>
+    /// Create a tweener for the alpha value of an entity's tint.
+    /// </summary>
     public static VNOperation FadeTo(this ITinted r, float alpha, float time, Easer? ease = null) =>
         r.Tween(new Tweener<float>(new(() => r.Tint.Value.a), alpha, time, a => r.Tint.OnNext(r.Tint.Value.WithA(a)), ease));
     
+    /// <summary>
+    /// Create a tweener for changing the tint of an entity.
+    /// </summary>
     public static VNOperation TintTo(this ITinted r, FColor tint, float time, Easer? ease = null) =>
         r.Tween(new Tweener<FColor>(new(() => r.Tint.Value), tint, time, r.Tint.OnNext, ease));
 
+    /// <summary>
+    /// Create a tweener for changing the zoom of a render group.
+    /// </summary>
     public static VNOperation ZoomTo(this RenderGroup rg, float zoom, float time, Easer? ease = null) =>
         rg.Tween(new Tweener<float>(new(() => rg.Zoom), zoom, time, rg.Zoom.OnNext, ease));
 
+    /// <summary>
+    /// <see cref="IDialogueBox.Say"/> with <see cref="SpeakFlags.DontClearText"/>.
+    /// </summary>
     public static VNOperation AlsoSay(this IDialogueBox dlg, LString content, ICharacter? character = default,
         SpeakFlags flags = SpeakFlags.Default) =>
         dlg.Say(content, character, flags | SpeakFlags.DontClearText);
 
+    /// <summary>
+    /// <see cref="IDialogueBox.Say"/> with <see cref="SpeakFlags.DontClearText"/> and a newline at the beginning.
+    /// </summary>
     public static VNOperation AlsoSayN(this IDialogueBox dlg, LString content, ICharacter? character = default,
         SpeakFlags flags = SpeakFlags.Default) {
         var ncontent = LString.Format("\n{0}", content);
@@ -119,7 +137,9 @@ public static class Helpers {
         return AlsoSay(dlg, ncontent, character, flags);
     }
 
-
+    /// <summary>
+    /// Run <see cref="IKeyValueRepository.GetData{T}"/> if a key exists in the repository.
+    /// </summary>
     public static bool TryGetData<T>(this IKeyValueRepository kvr, string? key, out T value) {
         if (kvr.HasData(key)) {
             value = kvr.GetData<T>(key);
@@ -129,17 +149,27 @@ public static class Helpers {
         return false;
     }
     
+    /// <summary>
+    /// Returns true if the mode automatically skips lines (loading or fastforward).
+    /// </summary>
     public static bool SkipsOperations(this SkipMode? sm) => sm switch {
         SkipMode.LOADING => true,
         SkipMode.FASTFORWARD => true,
         _ => false
     };
+    
+    /// <summary>
+    /// Returns true if the skip mode can be changed by the player (autoplay or fastforward).
+    /// </summary>
     public static bool IsPlayerControlled(this SkipMode? sm) => sm switch {
         SkipMode.AUTOPLAY => true,
         SkipMode.FASTFORWARD => true,
         _ => false
     };
 
+    /// <summary>
+    /// Run an action only if the skip mode does not automatically skip lines.
+    /// </summary>
     public static Action? SkipGuard(this IVNState vn, Action? act) => 
             act == null ? 
                 null :
@@ -148,6 +178,14 @@ public static class Helpers {
                         act();
                 };
 
+    /// <summary>
+    /// Add a disturbance effect over time to a <see cref="DisturbedEvented{T}"/>.
+    /// </summary>
+    /// <param name="ent">Entity on which the coroutine for the disturbance effect should be run.</param>
+    /// <param name="dist">Base value to which to add the effect.</param>
+    /// <param name="valuer">Function that produces the value of the disturbance.</param>
+    /// <param name="time">Amount of time for which to run the disturbance effect.</param>
+    /// <param name="timeTo01">True iff `valuer` operates over the range [0, 1], false iff over [0, time].</param>
     public static VNOperation Disturb<T>(this Entity ent, DisturbedEvented<T> dist, Func<float, T> valuer, 
         float time, bool timeTo01=true) => ent.MakeVNOp(cT => {
         IEnumerator _Disturb(Action done) {

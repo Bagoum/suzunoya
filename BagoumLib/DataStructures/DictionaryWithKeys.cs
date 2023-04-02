@@ -25,7 +25,7 @@ public class DictionaryWithKeys<K, V> where K : notnull {
         get => data[key];
         set {
             if (!data.ContainsKey(key))
-                Keys.AddPriority(DWKDeletionMarker.Make(this, key, 0));
+                Keys.AddToEnd(DWKDeletionMarker.Make(this, key, 0));
             data[key] = value;
         }
     }

@@ -56,7 +56,7 @@ public interface IVNState : IConfirmationReceiver {
     /// Before loading, the <see cref="VNState"/> should be initialized with the
     ///  save data that it had *before* running the BCtx being loaded into.
     /// <br/>The instance data at the time of save, with the BCtx partially executed,
-    ///  should be passed as <see cref="replayer"/> here.
+    ///  should be passed as `replayer` here.
     /// </summary>
     public void LoadToLocation(VNLocation target, IInstanceData replayer, Action? onLoaded = null);
 
@@ -70,24 +70,33 @@ public interface IVNState : IConfirmationReceiver {
     /// A list of currently-executing nested <see cref="BoundedContext{T}"/>s.
     /// </summary>
     List<OpenedContext> Contexts { get; }
+    
     /// <summary>
     /// An event called when a <see cref="BoundedContext{T}"/> begins, before it is added to <see cref="Contexts"/>.
     /// </summary>
     Event<OpenedContext> ContextStarted { get; }
+    
     /// <summary>
-    /// An event called when a <see cref="BoundedContext{T}"/> ends, after it is removed from <see cref="Contexts"/>.
+    /// An event called when a <see cref="BoundedContext{T}"/> ends, after its data is saved and
+    ///  after it is removed from <see cref="Contexts"/>.
     /// </summary>
     Event<OpenedContext> ContextFinished { get; }
 
     /// <summary>
+    /// True iff any <see cref="BoundedContext{T}"/>s are currently executing on the VN.
+    /// </summary>
+    bool ContextExecuting => Contexts.Count > 0;
+
+    /// <summary>
     /// The most recently opened bounded context (<see cref="Contexts"/>[^1]).
+    /// <br/>Throws an exception if <see cref="ContextExecuting"/> is false.
     /// </summary>
     OpenedContext LowestContext => Contexts[^1];
 
     /// <summary>
     /// Returns the type of skipping the VN currently has active.
     /// </summary>
-    public SkipMode? SkippingMode { get; }
+    SkipMode? SkippingMode { get; }
 
     /// <summary>
     /// Set the skip mode. Note that you cannot set the skip mode to LOADING.
@@ -136,11 +145,6 @@ public interface IVNState : IConfirmationReceiver {
     /// Add an entity to the VNState.
     /// </summary>
     public C Add<C>(C ent, RenderGroup? renderGroup = null, int? sortingID = null) where C : IEntity;
-    
-    /// <summary>
-    /// This is called within the RenderGroup constructor. You do not need to call it explicitly.
-    /// </summary>
-    IDisposable _AddRenderGroup(RenderGroup rg);
 
     /// <summary>
     /// Update with a timestep of zero to flush any cancelled coroutines.
@@ -229,7 +233,7 @@ public interface IVNState : IConfirmationReceiver {
     IInstanceData UpdateInstanceData();
     
     /// <summary>
-    /// Cascade destroy all currently running enumerators, then destroy all objects.
+    /// Run Predelete on all objects, then cascade destroy all currently running enumerators, then destroy all objects.
     /// </summary>
     void DeleteAll();
     
@@ -267,7 +271,7 @@ public interface IVNState : IConfirmationReceiver {
     /// <summary>
     /// All logs from executed VN code.
     /// </summary>
-    ISubject<LogMessage> Logs { get; }
+    Logger Logs { get; }
 
     /// <summary>
     /// Try to get the local data for the <see cref="BoundedContext{T}"/> with the given parentage path.
@@ -296,13 +300,13 @@ public class VNState : IVNState {
     /// <inheritdoc/>
     public void LoadToLocation(VNLocation target, IInstanceData replayer, Action? onLoaded = null) {
         LoadTo = (target, replayer, onLoaded);
-        Logs.OnNext(new LogMessage($"Began loading to location {LoadTo}", LogLevel.INFO));
+        Logs.Log($"Began loading to location {LoadTo}", LogLevel.INFO);
     }
 
     private void StopLoading() {
         if (!LoadTo.Try(out var lt))
             throw new Exception("Cannot stop loading when load configuration is null");
-        Logs.OnNext(new LogMessage($"Finished loading to location {LoadTo}", LogLevel.INFO));
+        Logs.Log($"Finished loading to location {LoadTo}", LogLevel.INFO);
         LoadTo = null;
         InstanceData = lt.replayer;
         if (Contexts.Count > 0)
@@ -338,7 +342,7 @@ public class VNState : IVNState {
         if (userSetSkipMode == mode)
             mode = null;
         if (mode is SkipMode.AUTOPLAY or SkipMode.FASTFORWARD && !AutoplayFastforwardAllowed) {
-            Logs.OnNext($"User tried to set skip mode to {mode}, but this is not allowed for this VNState.");
+            Logs.Log($"User tried to set skip mode to {mode}, but this is not allowed for this VNState.");
             return false;
         }
         userSetSkipMode = mode;
@@ -346,7 +350,7 @@ public class VNState : IVNState {
             SkipOperation();
         if (SkippingMode != null && CurrentProcesses?.ConfirmToken != null)
             _Confirm();
-        Logs.OnNext(new LogMessage($"Set the user skip mode to {mode}", LogLevel.INFO));
+        Logs.Log($"Set the user skip mode to {mode}", LogLevel.INFO);
         return true;
     }
     /// <inheritdoc/>
@@ -452,7 +456,7 @@ public class VNState : IVNState {
     /// <inheritdoc/>
     public Evented<string> OperationID { get; } = new(OPEN_OPID);
     /// <inheritdoc/>
-    public ISubject<LogMessage> Logs { get; } = new Event<LogMessage>();
+    public Logger Logs { get; } = new();
     /// <inheritdoc/>
     public Evented<bool> VNStateActive { get; } = new(true);
     
@@ -501,7 +505,7 @@ public class VNState : IVNState {
     /// <summary>
     /// Create a default rendering group. This is called at the end of the constructor.
     /// </summary>
-    protected virtual RenderGroup MakeDefaultRenderGroup() => new(this, visible: true);
+    protected virtual RenderGroup MakeDefaultRenderGroup() => Add(new RenderGroup(visible: true));
 
     /// <inheritdoc/>
     public IDisposable GetOperationCanceller(out VNProcessGroup op, bool allowUserSkip=true) {
@@ -543,15 +547,15 @@ public class VNState : IVNState {
                         InstanceData.SaveBCtxData(lctx, true);
             }
             if (lctx?.Result is {Valid: true, Value: {} res}) {
-                Logs.OnNext($"Load-skipping section {ContextsDescriptor} with return value {res}");
+                Logs.Log($"Load-skipping section {ContextsDescriptor} with return value {res}");
                 Finish();
                 return res;
             } else if (sbc.LoadingDefault.Try(out res)) {
-                Logs.OnNext($"Load-skipping section {ContextsDescriptor} with default return {res}");
+                Logs.Log($"Load-skipping section {ContextsDescriptor} with default return {res}");
                 Finish();
                 return res;
             }  else if (typeof(T) == typeof(Unit) && DefaultLoadSkipUnit) {
-                Logs.OnNext($"Load-skipping section {ContextsDescriptor} with default Unit return");
+                Logs.Log($"Load-skipping section {ContextsDescriptor} with default Unit return");
                 Finish();
                 return default!;
             } else
@@ -561,7 +565,7 @@ public class VNState : IVNState {
         var result = await innerTask();
         if (ctx is StrongBoundedContext<T> sbc_)
             sbc_.OnFinish?.Invoke();
-        Logs.OnNext($"Saving result {result} to context {ContextsDescriptor}");
+        Logs.Log($"Saving result {result} to context {ContextsDescriptor}");
         openCtx.Data.Result = result;
         InstanceDataChanged.OnNext(InstanceData);
         return result;
@@ -726,6 +730,10 @@ public class VNState : IVNState {
 
     /// <inheritdoc/>
     public C Add<C>(C ent, RenderGroup? renderGroup = null, int? sortingID = null) where C : IEntity {
+        if (ent is RenderGroup rg) {
+            _AddRenderGroup(rg);
+            return ent;
+        }
         var dsp = Entities.Add(ent);
         if (ent is IDialogueBox dlg) {
             MainDialogue ??= dlg;
@@ -738,11 +746,11 @@ public class VNState : IVNState {
         return ent;
     }
 
-    /// <inheritdoc/>
-    public IDisposable _AddRenderGroup(RenderGroup rg) {
+    private IDisposable _AddRenderGroup(RenderGroup rg) {
         if (RenderGroups.Any(x => x.Priority == rg.Priority.Value))
             throw new Exception("Cannot have multiple render groups with the same priority");
         var dsp = RenderGroups.Add(rg);
+        (rg as IEntity).AddToVNState(this, dsp);
         _RenderGroupCreated.OnNext(rg);
         return dsp;
     }
@@ -892,7 +900,7 @@ public class VNState : IVNState {
         if (interrupts.TryPeek(out var op) && op.ConfirmToken != null) {
             //User confirm cancels autoskip
             if (SkippingMode.IsPlayerControlled()) {
-                Logs.OnNext($"Cancelling skip mode {SkippingMode} due to user confirm input.");
+                Logs.Log($"Cancelling skip mode {SkippingMode} due to user confirm input.");
                 SetSkipMode(null);
             }
             _Confirm();
@@ -911,7 +919,7 @@ public class VNState : IVNState {
         this.AssertActive();
         //User skip cancels autoskip
         if (SkippingMode.IsPlayerControlled()) {
-            Logs.OnNext($"Cancelling skip mode {SkippingMode} due to user skip input.");
+            Logs.Log($"Cancelling skip mode {SkippingMode} due to user skip input.");
             SetSkipMode(null);
         }
         if (CurrentProcesses?.userSkipAllowed is true) {
@@ -931,7 +939,13 @@ public class VNState : IVNState {
     /// </summary>
     /// <exception cref="Exception"></exception>
     protected virtual void _DeleteAll() {
-        Logs.OnNext($"Deleting all entities within VNState {this}");
+        Logs.Log($"Deleting all entities within VNState {this}");
+        for (int ii = 0; ii < RenderGroups.Count; ++ii)
+            if (RenderGroups.ExistsAt(ii))
+                RenderGroups[ii].PreDelete();
+        for (int ii = 0; ii < Entities.Count; ++ii)
+            if (Entities.ExistsAt(ii))
+                Entities[ii].PreDelete();
         lifetimeToken.Cancel(ICancellee.HardCancelLevel);
         foreach (var t in Tokens)
             t.Dispose();

@@ -106,7 +106,12 @@ public class ExpressionPrinter {
                     var defaultTypeName = NameTypeInWords(parameter.ex.Type);
                     if (!defaultTypeName.All(char.IsLetterOrDigit))
                         defaultTypeName = "prm";
-                    AddNamed(parameter.ex, parameter.ex.Name, defaultTypeName);
+                    var name = parameter.ex.Name;
+                    //$ is illegal in source, but it may be used in expressions,
+                    // and the linearizer uses it for temp vars
+                    if (name?.Contains('$') is true)
+                        name = name.Replace("$", "");
+                    AddNamed(parameter.ex, name, defaultTypeName);
                     break;
                 case PrintToken.Semicolon:
                     Add(";");

@@ -33,7 +33,7 @@ public class CombMergeSorter<T> : ISorter<T> {
                 var a2i = 0;
                 var a3i = a;
                 //Merge [a, b) and [b, e)
-                //array[bi, b+comb) are remaining elements from B
+                //array[bi, e) are remaining elements from B
                 //buffer[a1i, a2i) are elements from A, succeeded by array[a3i, b)
                 //array[start, a3i) are merged elements
                 

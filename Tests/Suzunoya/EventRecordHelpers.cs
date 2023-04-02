@@ -19,7 +19,8 @@ internal static class EventRecordHelpers {
     private static HashSet<string> ignoreKeys = new() {
         "onupdate", "logs", "instancedatachanged",
         //use computed instead
-        "location", "euleranglesd", "scale", "tint"
+        "locallocation", "euleranglesd", "scale", "tint",
+        "computedlocallocation"
     };
 
     private static IEnumerable<(PropertyInfo, Type)> EvPropsPerType(Type typ) {

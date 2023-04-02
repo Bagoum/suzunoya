@@ -9,7 +9,6 @@ using BagoumLib.Functional;
 namespace BagoumLib.Expressions {
 
 public static class VisitorHelpers {
-
     public static bool IsBlockishExpression(this Expression e) => e switch {
         BlockExpression => true,
         ConditionalExpression cond => cond.Type == typeof(void),
@@ -65,10 +64,11 @@ public static class VisitorHelpers {
         ExpressionType.Assign,
         ExpressionType.ExclusiveOrAssign, ExpressionType.ModuloAssign,
         ExpressionType.AndAssign, ExpressionType.OrAssign, 
-        ExpressionType.LeftShiftAssign, ExpressionType.RightShiftAssign
+        ExpressionType.LeftShiftAssign, ExpressionType.RightShiftAssign,
+        ExpressionType.PostIncrementAssign, ExpressionType.PostDecrementAssign, 
+        ExpressionType.PreIncrementAssign, ExpressionType.PreDecrementAssign, 
     };
     public static bool IsAssign(this ExpressionType e) => AssignTypes.Contains(e);
-
 
     private static Either<string, string> Left(string s) => new(true, s, null!);
     private static Either<string, string> Right(string s) => new(false, null!, s);

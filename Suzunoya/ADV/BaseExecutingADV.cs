@@ -16,7 +16,8 @@ namespace Suzunoya.ADV {
 
 /// <summary>
 /// Base implementation of <see cref="IExecutingADV"/> for ADV games requiring assertion logic and map controls.
-/// <br/>Almost all game configuration is done in abstract method <see cref="ConfigureMapStates"/>.
+/// <br/>Almost all game configuration is done in abstract method <see cref="ConfigureMapStates"/>. Implementations
+///     must implement <see cref="ConfigureMapStates"/> and also call <see cref="SetupMapStates"/> in their constructor.
 /// </summary>
 [PublicAPI]
 public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADVIdealizedState where D : ADVData {
@@ -37,8 +38,8 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     /// <summary>
     /// Handler for managing maps and assertions.
     /// </summary>
-    public MapStateManager<I, D> MapStates { get; }
-    private readonly MapStateTransition<I, D> mapTransition;
+    public MapStateManager<I, D> MapStates { get; private set; }
+    private MapStateTransition<I, D> mapTransition;
     /// <inheritdoc cref="MapStateTransition{I,D}.MapUpdateTask"/>
     protected Task MapTransitionTask => mapTransition.MapUpdateTask ?? Task.CompletedTask;
     /// <summary>
@@ -71,16 +72,6 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
         this.Inst = inst;
         prevMap = Data.CurrentMap;
         MapWillUpdate = new((null, prevMap));
-        // ReSharper disable once VirtualMemberCallInConstructor
-        MapStates = ConfigureMapStates();
-        mapTransition = new(MapStates);
-        tokens.Add(mapTransition.ExecutingTransition.Subscribe(b => {
-            if (b)
-                transitionToken.Add(Manager.ADVState.AddConst(ADVManager.State.Waiting));
-            else
-                transitionToken.DisposeAll();
-        }));
-        tokens.Add(MapStates.MapEndStateDeactualized.Subscribe(_ => mapLocalTokens.DisposeAll()));
         tokens.Add(VN.InstanceDataChanged.Subscribe(_ => UpdateDataV(_ => { })));
         DataChanged = new Evented<D>(Data);
 
@@ -93,7 +84,6 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
             if (c.BCtx is IStrongBoundedContext { LoadSafe: false })
                 Data.UnlockContext(c);
         });
-        
     }
 
     /// <summary>
@@ -126,9 +116,10 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     /// <summary>
     /// Update the game data and recompute map assertions. This returns nothing; use <see cref="UpdateData"/> if you
     ///  want to await the update task.
+    /// <br/>This uses SimultaneousActualization by default.
     /// </summary>
     protected void UpdateDataV(Action<D> updater, MapStateTransitionSettings<I>? transition = null) {
-        _ = UpdateData(updater, transition).ContinueWithSync();
+        _ = UpdateData(updater, transition ?? new() { SimultaneousActualization = true }).ContinueWithSync();
     }
     /// <summary>
     /// Update the game data and recompute map assertions.
@@ -161,11 +152,14 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     /// Top-level contexts should always be {Unit}.
     /// If you provide an unidentifiable id (eg. empty string), it won't be loadable.
     /// </summary>
-    protected BoundedContext<Unit> Context(string id, Func<Task> innerTask) {
+    /// <param name="id">ID by which teh inner context is identified.</param>
+    /// <param name="innerTask">Inner executed content for the bounded context.</param>
+    /// <param name="isTrivialTask">See <see cref="BoundedContext{T}"/>.<see cref="BoundedContext{T}.Trivial"/></param>
+    protected BoundedContext<Unit> Context(string id, Func<Task> innerTask, bool isTrivialTask=false) {
         var ctx = new BoundedContext<Unit>(VN, id, async () => {
             await innerTask();
             return default;
-        });
+        }) { Trivial = isTrivialTask };
         if (ctx.Identifiable) {
             if (bctxes.ContainsKey(ctx.ID))
                 throw new Exception($"Multiple BCTXes are defined for key {ctx.ID}");
@@ -180,21 +174,46 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     public async Task<IADVCompletion> Run() {
         await mapTransition.UpdateMapData(Data, new MapStateTransitionSettings<I> {
             ExtraAssertions = (map, s) => {
-                if (map == prevMap && Inst.Request.LoadProxyData?.VNData is { Location: { } l} replayer) {
+                if (map != prevMap) return;
+                if (Inst.Request.LoadProxyData?.VNData is { Location: { } l} replayer) {
                     //If saved during a VN segment, load into it
                     Inst.VN.LoadToLocation(l, replayer, () => {
                         Inst.Request.FinalizeProxyLoad();
+                        ADVDataFinalized();
                         UpdateDataV(_ => { });
                     });
                     if (!s.SetEntryVN(bctxes[l.Contexts[0]], RunOnEntryVNPriority.LOAD))
                         throw new Exception("Couldn't set load entry VN");
+                } else {
+                    ADVDataFinalized();
                 }
             }
         });
         //This is when the entire game finishes
         return await completion.Task;
     }
+    
+    /// <inheritdoc/>
+    public abstract void ADVDataFinalized();
 
+    /// <summary>
+    /// Function that runs <see cref="ConfigureMapStates"/> and related map setup. This must be called by
+    /// subclass constructors, or after the constructor is run.
+    /// </summary>
+    public BaseExecutingADV<I, D> SetupMapStates() {
+        // ReSharper disable once VirtualMemberCallInConstructor
+        MapStates = ConfigureMapStates();
+        mapTransition = new(MapStates);
+        tokens.Add(mapTransition.ExecutingTransition.Subscribe(b => {
+            if (b)
+                transitionToken.Add(Manager.ADVState.AddConst(ADVManager.State.Waiting));
+            else
+                transitionToken.DisposeAll();
+        }));
+        tokens.Add(MapStates.MapEndStateDeactualized.Subscribe(_ => mapLocalTokens.DisposeAll()));
+        return this;
+    }
+    
     /// <summary>
     /// Map setup function run once during game initialization. This handles the game's entire logical configuration.
     /// <br/>Subclasses must override this to make data-dependent assertions on maps.

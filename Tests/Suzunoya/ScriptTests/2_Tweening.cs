@@ -21,7 +21,7 @@ public class _2TweeningSkipCancelScriptTest {
         public void Run() {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
-            reimu.Location.Value = Vector3.Zero;
+            reimu.LocalLocation.Value = Vector3.Zero;
             var t = reimu.MoveTo(Vector3.One, 1f, Easers.ELinear).Task;
             er.GetAndClear();
             //First update dT not counted
@@ -78,9 +78,12 @@ public class _2TweeningSkipCancelScriptTest {
             ListEq(er.GetAndClear(), new EventRecord.LogEvent[] {
                 //new(reimu, "Location", Vector3.One),
                 //new(reimu, "Location", Vector3.One),
-                new(md, "EntityActive", false),
-                new(reimu, "EntityActive", false),
-                new(vn.DefaultRenderGroup, "EntityActive", false),
+                new(vn.DefaultRenderGroup, "EntityActive", EntityState.Predeletion),
+                new(md, "EntityActive", EntityState.Predeletion),
+                new(reimu, "EntityActive", EntityState.Predeletion),
+                new(md, "EntityActive", EntityState.Deleted),
+                new(reimu, "EntityActive", EntityState.Deleted),
+                new(vn.DefaultRenderGroup, "EntityActive", EntityState.Deleted),
                 new(vn, "VNStateActive", false)
                 //The rotation function does not start due to cancellation
             });

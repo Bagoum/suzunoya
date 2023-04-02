@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reactive.Subjects;
 using BagoumLib.Functional;
 using JetBrains.Annotations;
@@ -52,7 +53,7 @@ public class Evented<T> : ICSubject<T> {
     /// Set a new value only if it is not equal to the existing value.
     /// </summary>
     public void PublishIfNotSame(T value) {
-        if (!Equals(value, _value))
+        if (!EqualityComparer<T>.Default.Equals(value, _value))
             OnNext(value);
     }
 

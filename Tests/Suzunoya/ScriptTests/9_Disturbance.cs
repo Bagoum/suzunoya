@@ -22,9 +22,9 @@ public class _9DisturbanceScriptTest {
         public async Task<int> Run() {
             var md = vn.Add(new TestDialogueBox());
             var reimu = vn.Add(new Reimu());
-            reimu.Location.Value = Vector3.Zero;
+            reimu.LocalLocation.Value = Vector3.Zero;
             await reimu.MoveTo(Vector3.One, 8f, Easers.ELinear).And(
-                reimu.Disturb(reimu.ComputedLocation, t => new Vector3(0, 4 * OffEasers.ESoftmod010(t), 0), 4));
+                reimu.Disturb(reimu.ComputedLocalLocation, t => new Vector3(0, 4 * OffEasers.ESoftmod010(t), 0), 4));
             return 1337;
         }
 

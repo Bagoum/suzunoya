@@ -100,9 +100,9 @@ public record MapStateManager<I, D>(IExecutingADV ADV, Func<I> Constructor) : IM
     /// Update all map definitions with a new game data object.
     /// </summary>
     public async Task UpdateMaps(D data, string newCurrentMap, MapStateTransitionSettings<I>? settings = null) {
-        ADV.VN.Logs.OnNext($"Updating map state for next map {newCurrentMap} (current map is {CurrentMap})...");
+        ADV.VN.Logs.Log($"Updating map state for next map {newCurrentMap} (current map is {CurrentMap})...");
         if (newCurrentMap != CurrentMap && mapStates.TryGetValue(CurrentMap, out var s)) {
-            ADV.VN.Logs.OnNext($"As the map has changed, the current map {CurrentMap} will be end-state deactualized.");
+            ADV.VN.Logs.Log($"As the map has changed, the current map {CurrentMap} will be end-state deactualized.");
             await s.State.DeactualizeOnEndState();
             MapEndStateDeactualized.OnNext(default);
         }
@@ -129,7 +129,7 @@ public record MapStateManager<I, D>(IExecutingADV ADV, Func<I> Constructor) : IM
         //Actualize only the current map based on its previous state
         await mapStates[CurrentMap].State.Actualize(prevStateForCurrMap, settings?.SimultaneousActualization ?? false);
 
-        ADV.VN.Logs.OnNext($"Finished updating map state for next map {newCurrentMap}.");
+        ADV.VN.Logs.Log($"Finished updating map state for next map {newCurrentMap}.");
     }
 
     /// <inheritdoc/>

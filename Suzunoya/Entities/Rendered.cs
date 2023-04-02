@@ -111,7 +111,7 @@ public class Rendered : Transform, IRendered {
     }
 
     /// <inheritdoc />
-    protected override void BindParent(ITransform nParent) {
+    protected override void BindParent(ITransform? nParent) {
         base.BindParent(nParent);
         if (nParent is IRendered r)
             parentTokens.Add(Visible.AddDisturbance(r.Visible));
@@ -132,6 +132,17 @@ public class Rendered : Transform, IRendered {
     /// Short for Visible.Value = true
     /// </summary>
     public void Show() => Visible.Value = true;
+    
+    /// <inheritdoc />
+    public override void ClearEvents() {
+        base.ClearEvents();
+        Tint.OnCompleted();
+        ComputedTint.OnCompleted();
+        RenderGroup.OnCompleted();
+        RenderLayer.OnCompleted();
+        SortingID.OnCompleted();
+        Visible.OnCompleted();
+    }
 }
 
 }

@@ -24,14 +24,16 @@ public class TestParsing1 {
         var parseIntList1 = ParseInt.SepBy1(Char(','));
         parseIntList.AssertSuccess("abc", new List<int>());
         parseIntList.AssertSuccess("", new List<int>());
-        parseIntList1.AssertFail("", new IncorrectNumber(1, 0, null, 
-            new(0, new Expected("at least one digit"))), 0);
+        parseIntList1.AssertFail("", new Expected("at least one digit"), 0);
         parseIntList.AssertSuccess("2,366,41abc", new List<int>(){2,366,41});
         parseIntList.ThenEOF().AssertFail("abc", new OneOf(new() {
             new Expected("at least one digit"),
             new Expected("end of file")
         }), 0);
-        parseIntList.ThenEOF().AssertFail("1,1a", new Expected("end of file"),3);
+        parseIntList.ThenEOF().AssertFail("1,1a", new OneOf(new() {
+            new ExpectedChar(',') ,
+            new Expected("end of file") 
+        }),3);
         parseIntList.AssertFail("1,1,a", new Expected("at least one digit"),4);
     }
 
@@ -49,9 +51,9 @@ public class TestParsing1 {
     [Test]
     public void TestEOF() {
         Lower.ThenEOF().AssertFail("hello", "Error at Line 1, Col 2:\n" +
-                                                    "hello\n" +
-                                                    "h| <- at this location\n" +
-                                                    "Expected end of file");
+                                                    "  hello\n" +
+                                                    "  h| <- at this location\n" +
+                                                    "Expected end of file.");
     }
 
     [Test]
@@ -82,14 +84,11 @@ public class TestParsing1 {
     
     [Test]
     public void TestLabel() {
-        parseEmail.AssertFail("!!", new Labelled("Email name", 
-            new(new LocatedParserError(0, new Expected("at least one letter or digit")))));
+        parseEmail.AssertFail("!!", new Labelled("Email name", new Expected("at least one letter or digit")));
         parseEmail.AssertFail("name!!", new ExpectedChar('@'), 4);
-        parseEmail.AssertFail("name@!!", new Labelled("Email domain", 
-            new(new LocatedParserError(5, new Expected("at least one letterA")))), 5);
+        parseEmail.AssertFail("name@!!", new Labelled("Email domain", new Expected("at least one letterA")), 5);
         parseEmail.AssertFail("name@site!!", new ExpectedChar('.'), 9);
-        parseEmail.AssertFail("name@site.!", new Labelled("Email TLD", 
-            new(new LocatedParserError(10, new Expected("at least one letterB")))), 10);
+        parseEmail.AssertFail("name@site.!", new Labelled("Email TLD", new Expected("at least one letterB")), 10);
         parseEmail.AssertSuccess("name@site.com", new Email("name", "site", "com"));
     }
 
@@ -99,15 +98,12 @@ public class TestParsing1 {
         var parseEmails1 = parseEmail.ThenIg(Newline).Many1();
         var parse3Emails = parseEmail.ThenIg(Newline).Repeat(3, 3);
         parseEmails.AssertSuccess("!!!", new List<Email>());
-        parseEmails1.AssertFail("!!!", new IncorrectNumber(1, 0, null,
-            new LocatedParserError(0, new Labelled("Email name", new(
-                new LocatedParserError(0, new Expected("at least one letter or digit")))))));
+        parseEmails1.AssertFail("!!!", new Labelled("Email name", new Expected("at least one letter or digit")));
         parseEmails.AssertFail("a@b.net\nb@c.com", new Expected("newline"), 15);
         parseEmails.AssertSuccess("a@b.net\nb@c.com\n", new() {new("a", "b", "net"), new("b", "c", "com")});
         parseEmails1.AssertSuccess("a@b.net\nb@c.com\n", new() {new("a", "b", "net"), new("b", "c", "com")});
         parse3Emails.AssertFail("a@b.net\nb@c.com\n", new IncorrectNumber(3, 2, null, 
-            new LocatedParserError(16, new Labelled("Email name", new(
-                new LocatedParserError(16, new Expected("at least one letter or digit")))))));
+            new LocatedParserError(16, new Labelled("Email name", new Expected("at least one letter or digit")))));
         parse3Emails.AssertSuccess("a@b.net\nb@c.com\nc@d.com\n", new() {
             new("a", "b", "net"), new("b", "c", "com"), new("c", "d", "com")
         });

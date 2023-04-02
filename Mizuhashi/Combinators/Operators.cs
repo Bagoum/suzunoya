@@ -30,7 +30,7 @@ public enum Associativity {
 /// </summary>
 public record AmbiguousAssociativity<T, A, C>(ParseResult<(C, Operator<T, A, C>.Infix)> CurrentOp, ParseResult<(C, Operator<T, A, C>.Infix)> UnexpectedOp) : ParserError { 
     /// <inheritdoc/>
-    public override string Show(IInputStream s) {
+    public override string Show(IInputStream s, int streamIndex) {
         var w = s.TokenWitness;
         var co = CurrentOp.Result.Value;
         var uo = UnexpectedOp.Result.Value;
@@ -57,8 +57,15 @@ public record Operator<T, A, C>(int Precedence) {
     /// A prefix operator.
     /// </summary>
     public record Prefix : Operator<T, A, C> {
+        /// <summary>
+        /// Function that joins the operator and its operand(s) into a single entity.
+        /// </summary>
         public Func<C, A, A> Op { get; }
+        /// <summary>
+        /// Parser that parses the operator.
+        /// </summary>
         public Parser<T, (C, Prefix)> Parser { get; init; }
+        /// <inheritdoc cref="Operator{T,A,C}.Prefix"/>
         public Prefix(Parser<T, C> rawOpParser, Func<C, A, A> op, int Precedence) : base(Precedence) {
             this.Op = op;
             this.Parser = rawOpParser.Then(PReturn<T, Prefix>(this));
@@ -74,8 +81,11 @@ public record Operator<T, A, C>(int Precedence) {
     /// A postfix operator.
     /// </summary>
     public record Postfix : Operator<T, A, C> {
+        /// <inheritdoc cref="Operator{T,A,C}.Prefix.Op"/>
         public Func<A, C, A> Op { get; }
+        /// <inheritdoc cref="Operator{T,A,C}.Prefix.Parser"/>
         public Parser<T, (C, Postfix)> Parser { get; init; }
+        /// <inheritdoc cref="Operator{T,A,C}.Postfix"/>
         public Postfix(Parser<T, C> rawOpParser, Func<A, C, A> op, int Precedence) : base(Precedence) {
             this.Op = op;
             this.Parser = rawOpParser.Then(PReturn<T, Postfix>(this));
@@ -93,9 +103,13 @@ public record Operator<T, A, C>(int Precedence) {
     ///  and the resulting function as separate arguments.
     /// </summary>
     public record Infix : Operator<T, A, C> {
+        /// <inheritdoc cref="Operator{T,A,C}.Prefix.Op"/>
         public Func<A, C, A, A> Op { get; }
+        /// <inheritdoc cref="Associativity"/>
         public Associativity Assoc { get; }
-        public Parser<T, (C, Infix)> Parser { get;  }
+        /// <inheritdoc cref="Operator{T,A,C}.Prefix.Parser"/>
+        public Parser<T, (C, Infix)> Parser { get; }
+        /// <inheritdoc cref="Operator{T,A,C}.Infix"/>
         
         public Infix(Parser<T, C> RawOperatorParser, Func<A, C, A, A> Op, Associativity Assoc, int Precedence) : base(Precedence) {
             this.Op = Op;
@@ -109,6 +123,10 @@ public record Operator<T, A, C>(int Precedence) {
 public static partial class Combinators {
     private static A Op<T, A, C>(this (C, Operator<T, A, C>.Infix) op, A left, A right) =>
         op.Item2.Op(left, op.Item1, right);
+    
+    /// <summary>
+    /// Helper function to convert <see cref="Associativity"/> to 'left', 'right', or 'non'.
+    /// </summary>
     public static string Show(this Associativity assoc) => assoc switch {
         Associativity.Left => "left",
         Associativity.Right => "right",
@@ -125,23 +143,30 @@ public static partial class Combinators {
             .ToArray();
         //Each row in table is a list of operators with the same precedence
         //We go through each row and parse it
-        return table.Aggregate(term, ParseSamePrecedenceOperators).Label("operators");
+        return table.Aggregate(term, ParseSamePrecedenceOperators);
     }
 
     private static Parser<T, A> ParseSamePrecedenceOperators<T, A, C>(Parser<T, A> term, IEnumerable<Operator<T, A, C>> ops) {
         PartitionOperators(ops, out var rassoc, out var lassoc, out var nassoc, out var prefix, out var postfix);
-        var rassocP = Choice(rassoc.Select(r => r.Parser).ToArray());
-        var lassocP = Choice(lassoc.Select(r => r.Parser).ToArray());
-        var nassocP = Choice(nassoc.Select(r => r.Parser).ToArray());
-        //For prefix/postfix, it's always ok to not parse anything. For infix, a successful parse can 
-        // sometimes indicate an ambiguity, so we need separate handling for the preturn.
-        var prefixPR = ChoiceL("", prefix.Append(Operator<T,A,C>.Prefix.Null).Select(r => r.Parser).ToArray());
-        var postfixPR = ChoiceL("", postfix.Append(Operator<T,A,C>.Postfix.Null).Select(r => r.Parser).ToArray());
-        var termP = Sequential(prefixPR, term, postfixPR, (pref, t, post) => 
-            post.Item2.Op(pref.Item2.Op(pref.Item1, t), post.Item1));
+        var rassocP = rassoc.Count == 0 ? null : ChoiceL("", rassoc.Select(r => r.Parser).ToArray());
+        var lassocP = lassoc.Count == 0 ? null : ChoiceL("", lassoc.Select(r => r.Parser).ToArray());
+        var nassocP = nassoc.Count == 0 ? null : ChoiceL("", nassoc.Select(r => r.Parser).ToArray());
+        if (prefix.Count >= 0 || postfix.Count >= 0) {
+            //For prefix/postfix, it's always ok to not parse anything. For infix, a successful parse can 
+            // sometimes indicate an ambiguity, so we need separate handling for the null case.
+            var prefixPR = ChoiceL("", prefix.Append(Operator<T,A,C>.Prefix.Null).Select(r => r.Parser).ToArray());
+            var postfixPR = ChoiceL("", postfix.Append(Operator<T,A,C>.Postfix.Null).Select(r => r.Parser).ToArray());
+            if (prefix.Count > 0 && postfix.Count > 0)
+                term = Sequential(prefixPR, term, postfixPR, 
+                    (pref, t, post) => post.Item2.Op(pref.Item2.Op(pref.Item1, t), post.Item1));
+            else if (prefix.Count > 0)
+                term = Sequential(prefixPR, term, (pref, t) => pref.Item2.Op(pref.Item1, t));
+            else if (postfix.Count > 0)
+                term = Sequential(term, postfixPR, (t, post) => post.Item2.Op(t, post.Item1));
+        }
 
         return inp => {
-            var rterm1 = termP(inp);
+            var rterm1 = term(inp);
             if (!rterm1.Result.Try(out var term1))
                 return rterm1;
 
@@ -156,7 +181,7 @@ public static partial class Combinators {
             }
             ParseResult<A>? VerifyAmbiguity(Associativity assoc, in ParseResult<(C, Operator<T, A, C>.Infix)> precedingOp, in ParseResult<A> precedingTerm) {
                 var ss = inp.Stative;
-                if (assoc != Associativity.Left) {
+                if (assoc != Associativity.Left && lassocP != null) {
                     var rLeft = lassocP(inp);
                     if (rLeft.Result.Valid)
                         return rLeft
@@ -164,7 +189,7 @@ public static partial class Combinators {
                             .WithPreceding(in precedingTerm);
                 }
                 inp.RollbackFast(in ss);
-                if (assoc != Associativity.Right) {
+                if (assoc != Associativity.Right && rassocP != null) {
                     var rRight = rassocP(inp);
                     if (rRight.Result.Valid)
                         return rRight
@@ -172,22 +197,27 @@ public static partial class Combinators {
                             .WithPreceding(in precedingTerm);
                 }
                 inp.RollbackFast(in ss);
-                //non-associative operators can't be sequenced, so
-                // we have to check for them even under the non-associative parser
-                var rNone = nassocP(inp);
-                if (rNone.Result.Valid)
-                    return rNone
-                        .AsError<A>(new AmbiguousAssociativity<T, A, C>(precedingOp, rNone))
-                        .WithPreceding(in precedingTerm);
-                inp.RollbackFast(in ss);
+                if (nassocP != null) {
+                    //non-associative operators can't be sequenced, so
+                    // we have to check for them even under the non-associative parser
+                    var rNone = nassocP(inp);
+                    if (rNone.Result.Valid)
+                        return rNone
+                            .AsError<A>(new AmbiguousAssociativity<T, A, C>(precedingOp, rNone))
+                            .WithPreceding(in precedingTerm);
+                    inp.RollbackFast(in ss);
+                }
                 return null;
             }
 
             //Try to parse right associations first
+            var ropAndTerm1 = rterm1.FMap<(C, Operator<T, A, C>.Infix)>(_ => default!);
+            if (rassocP == null)
+                goto lassoc_stage;
             var rop = rassocP(inp);
-            var ropAndTerm1 = rop.WithPreceding(in rterm1);
+            ropAndTerm1 = rop.WithPreceding(in rterm1);
             if (rop.Result.Try(out var op)) {
-                var rterm2 = termP(inp).WithPreceding(in ropAndTerm1);
+                var rterm2 = term(inp).WithPreceding(in ropAndTerm1);
                 if (!rterm2.Result.Try(out var term2))
                     //Operators must be nonempty, so this is always a fatal error
                     return rterm2.CastFailure<A>();
@@ -204,7 +234,7 @@ public static partial class Combinators {
                 stack.Push((term2, op2));
                 while (true) {
                     //Parse the second term (required)
-                    rterm2 = termP(inp).WithPreceding(in rop2);
+                    rterm2 = term(inp).WithPreceding(in rop2);
                     if (!rterm2.Result.Try(out term2))
                         return rterm2.CastFailure<A>();
                     //Try to parse another operator
@@ -226,11 +256,14 @@ public static partial class Combinators {
             if (rop.Status == ResultStatus.FATAL)
                 return rop.CastFailure<A>();
             
+            lassoc_stage: ;
             //Then try to parse left associations
+            if (lassocP == null)
+                goto nassoc_stage;
             rop = lassocP(inp);
             ropAndTerm1 = rop.WithPreceding(in ropAndTerm1);
             if (rop.Result.Try(out op)) {
-                var rterm2 = termP(inp).WithPreceding(in ropAndTerm1);
+                var rterm2 = term(inp).WithPreceding(in ropAndTerm1);
                 if (!rterm2.Result.Try(out var term2))
                     return rterm2.CastFailure<A>();
                 
@@ -245,7 +278,7 @@ public static partial class Combinators {
                 //If we have more terms, loop and simplify in the loop.
                 while (true) {
                     //Parse the second term (required)
-                    rterm2 = termP(inp).WithPreceding(in rop2);
+                    rterm2 = term(inp).WithPreceding(in rop2);
                     if (!rterm2.Result.Try(out term2))
                         return rterm2.CastFailure<A>();
                     term1 = op.Op(term1, term2);
@@ -265,11 +298,14 @@ public static partial class Combinators {
             if (rop.Status == ResultStatus.FATAL)
                 return rop.CastFailure<A>();
             
+            nassoc_stage : ;
             //Then try to parse non-associative associations
+            if (nassocP == null)
+                goto end;
             rop = nassocP(inp);
             ropAndTerm1 = rop.WithPreceding(in ropAndTerm1);
             if (rop.Result.Try(out op)) {
-                var rterm2 = termP(inp).WithPreceding(in ropAndTerm1);
+                var rterm2 = term(inp).WithPreceding(in ropAndTerm1);
                 if (!rterm2.Result.Try(out var term2))
                     return rterm2.CastFailure<A>();
 
@@ -277,6 +313,7 @@ public static partial class Combinators {
                 return VerifyAmbiguity(Associativity.None, in rop, in rterm2) ?? rterm2.WithResult(op.Op(term1, term2));
             }
 
+            end: ;
             return rterm1;
         };
     }

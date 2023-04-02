@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using BagoumLib;
 using BagoumLib.Functional;
 using JetBrains.Annotations;
 
@@ -10,6 +11,8 @@ namespace Mizuhashi {
 /// Abstract type for errors that occur while parsing.
 /// </summary>
 public abstract record ParserError {
+    public Position? StartingFrom { get; init; } = null;
+    
     /// <summary>
     /// Convert this error and all nested errors into a flattened list.
     /// </summary>
@@ -22,17 +25,36 @@ public abstract record ParserError {
     public virtual ParserError JoinWith(ParserError other) => new EitherOf(this, other);
     
     /// <summary>
-    /// Pretty-print the error.
+    /// Pretty-print the error contents.
+    /// <br/>This does not print the position prelude, but nested errors may print their own prelude.
     /// </summary>
-    /// <param name="s">Source string.</param>
-    public abstract string Show(IInputStream s);
+    public abstract string Show(IInputStream s, int streamIndex);
+
+    /// <summary>
+    /// Show a top-level error. This always prints the position prelude.
+    /// </summary>
+    public string ShowTopLevel(IInputStream s, int streamIndex) {
+        var e = this.Flatten();
+        return $"{s.TokenWitness.ShowErrorPosition(new(streamIndex, e))}\n{e.Show(s, streamIndex)}";
+    }
+
+    /// <summary>
+    /// Show a nested error. This prints the position prelude iff <see cref="StartingFrom"/> is nonempty.
+    /// </summary>
+    public string ShowNested(IInputStream s, int streamIndex) {
+        if (StartingFrom != null)
+            //add newline for disambiguation
+            return $"\n{s.TokenWitness.ShowErrorPosition(new(streamIndex, this))}\n{Show(s, streamIndex)}";
+        else
+            return Show(s, streamIndex);
+    }
 
     /// <summary>
     /// Error representing generic failure.
     /// </summary>
     public record Failure(string Message) : ParserError {
         /// <inheritdoc/>
-        public override string Show(IInputStream s) => $"Failure: {Message}";
+        public override string Show(IInputStream s, int streamIndex) => Message;
     }
 
     /// <summary>
@@ -40,7 +62,7 @@ public abstract record ParserError {
     /// </summary>
     public record ExpectedChar(char Char) : ParserError {
         /// <inheritdoc/>
-        public override string Show(IInputStream s) => $"Expected '{Char}'";
+        public override string Show(IInputStream s, int streamIndex) => $"Expected '{Char}'.";
     }
     
     /// <summary>
@@ -48,7 +70,7 @@ public abstract record ParserError {
     /// </summary>
     public record Expected(string String) : ParserError { 
         /// <inheritdoc/>
-        public override string Show(IInputStream s) => $"Expected {String}";
+        public override string Show(IInputStream s, int streamIndex) => $"Expected {String}.";
     }
 
     /// <summary>
@@ -56,9 +78,9 @@ public abstract record ParserError {
     /// </summary>
     public record IncorrectNumber(int Required, int Received, string? ObjectDescription, LocatedParserError? Inner) : ParserError {
         /// <inheritdoc/>
-        public override string Show(IInputStream s) {
+        public override string Show(IInputStream s, int streamIndex) {
             var objSuffix = ObjectDescription == null ? "" : $" of {ObjectDescription}";
-            var excSuffix = Inner == null ? "" : "\n\t" + s.ShowError(Inner.Value).Replace("\n", "\n\t");
+            var excSuffix = Inner == null ? "" : "\n\t" + Inner.Value.Show(s).Replace("\n", "\n\t");
             return $"Required {Required} values{objSuffix}, but only received {Received}." + excSuffix;
         }
     }
@@ -68,7 +90,7 @@ public abstract record ParserError {
     /// </summary>
     public record UnexpectedChar(char Char) : ParserError { 
         /// <inheritdoc/>
-        public override string Show(IInputStream s) => $"Did not expect '{Char}'";
+        public override string Show(IInputStream s, int streamIndex) => $"Did not expect '{Char}'.";
         
     }
    
@@ -77,19 +99,19 @@ public abstract record ParserError {
     /// </summary>
     public record Unexpected(string String) : ParserError { 
             /// <inheritdoc/>
-        public override string Show(IInputStream s) => $"Did not expect {String}";
+        public override string Show(IInputStream s, int streamIndex) => $"Did not expect {String}.";
     }
     
     /// <summary>
     /// A wrapper around an error with a label that describes what it was supposed to parse.
     /// </summary>
-    public record Labelled(string Label, Either<string, LocatedParserError?> ExpectedContent) : ParserError {
+    public record Labelled(string Label, Either<string, ParserError?> ExpectedContent) : ParserError {
         /// <inheritdoc/>
-        public override string Show(IInputStream s) => ExpectedContent.Map(
-            err => $"Failed in parsing {Label}: {err}",
-            err => $"Failed in parsing {Label}" + (err == null ?
-                "" :
-                ":\n\t" + s.ShowError(err.Value).Replace("\n", "\n\t"))
+        public override string Show(IInputStream s, int streamIndex) => ExpectedContent.Map(
+            err => $"Failed while parsing {Label}.\n{err}",
+            err => err is null ?
+                $"Expected {Label}." :
+                $"Failed while parsing {Label}.\n{err.ShowNested(s, streamIndex)}"
         );
     }
 
@@ -101,8 +123,8 @@ public abstract record ParserError {
         protected override IEnumerable<ParserError> Enumerated() => OptionA.Enumerated().Concat(OptionB.Enumerated());
         
         /// <inheritdoc/>
-        public override string Show(IInputStream s) {
-            return "This should not appear.";
+        public override string Show(IInputStream s, int streamIndex) {
+            return "Static failure: EitherOf direct show: This should not appear.";
         }
     }
 
@@ -119,11 +141,11 @@ public abstract record ParserError {
         }
 
         /// <inheritdoc/>
-        public override string Show(IInputStream s) {
+        public override string Show(IInputStream s, int streamIndex) {
             if (Errors.Count == 1)
-                return Errors[0].Show(s);
-            return "Parsing failed. Resolve any of the following errors to continue.\n\t" + string.Join("\n",
-                Errors.Select(e => e.Show(s))).Replace("\n", "\n\t");
+                return Errors[0].Show(s, streamIndex);
+            return "Resolve any of the following errors to continue.\n\t" + string.Join("\n\t",
+                Errors.Select(e => "- " + e.ShowNested(s, streamIndex).Replace("\n", "\n\t  ")));
         }
 
         /// <summary>
@@ -141,6 +163,8 @@ public abstract record ParserError {
         this switch {
             EitherOf e => new OneOf(e.Enumerated().ToList()),
             OneOf e => new OneOf(e.Enumerated().ToList()),
+            Labelled { ExpectedContent: {IsRight: true, Right: { } r } } e => 
+                e with { ExpectedContent = new(r.Flatten()) },
             _ => this
         };
 
@@ -177,7 +201,7 @@ public readonly struct LocatedParserError {
     /// <summary>
     /// Display the error in the source stream.
     /// </summary>
-    public string Show(IInputStream source) => source.ShowError(this);
+    public string Show(IInputStream source) => Error.ShowTopLevel(source, Index);
     
     /// <summary>
     /// Join two errors as efficiently as possible.

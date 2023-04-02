@@ -25,18 +25,18 @@ public class _8RenderGroupTest {
             var reimu = vn.Add(new Reimu());
             await vn.Wait(0);
             
-            var rg2 = new RenderGroup(vn, "rg2", 2);
-            var rg3 = new RenderGroup(vn, "rg3", 3);
+            var rg2 = vn.Add(new RenderGroup("rg2", 2));
+            var rg3 = vn.Add(new RenderGroup("rg3", 3));
             //Multiple render groups cannot have the same priority (at least not on initialization)
-            Assert.Throws<Exception>(() => new RenderGroup(vn, "rg4", 2));
+            Assert.Throws<Exception>(() => vn.Add(new RenderGroup("rg4", 2)));
             
             reimu.AddToRenderGroup(rg2);
             ListEq(rg2.Contents.ToArray(), new[] { reimu });
             reimu.AddToRenderGroup(rg3);
             ListEq(rg2.Contents.ToArray(), new IRendered[] { });
             ListEq(rg3.Contents.ToArray(), new[] { reimu });
-            reimu.Location.Value = Vector3.One;
-            rg3.ZoomTarget.Value = reimu.ComputedLocation;
+            reimu.LocalLocation.Value = Vector3.One;
+            rg3.ZoomTarget.Value = reimu.ComputedLocalLocation;
             await rg3.ZoomTo(2f, 3f);
             return 1337;
         }
@@ -58,7 +58,7 @@ public class _8RenderGroupTest {
     private static readonly string[] stored = {
         "<VNState>.$UpdateCount ~ 0",
         "<VNState>.RenderGroupCreated ~ <RenderGroup>",
-        "<RenderGroup>.EntityActive ~ True",
+        "<RenderGroup>.EntityActive ~ Active",
         "<RenderGroup>.ComputedEulerAnglesD ~ <0, 0, 0>",
         "<RenderGroup>.ComputedLocation ~ <0, 0, 0>",
         "<RenderGroup>.NestedRenderGroup ~ ",
@@ -71,7 +71,7 @@ public class _8RenderGroupTest {
         "<RenderGroup>.ZoomTarget ~ <0, 0, 0>",
         "<RenderGroup>.ZoomTransformOffset ~ <0, 0, 0>",
         "<VNState>.RenderGroupCreated ~ <RenderGroup>",
-        "<RenderGroup>.EntityActive ~ True",
+        "<RenderGroup>.EntityActive ~ Active",
         "<RenderGroup>.ComputedEulerAnglesD ~ <0, 0, 0>",
         "<RenderGroup>.ComputedLocation ~ <0, 0, 0>",
         "<RenderGroup>.NestedRenderGroup ~ ",

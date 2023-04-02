@@ -129,7 +129,10 @@ public abstract class DisturbedEvented<T> : ICSubject<T> {
     public void OnError(Exception error) => onSet.OnError(error);
 
     /// <inheritdoc/>
-    public void OnCompleted() => onSet.OnCompleted();
+    public void OnCompleted() {
+        onSet.OnCompleted();
+        ClearDisturbances();
+    }
 }
 
 /// <summary>

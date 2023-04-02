@@ -102,9 +102,12 @@ public class Coroutines : ICoroutineRunner {
             var dc = n.DeletedCount;
             bool remaining = n.Value.ienum.MoveNext();
             if (n.DeletedCount != dc) {
-                if (coroutines.Count != 0)
-                    throw new Exception($"Since a coroutine node was externally deleted, expected all nodes to be " +
-                                        $"deleted, but {coroutines.Count} yet exist.");
+                //There are valid use cases for having remaining coroutines:
+                // specifically, when all coroutines are deleted and then new ones are added
+                //No need to enforce on this case, just assume that all the remaining coroutines are new.
+                //if (coroutines.Count != 0)
+                //    throw new Exception($"Since a coroutine node was externally deleted, expected all nodes to be " +
+                //                        $"deleted, but {coroutines.Count} yet exist.");
                 changed = true;
                 break;
             } else if (remaining) {

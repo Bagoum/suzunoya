@@ -23,7 +23,8 @@ public static class TestHelpers {
         if (res.Error is { } err)
             Console.WriteLine("Success with errors:\n" + strm.ShowAllFailures(err));
         if (!strm.Empty)
-            Console.WriteLine($"Success with incomplete parse:\n{strm.Source[..strm.Index]}|{strm.Source[strm.Index..]}");
+            Console.WriteLine($"Success with incomplete parse:\n{strm.TokenWitness.ShowConsumed(0, strm.Index)}|" +
+                              $"{strm.TokenWitness.ShowConsumed(strm.Index, strm.Source.Length)}");
         Assert.IsTrue(verify(res.Result.Value));
     }
 
@@ -41,7 +42,7 @@ public static class TestHelpers {
             if (!Equals(exp, errs))
                 Assert.Fail($"Expecting\n{exp.Show(strm)}\n~~~\n but instead received\n~~~\n{errs.Show(strm)}");
         } else if (!Equals(e, resultErr.Error)) 
-                Assert.Fail($"Expecting\n{e.Show(strm)}\n~~~but instead received~~~\n{resultErr.Error.Show(strm)}\n" +
+                Assert.Fail($"Expecting\n{e.Show(strm, resultErr.Index)}\n~~~but instead received~~~\n{resultErr.Error.Show(strm, resultErr.Index)}\n" +
                             $"~~~as part of complete message~~~\n{strm.ShowAllFailures(result.ErrorOrThrow)}");
         try {
             AssertHelpers.ListEq(strm.Rollbacks.Select(u => u.Error).ToList(), backtracks);

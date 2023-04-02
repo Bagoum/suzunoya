@@ -201,7 +201,7 @@ public static class MarkdownParser {
 
     }
 
-    private static readonly ParserError ParensMismatched = new ParserError.Failure("mismatched parentheses");
+    private static readonly ParserError ParensMismatched = new ParserError.Failure("Parentheses are mismatched.");
     /// <summary>
     /// Parses the URL link, assuming the opening ( has already been parsed.
     /// <br/>If it fails, it does not consume.
@@ -531,7 +531,7 @@ public static class MarkdownParser {
                     return Finalize(next);
                 else if (!next.Consumed)
                     return new(
-                        new ParserError.Failure("ManyBlocks parser parsed an object without consuming text."), next.Start);
+                        new ParserError.Failure("`ManyBlocks` parser parsed an object without consuming text."), next.Start);
                 else
                     Results().Add(next.Result.Value);
             }
@@ -564,7 +564,7 @@ public static class MarkdownParser {
                 return Finalize(next);
             else if (!next.Consumed)
                 return new(
-                    new ParserError.Failure("ManyBlocks parser parsed an object without consuming text."), next.Start);
+                    new ParserError.Failure("`ManyBlocks` parser parsed an object without consuming text."), next.Start);
             else
                 results.Add(next.Result.Value);
         }
@@ -602,7 +602,8 @@ public static class MarkdownParser {
     public static List<Block> Parse(string markdownText, Settings? settings = null) {
         markdownText = markdownText.Replace("\r\n", "\n").Replace("\r", "\n");
         return ParseDocument(settings ?? new())
-            .ResultOrErrorString(new("Markdown text", markdownText.ToCharArray(), null!))
+            .ResultOrErrorString(new("Markdown text", markdownText.ToCharArray(), null!, 
+                new CharTokenWitnessCreator(markdownText)))
             .Map(l => l, err => throw new Exception(err));
     }
 }

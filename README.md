@@ -15,17 +15,19 @@ All code is written in C#9 and compiled against Standard 2.1 for compatibility w
 
 BagoumLib is a small class library with some convenient functionality, including:
 
-- Easing, lerping, and tweening
-- Convenient data structures such as compacting arrays and coroutine iterators 
-- Low-garbage event classes
-- Helpers for expression trees, including functionality to print expressions to source code
+- Easing, lerping, and tweening (see BagoumLib.Transitions)
+- Convenient data structures such as compacting arrays and coroutine iterators (see BagoumLib.DataStructures)
+- Low-garbage event classes (see BagoumLib.Events)
+- Utilities for type unification, including type unification of an entire program with generics, return type disambiguation, implicit casting, and method overloads (see BagoumLib.Unification)
+  - This doesn't yet support type constraints, such as `T : IMyInterface`
+- Helpers for expression trees, including functionality to print expressions to source code (see BagoumLib.Expressions.ExpressionPrinter)
   - I do not believe there are any other expression-to-source implementations for C#. There are many projects that can print expressions to stuff that looks like C# code, but they can't create code that you can actually compile.
 
 You can compile it to a DLL and use it separately if you like. Note that the task code in BagoumLib uses the custom ICancellee interface, which is not thread-safe in the way CancellationToken is. 
 
 ### Mizuhashi
 
-Mizuhashi is a lightweight combinatorial parser based on FParsec. I wrote this because Unity is really spotty with F# support and none of the C# FParsec clones I could find were up to my taste.
+Mizuhashi is a lightweight combinatorial parser based on FParsec. I wrote this because Unity is really spotty with F# support and none of the C# FParsec clones I could find were up to my taste. It supports tokenized parsing. There is also a mostly-functional Markdown parser in Mizuhashi.Parsers.MarkdownParser.
 
 Consumes BagoumLib.
 

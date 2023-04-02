@@ -78,6 +78,8 @@ public static class Easers {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EInBack(float x) => x * x * ((BackElasticity + 1) * x - BackElasticity);
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float CEOutBack(float elast, float x) => 1 + --x * x * ((elast + 1) * x + elast);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutBack(float x) => 1 + --x * x * ((BackElasticity + 1) * x + BackElasticity);
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOBack(float x) =>

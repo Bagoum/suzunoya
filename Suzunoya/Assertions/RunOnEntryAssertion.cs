@@ -7,6 +7,13 @@ namespace Suzunoya.Assertions {
 /// An assertion that runs a task on entry (new state/no preceding only). Throws on inherit.
 /// </summary>
 public record RunOnEntryAssertion(Func<Task> OnEntry) : IAssertion<RunOnEntryAssertion> {
+
+    /// <inheritdoc/>
+    public RunOnEntryAssertion(Action OnEntry) : this(() => {
+        OnEntry();
+        return Task.CompletedTask;
+    }) { }
+    
     /// <inheritdoc/>
     public (int Phase, int Ordering) Priority { get; set; } = (0, 0);
     /// <inheritdoc/>

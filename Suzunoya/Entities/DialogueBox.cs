@@ -24,7 +24,7 @@ public enum SpeakFlags {
     None = 0,
     /// <summary>
     /// By default, every text command will reset all visible text and the speaker. To avoid this,
-    /// use this flag (or call AlsoSay).
+    /// use this flag (or call <see cref="Helpers.AlsoSay"/>).
     /// </summary>
     DontClearText = 1 << 0,
     /// <summary>

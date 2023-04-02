@@ -27,9 +27,9 @@ public static class Utilities {
                 exc = new Exception(e.Message, exc);
             }
             if (exc != null) {
-                Logging.Log(LogMessage.Error(exc, 
+                Logging.Logs.Error(exc, 
                     "Exceptions occured within a task continuation. " +
-                    "If this continuation is awaited by the main thread, then this error may be repeated."));
+                    "If this continuation is awaited by the main thread, then this error may be repeated.");
                 throw exc;
             }
         }
@@ -51,9 +51,9 @@ public static class Utilities {
                 exc = new Exception(e.Message, exc);
             }
             if (exc != null) {
-                Logging.Log(LogMessage.Error(exc, 
+                Logging.Logs.Error(exc, 
                     "Exceptions occured within a task continuation. " +
-                    "If this continuation is awaited by the main thread, then this error may be repeated."));
+                    "If this continuation is awaited by the main thread, then this error may be repeated.");
                 throw exc;
             }
         }

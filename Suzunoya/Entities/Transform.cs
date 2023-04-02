@@ -14,13 +14,18 @@ public interface ITransform : IEntity {
     /// <summary>
     /// Base location of the entity.
     /// </summary>
-    IdealOverride<Vector3> Location { get; }
+    IdealOverride<Vector3> LocalLocation { get; }
     
     /// <summary>
     /// Location with disturbance effects such as screenshake or displacement applied.
     /// </summary>
-    DisturbedSum<Vector3> ComputedLocation { get; }
+    DisturbedSum<Vector3> ComputedLocalLocation { get; }
     
+    /// <summary>
+    /// Location including offset of any parent objects.
+    /// </summary>
+    DisturbedSum<Vector3> ComputedLocation { get; }
+
     /// <summary>
     /// Base euler angles of the entity.
     /// </summary>
@@ -62,7 +67,9 @@ public interface ITransform : IEntity {
 /// </summary>
 public class Transform : Entity, ITransform {
     /// <inheritdoc />
-    public IdealOverride<Vector3> Location { get; }
+    public IdealOverride<Vector3> LocalLocation { get; }
+    /// <inheritdoc />
+    public DisturbedSum<Vector3> ComputedLocalLocation { get; }
     /// <inheritdoc />
     public DisturbedSum<Vector3> ComputedLocation { get; }
     /// <inheritdoc />
@@ -88,9 +95,7 @@ public class Transform : Entity, ITransform {
         set {
             if (value == parent) return;
             parentTokens.DisposeAll();
-            parent = null;
-            if (value != null)
-                BindParent(value);
+            BindParent(value);
         }
     }
 
@@ -98,8 +103,9 @@ public class Transform : Entity, ITransform {
     /// Create a transform entity.
     /// </summary>
     public Transform(Vector3? location = null, Vector3? eulerAnglesD = null, Vector3? scale = null) {
-        Location = new(location ?? Vector3.Zero);
-        ComputedLocation = new(Location);
+        LocalLocation = new(location ?? Vector3.Zero);
+        ComputedLocalLocation = new(LocalLocation);
+        ComputedLocation = new(ComputedLocalLocation as IBObservable<Vector3>);
         EulerAnglesD = new(eulerAnglesD ?? Vector3.Zero);
         ComputedEulerAnglesD = new(EulerAnglesD);
         Scale = new(scale ?? Vector3.One);
@@ -110,25 +116,51 @@ public class Transform : Entity, ITransform {
     /// Set the parent of this transform. This means that the location, euler angles, and scale will be
     ///  offset by the parent's values.
     /// </summary>
-    protected virtual void BindParent(ITransform nParent) {
-        Container.Logs.OnNext($"{this} is set as a child of {nParent}.");
+    protected virtual void BindParent(ITransform? nParent) {
         parent = nParent;
-        parentTokens.Add(nParent.EntityActive.Subscribe(b => {
-            if (!b) {
-                Container.Logs.OnNext($"{this} has received a cascading deletion from a parent.");
-                //Cascading deletions should be soft since they may occur in cases where
-                // parent and child are simultaneously running exit animations (and the parent finishes first),
-                // and these should not cause hard cancellations to be raised.
-                SoftDelete();
-            }
-        }));
-        parentTokens.Add(ComputedLocation.AddDisturbance(nParent.ComputedLocation));
-        parentTokens.Add(ComputedEulerAnglesD.AddDisturbance(nParent.ComputedEulerAnglesD));
-        parentTokens.Add(ComputedScale.AddDisturbance(nParent.ComputedScale));
-        parentTokens.Add(nParent.NotifyChildCreated(this));
+        if (nParent == null) {
+            ComputedLocation.ClearDisturbances();
+            parentTokens.Add(ComputedLocation.AddDisturbance(ComputedLocalLocation));
+        } else {
+            Container.Logs.Log("{0} is set as a child of {1}.", this, nParent, LogLevel.DEBUG1);
+            parentTokens.Add(nParent.EntityActive.Subscribe(b => {
+                if (b == EntityState.Deleted) {
+                    Container.Logs.Log("{0} has received a cascading deletion from a parent.", this, LogLevel.DEBUG1);
+                    //Cascading deletions should be soft since they may occur in cases where
+                    // parent and child are simultaneously running exit animations (and the parent finishes first),
+                    // and these should not cause hard cancellations to be raised.
+                    SoftDelete();
+                }
+            }));
+            ComputedLocation.ClearDisturbances();
+            parentTokens.Add(ComputedLocation.AddDisturbance(nParent.ComputedLocation));
+            var localLoc = new LiftEvented<Vector3, Vector3, Vector3>((a, b) => a * b, ComputedLocalLocation, nParent.Scale);
+            parentTokens.Add(localLoc);
+            parentTokens.Add(ComputedLocation.AddDisturbance(localLoc));
+            parentTokens.Add(ComputedEulerAnglesD.AddDisturbance(nParent.ComputedEulerAnglesD));
+            parentTokens.Add(ComputedScale.AddDisturbance(nParent.ComputedScale));
+            parentTokens.Add(nParent.NotifyChildCreated(this));
+        }
     }
     /// <inheritdoc />
     public IDisposable NotifyChildCreated(ITransform child) => children.Add(child);
+
+    /// <inheritdoc />
+    public override void ClearEvents() {
+        base.ClearEvents();
+        ComputedLocalLocation.OnCompleted();
+        ComputedScale.OnCompleted();
+        ComputedEulerAnglesD.OnCompleted();
+        LocalLocation.OnCompleted();
+        Scale.OnCompleted();
+        EulerAnglesD.OnCompleted();
+    }
+
+    /// <inheritdoc />
+    public override void Delete() {
+        parentTokens.DisposeAll();
+        base.Delete();
+    }
 }
 
 }

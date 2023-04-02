@@ -188,7 +188,7 @@ public static class ExExtensions {
         Ex.Condition(dict.DictContains(key), dict.DictGet(key), deflt);
     
     /// <summary>
-    /// The expression for (dict[key])
+    /// The expression for (dict[key]). Note that this allows read and write.
     /// </summary>
     public static Ex DictGet(this Ex dict, Ex key) => Ex.Property(dict, "Item", key);
     

@@ -269,7 +269,7 @@ public static class ArrayExtensions {
     /// </summary>
     public static int IndexOf<T>(this T[] arr, T obj) {
         for (int ii = 0; ii < arr.Length; ++ii) {
-            if (Equals(arr[ii], obj)) return ii;
+            if (EqualityComparer<T>.Default.Equals(arr[ii], obj)) return ii;
         }
         return -1;
     }
@@ -419,7 +419,7 @@ public static class IEnumExtensions {
     public static int IndexOf<T>(this IEnumerable<T> arr, T obj) {
         int i = 0;
         foreach (var x in arr) {
-            if (Equals(obj, x)) return i;
+            if (EqualityComparer<T>.Default.Equals(obj, x)) return i;
             ++i;
         }
         return -1;
@@ -605,13 +605,13 @@ public static class ListExtensions {
     /// <summary>
     /// Returns true if the lists contains the same elements.
     /// </summary>
-    public static bool AreSame<T>(this IReadOnlyList<T>? arr, IReadOnlyList<T>? other) where T: IEquatable<T> {
+    public static bool AreSame<T>(this IReadOnlyList<T>? arr, IReadOnlyList<T>? other) {
         if (arr == null && other == null) return true;
         if (arr == null || other == null) return false;
         if (arr.Count != other.Count)
             return false;
         for (int ii = 0; ii < arr.Count; ++ii)
-            if (!arr[ii].Equals(other[ii]))
+            if (!EqualityComparer<T>.Default.Equals(arr[ii], other[ii]))
                 return false;
         return true;
     }

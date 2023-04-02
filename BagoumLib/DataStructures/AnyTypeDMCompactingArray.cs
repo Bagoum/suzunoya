@@ -102,6 +102,14 @@ public class AnyTypeDMCompactingArray<D> where D : IDeletionMarker {
     }
 
     /// <summary>
+    /// Add an element to the array at the end, ignoring its priority.
+    /// </summary>
+    public void AddToEnd(D dm) {
+        MaybeResize();
+        Data[count++] = dm;
+    }
+
+    /// <summary>
     /// Returns true iff the element at the given index has not been deleted.
     /// </summary>
     public bool ExistsAt(int index) => !Data[index].MarkedForDeletion;

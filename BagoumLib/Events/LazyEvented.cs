@@ -54,7 +54,7 @@ public class LazyEvented<T> : ICSubject<T> {
     /// </summary>
     public void Recompute() {
         var nv = getter();
-        if (!Equals(nv, _value))
+        if (!EqualityComparer<T>.Default.Equals(nv, _value))
             OnNext(nv);
     }
 

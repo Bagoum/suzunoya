@@ -92,7 +92,7 @@ public readonly struct Maybe<T> {
     
     /// <inheritdoc cref="Equals(BagoumLib.Functional.Maybe{T})"/>
     public static bool operator ==(Maybe<T> a, Maybe<T> b) =>
-        (a.Valid == b.Valid) && (!a.Valid || Equals(a.Value, b.Value));
+        (a.Valid == b.Valid) && (!a.Valid || EqualityComparer<T>.Default.Equals(a.Value, b.Value));
 
     /// <summary>
     /// Inequality operator.
