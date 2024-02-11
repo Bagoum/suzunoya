@@ -108,6 +108,16 @@ public static class TypeUnifyTests {
     private static MethodInfo MT(string name, params Type[] types) => typeof(TypeUnifyTests).GetMethod(name, types)!;
     
     private static Dummy FromMethodN(string name) => FromMethod(M(name));
+    
+    
+    [Test]
+    public static void TestDontBindRecursive() {
+        var a = new Variable();
+        var b = new Variable();
+        var u = Unifier.Empty.Bind(a, b.MakeArrayType(), a, b.MakeArrayType()).LeftOrThrow;
+        var u2 = u.Bind(b, a, b, a).RightOrThrow;
+        var u3 = u.Bind(b, a.MakeArrayType(), b, a.MakeArrayType()).RightOrThrow;
+    }
 
     public static List<T> Generic0<T>(T arg1) => null!;
     public static List<T> Generic1<T>(List<T[]> arg1, Func<T, T> arg2) => null!;
@@ -139,7 +149,26 @@ public static class TypeUnifyTests {
         
     }
 
-    
+    public static float FuncOf5(int a, uint b, short c, long d, double e) => 0;
+
+    [Test]
+    public static void TestPartialApp() {
+        AssertSuccess<Func<int,uint,short,long,double,float>>(FromMethodN("FuncOf5").PartialApplyToFunc(0), 
+            Call(Unknown));
+        AssertSuccess<Func<uint,short,long,double,float>>(FromMethodN("FuncOf5").PartialApplyToFunc(1), 
+            Call(Type<int>(), Unknown));
+        AssertSuccess<Func<short,long,double,float>>(FromMethodN("FuncOf5").PartialApplyToFunc(2), 
+            Call(Type<int>(), Type<uint>(), Unknown));
+        AssertSuccess<Func<long,double,float>>(FromMethodN("FuncOf5").PartialApplyToFunc(3), 
+            Call(Type<int>(), Type<uint>(), Type<short>(), Unknown));
+        AssertSuccess<Func<double,float>>(FromMethodN("FuncOf5").PartialApplyToFunc(4), 
+            Call(Type<int>(), Type<uint>(), Type<short>(), Type<long>(), Unknown));
+        AssertSuccess<Func<float>>(FromMethodN("FuncOf5").PartialApplyToFunc(5), 
+            Call(Type<int>(), Type<uint>(), Type<short>(), Type<long>(), Type<double>(), Unknown));
+        Assert.Throws<Exception>(() => FromMethodN("FuncOf5").PartialApplyToFunc(6));
+    }
+
+
     public static T[] NestA<T>(int a, T b) => default!;
     public static T[] NestB<T>(T b) => default!;
     public static T ID<T>(T b) => default!;
@@ -328,8 +357,22 @@ public static class TypeUnifyTests {
         AssertPossibleTypes(ast, typeof(double));
         u = ast.ResolveUnifiers(K<double>(), new(), Unifier.Empty).LeftOrThrow;
     }
-    
-    
+
+    public static string MyFnV1(int x) => "";
+    public static bool MyFnV2(double y) => false;
+    [Test]
+    public static void TestRequiredImplicitCast() {
+        ITree callMyFn = new Method(new[] { add1 }, //int->string->string
+            new AtomicWithType(Type<int>()),
+            new Method(new[]{ FromMethodN("MyFnV1"), FromMethodN("MyFnV2")},
+                new AtomicWithType(Type<double>())
+            ));
+        var resolver = new TypeResolver(new Dictionary<Type, Type[]> {
+            { typeof(double), new[] { typeof(int) } }
+        });
+        AssertPossibleTypes(callMyFn, resolver, typeof(string));
+        var u = callMyFn.ResolveUnifiers(Type<string>(), resolver, Unifier.Empty).LeftOrThrow;
+    }
 
     [Test]
     public static void TestImplicitCast() {
@@ -347,10 +390,11 @@ public static class TypeUnifyTests {
         });
         AssertPossibleTypes(ast, resolver, typeof(int)); //int is the return type of add2
         var u = ast.ResolveUnifiers(Type<int>(), resolver, Unifier.Empty).LeftOrThrow;
-        //Implicit casts cascade as far down as possible
+        //Implicit casts prefer to attach higher up.
+        //Prefer to cast the result of addG2 instead of the argument.
         Assert.IsNull(ast.ImplicitCast);
-        Assert.IsNull(addG2Ast.ImplicitCast);
-        Assert.AreEqual(typeof(float), addG2Ast.Arguments[1].ImplicitCast.ResultType.Resolve(Unifier.Empty).LeftOrThrow);
+        Assert.AreEqual(typeof(float), addG2Ast.ImplicitCast!.ResultType.Resolve().LeftOrThrow);
+        Assert.IsNull(addG2Ast.Arguments[1].ImplicitCast);
 
         var isResolver = new TypeResolver(new Dictionary<Type, Type[]> {
             { typeof(int), new[] { typeof(float), typeof(string) } },
@@ -436,6 +480,8 @@ public static class TypeUnifyTests {
     public static float Consume2<T>(T a, T b) => default!;
     public static float ConsumeInt(int a) => default!;
     public static float ConsumeString(string a) => default!;
+    public static T Mul<T>(float a, T b) => default!;
+    public static T MulRev<T>(T a, float b) => default!;
     private static readonly Dummy consume = FromMethod(M("Consume"));
     private static readonly Dummy consume2 = FromMethod(M("Consume2"));
     private static readonly Dummy consumeInt = FromMethod(M("ConsumeInt"));
@@ -479,17 +525,16 @@ public static class TypeUnifyTests {
         Assert.AreEqual(typeof(float), ue.LeftOrThrow.Item1.Resolve(Unifier.Empty).LeftOrThrow);
         Assert.IsTrue(ast.IsFullyResolved);
 
-        var v1 = UnknownTree;
-        ast = new Method(new[] { consumeInt, consumeStr },
-            v1
+        ast = new Method(new[] { FromMethodN("Mul"), FromMethodN("MulRev") },
+            new AtomicWithType(Type<float>()),
+            new AtomicWithType(Type<float>())
         );
         AssertPossibleTypes(ast, typeof(float), typeof(float));
         Assert.IsInstanceOf<TypeUnifyErr.MultipleOverloads>(ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty).RightOrThrow);
-        (ast as Method).PreferFirstOverload = true;
+        (ast as Method).OverloadsAreInterchangeable = true;
+        AssertPossibleTypes(ast, typeof(float));
         var u = ast.ResolveUnifiers(Type<float>(), new(), Unifier.Empty).LeftOrThrow.Item2;
-        Assert.AreEqual(typeof(int), v1.SelectedOverloadReturnType.Resolve(u).LeftOrThrow);
-        
-        
+
         /* consume t>t>float
             id t>t
                 unknown
@@ -548,9 +593,33 @@ public static class TypeUnifyTests {
         Assert.AreEqual(u.Item1.Resolve(u.Item2).LeftOrThrow, typeof(float));
         Assert.IsNotNull((ast as Method).Arguments[0].ImplicitCast);
         var w = 5;
-
     }
-    
+
+    public static float Sum(float[] args) => default!;
+
+    [Test]
+    public static void TestCastThroughArray() {
+        ITree ast = new Method(new[] { FromMethodN("Sum") },
+            new Arr(
+                new AtomicWithType(Type<float>())
+            ));
+        AssertPossibleTypes(ast, typeof(float));
+
+        var resolver = new TypeResolver(new ImplicitTypeConverter(typeof(int), typeof(float))); 
+        ast = new Method(new[] { FromMethodN("Sum") },
+            new Arr(
+                new AtomicWithType(Type<float>()),
+                new AtomicWithType(Type<int>())
+            ));
+        AssertPossibleTypes(ast, resolver, typeof(float));
+        
+        ast = new Method(new[] { FromMethodN("Sum") },
+            new Arr(
+                new AtomicWithType(Type<int>()),
+                new AtomicWithType(Type<int>())
+            ));
+       // AssertPossibleTypes(ast, resolver, typeof(float));
+    }
     
     
     private static void AssertPossibleTypes(ITree tree, params Type?[] typs) =>

@@ -19,6 +19,7 @@ public class Expressions {
     private static readonly ParameterExpression z = Prm<int>("z");
     private static readonly LabelTarget breaker = Ex.Label("break_me");
     private static readonly LabelTarget continuer = Ex.Label("continue_me");
+    private static readonly LabelTarget returnInt = Ex.Label(typeof(int), "return");
 
     [Test]
     public void TestBinary() {
@@ -59,7 +60,7 @@ stringArray3;
                     Ex.Break(breaker),
                     Ex.Block(
                         Ex.MultiplyAssign(x, ExC(2)),
-                        Ex.Break(continuer),
+                        Ex.Continue(continuer),
                         Ex.PreIncrementAssign(x)))
                 ), breaker, continuer), 
             x);
@@ -69,15 +70,32 @@ stringArray3;
 while (true) {
     continue_me:;
     if (x > y) {
-        goto break_me;
+        break;
     } else {
         x *= 2;
-        goto continue_me;
-        --x;
+        continue;
+        ++x;
     }
 }
 break_me:;
 x;");
+    }
+
+    [Test]
+    public void TestReturn() {
+        var body = Ex.Block(
+            Ex.IfThen(x.GT(ExC(1)), Ex.Return(returnInt, ExC(1))),
+            Ex.Return(returnInt, x.Sub(ExC(5))),
+            Ex.Label(returnInt, Ex.Default(typeof(int)))
+        );
+        var func = Expression.Lambda<Func<int, int>>(body, x).Compile();
+        Assert.AreEqual(1, func(10));
+        Assert.AreEqual(-8, func(-3));
+        AssertEx(body, @"if (x > 1) {
+    return 1;
+}
+return x - 5;
+return:;");
     }
 
     [Test]

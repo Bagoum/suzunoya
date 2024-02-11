@@ -334,6 +334,19 @@ public static class IEnumExtensions {
         if (ct > 0)
             yield return (prev, last);
     }
+
+    /// <summary>
+    /// Return `arr.Append(next)` if next is nnonnull. Otherwise, return `arr`.
+    /// </summary>
+    public static IEnumerable<T> AppendIfNonnull<T>(this IEnumerable<T> arr, T? next) where T : class {
+        return (next == null) ? arr : arr.Append(next);
+    }
+    /// <summary>
+    /// Return `arr.Append(next)` if next is nnonnull. Otherwise, return `arr`.
+    /// </summary>
+    public static IEnumerable<T> AppendIfNonnull<T>(this IEnumerable<T> arr, T? next) where T : struct {
+        return (next.Try(out var x)) ? arr.Append(x) : arr;
+    }
     
     /// <summary>
     /// Get the index and element of each element in the enumerable.

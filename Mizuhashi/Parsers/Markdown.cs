@@ -602,7 +602,7 @@ public static class MarkdownParser {
     public static List<Block> Parse(string markdownText, Settings? settings = null) {
         markdownText = markdownText.Replace("\r\n", "\n").Replace("\r", "\n");
         return ParseDocument(settings ?? new())
-            .ResultOrErrorString(new("Markdown text", markdownText.ToCharArray(), null!, 
+            .ResultOrErrorString(new(markdownText, "Markdown text", null!, 
                 new CharTokenWitnessCreator(markdownText)))
             .Map(l => l, err => throw new Exception(err));
     }

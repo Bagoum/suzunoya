@@ -43,23 +43,23 @@ public class Trie {
     ///  stored string and the provided string. eg. If this trie represents "abc" and Add("def") is called on this trie,
     ///  then "abcdef" is added to the root trie.
     /// </summary>
-    public void Add(ReadOnlySpan<char> str) {
-        if (str.IsEmpty) {
+    public void Add(string str, int fromIndex = 0) {
+        if (fromIndex >= str.Length) {
             IsLeaf = true;
             return;
         }
-        if (!branches.TryGetValue(str[0], out var nxt))
-            nxt = branches[str[0]] = new(this);
-        nxt.Add(str[1..]);
+        if (!branches.TryGetValue(str[fromIndex], out var nxt))
+            nxt = branches[str[fromIndex]] = new(this);
+        nxt.Add(str, fromIndex + 1);
     }
 
     /// <summary>
     /// Check whether a string exists in this trie.
     /// </summary>
-    public bool Contains(ReadOnlySpan<char> str) {
-        if (str.IsEmpty)
+    public bool Contains(string str, int fromIndex = 0) {
+        if (fromIndex >= str.Length)
             return IsLeaf;
-        return branches.TryGetValue(str[0], out var nxt) && nxt.Contains(str[1..]);
+        return branches.TryGetValue(str[fromIndex], out var nxt) && nxt.Contains(str, fromIndex + 1);
     }
 
     /// <summary>
@@ -68,7 +68,7 @@ public class Trie {
     /// <br/>FindLongestSubstring("abcd") = "abc"
     /// <br/>FindLongestSubstring("pe") = null
     /// </summary>
-    public string? FindLongestSubstring(ReadOnlySpan<char> str) {
+    public string? FindLongestSubstring(string str) {
         var current = this;
         int? latestEndIndex = null;
         for (int ii = 0;; ++ii) {

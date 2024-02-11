@@ -9,7 +9,7 @@ namespace BagoumLib.DataStructures {
 /// <see cref="IDeletionMarker{T}"/> in one array.
 /// </summary>
 /// <typeparam name="T">Value type of array elements</typeparam>
-public class AbstractDMCompactingArray<T> : AnyTypeDMCompactingArray<IDeletionMarker<T>>, IEnumerable<T> {
+public class AbstractDMCompactingArray<T> : AnyTypeDMCompactingArray<IDeletionMarker<T>>, IReadOnlyDMCompactingArray<T> {
     /// <summary>
     /// Create a new compacting array with the provided initial capacity.
     /// </summary>
@@ -19,7 +19,7 @@ public class AbstractDMCompactingArray<T> : AnyTypeDMCompactingArray<IDeletionMa
     /// <inheritdoc cref="DMCompactingArray{T}.Item"/>
     public T this[int index] => Data[index].Value;
 
-    /// <inheritdoc cref="DMCompactingArray{T}.GetIfExistsAt"/>
+    /// <inheritdoc cref="IReadOnlyDMCompactingArray{T}.GetIfExistsAt"/>
     public bool GetIfExistsAt(int index, out T val) {
         if (Data[index].MarkedForDeletion) {
             val = default!;

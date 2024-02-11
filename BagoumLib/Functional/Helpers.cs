@@ -18,6 +18,39 @@ public static class Helpers {
         else
             return valueOrDelayed.Right();
     }
+    
+    /// <summary>
+    /// When both sides of an Either derive from a base type, return the left or right value as the base type.
+    /// </summary>
+    public static T LeftOrRight<L,R,T>(this Either<L, R> either) where L: T where R: T => 
+        either.IsLeft ? either.Left : either.Right;
+
+
+    /// <summary>
+    /// Get the value if it is present, otherwise get null.
+    /// </summary>
+    public static T? ValueOrSNull<T>(this Maybe<T> m) where T: struct => m.Valid ? m.Value : null;
+    
+    /// <summary>
+    /// Get the value if it is present, otherwise get null.
+    /// </summary>
+    public static T? ValueOrNull<T>(this Maybe<T> m) where T: class => m.Valid ? m.Value : null;
+    
+    /// <summary>
+    /// Accumulate many results of a selection over a failable function together.
+    /// If at least one Either is Right, then the result will short-circuit and return that Right.
+    /// </summary>
+    public static Either<List<L>, R> SequenceL<T, L, R>(this IEnumerable<T> items, Func<T, Either<L, R>> map) {
+        List<L> l = new();
+        foreach (var item in items) {
+            var x = map(item);
+            if (x.IsRight) {
+                return x.Right;
+            } else
+                l.Add(x.Left);
+        }
+        return l;
+    }
 
     /// <summary>
     /// Accumulate many Eithers together.

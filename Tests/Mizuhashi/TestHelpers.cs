@@ -42,7 +42,7 @@ public static class TestHelpers {
             if (!Equals(exp, errs))
                 Assert.Fail($"Expecting\n{exp.Show(strm)}\n~~~\n but instead received\n~~~\n{errs.Show(strm)}");
         } else if (!Equals(e, resultErr.Error)) 
-                Assert.Fail($"Expecting\n{e.Show(strm, resultErr.Index)}\n~~~but instead received~~~\n{resultErr.Error.Show(strm, resultErr.Index)}\n" +
+                Assert.Fail($"Expecting\n{e.Show(strm, resultErr.Index, resultErr.End)}\n~~~but instead received~~~\n{resultErr.Error.Show(strm, resultErr.Index, resultErr.End)}\n" +
                             $"~~~as part of complete message~~~\n{strm.ShowAllFailures(result.ErrorOrThrow)}");
         try {
             AssertHelpers.ListEq(strm.Rollbacks.Select(u => u.Error).ToList(), backtracks);
@@ -89,6 +89,6 @@ public static class TestHelpers {
         p.AssertFailRegex(s.ToCharArray(), regex);
 
     public static ParseResult<R> Run<T, R>(this Parser<T, R> p, T[] s, out InputStream<T> strm) => 
-        p(strm = new("test parser", s, default!));
+        p(strm = new(s, "test parser"));
 }
 }

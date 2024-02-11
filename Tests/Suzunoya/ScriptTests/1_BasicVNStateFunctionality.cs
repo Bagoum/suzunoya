@@ -65,7 +65,7 @@ public class _1BasicVNStateFunctionalityTest {
                 "<TestDialogueBox>.RenderLayer ~ 0",
                 "<TestDialogueBox>.ComputedScale ~ <1, 1, 1>",
                 "<TestDialogueBox>.SortingID ~ 0",
-                "<TestDialogueBox>.Speaker ~ (, Default)",
+                "<TestDialogueBox>.Speaker ~ (, None)",
                 "<TestDialogueBox>.ComputedTint ~ RGBA(1.000, 1.000, 1.000, 1.000)",
                 "<TestDialogueBox>.Visible ~ True",
                 "<RenderGroup>.RendererAdded ~ <Reimu>",
@@ -91,7 +91,7 @@ public class _1BasicVNStateFunctionalityTest {
             ListEq(er.SimpleLoggedEventStrings, new [] {
                 "<VNState>.OperationID ~ hEllO wOrld foo",
                 "<TestDialogueBox>.DialogueCleared ~ ()",
-                "<TestDialogueBox>.Speaker ~ (<Reimu>, Default)",
+                "<TestDialogueBox>.Speaker ~ (<Reimu>, None)",
             });
             er.LoggedEvents.Clear();
             //The dT on the first frame doesn't matter since the pattern is "yield then -= dT"

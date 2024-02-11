@@ -89,7 +89,7 @@ public class _3ExternalScriptRunExample {
 	    "<VNState>.$UpdateCount ~ 5",
 	    "<VNState>.OperationID ~ <color=red>hello wo<silent>rl</color>d</silent>",
 	    "<TestDialogueBox>.DialogueCleared ~ ()",
-	    "<TestDialogueBox>.Speaker ~ (<Reimu>, Default)",
+	    "<TestDialogueBox>.Speaker ~ (<Reimu>, None)",
 	    "<VNState>.DialogueLog ~ Reimu:hello world",
 	    "<TestDialogueBox>.DialogueStarted ~ Reimu:hello world",
 	    "<TestDialogueBox>.Dialogue ~ (TagOpen { name = color, tag = Color { color = red } }, hello)",

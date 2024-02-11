@@ -10,7 +10,7 @@ public static partial class Combinators {
     /// FParsec preturn
     /// </summary>
     public static Parser<T, R> PReturn<T, R>(R val) => input =>
-        new ParseResult<R>(new(val), null, input.Index, input.Index);
+        new ParseResult<R>(new(val), null as LocatedParserError?, input.Index, input.Index);
 
     /// <summary>
     /// FParsec >>%
@@ -129,18 +129,16 @@ public static partial class Combinators {
         if (res.Consumed)
             return res;
         return new(res.Result, 
-            res.Error.Try(out var e) ? new LocatedParserError(e.Index, 
-                new ParserError.Labelled(label, e.Error)) : null, res.Start, res.End);
+            res.Error.Try(out var e) ? e.WithError(new ParserError.Labelled(label, e.Error)) : null, res.Start, res.End);
     };
     
     /// <summary>
     /// FParsec &lt;??&gt;: Wrap any error messages in a label.
     /// </summary>
     public static Parser<T, R> LabelV<T, R>(this Parser<T, R> p, string label) => input => {
-        var s = input.Stative.SourcePosition;
         var res = p(input);
         if (res.Error.Try(out var e))
-            return new(res.Result, new(e.Index, new ParserError.Labelled(label, e.Error) { StartingFrom = s }), res.Start, res.End);
+            return new(res.Result, e.WithError(new ParserError.Labelled(label, e.Error)), res.Start, res.End);
         return res;
     };
 
@@ -151,7 +149,7 @@ public static partial class Combinators {
         var err = new ParserError.Expected("any token");
         return input => input.Empty ?
             new(err, input.Index) :
-            new(new(input.Next), null, input.Index, input.Step(1));
+            new(new(input.Next), null as LocatedParserError?, input.Index, input.Step(1));
     }
     
     
@@ -249,14 +247,13 @@ public static partial class Combinators {
         if (ps.Length == 0) return Error<T, R>("No choice arms");
         var perr = new ParserError.Labelled(label, new(null as ParserError));
         return input => {
-            var err = new LocatedParserError(input.Index, perr);
             ParseResult<R> result = default!;
             for (int ii = 0; ii < ps.Length; ++ii) {
                 result = ps[ii](input);
                 if (result.Status != ResultStatus.ERROR)
                     return result;
             }
-            return new(result.Result, err, result.Start, result.End);
+            return new(result.Result, new LocatedParserError(result.Start, result.End, perr), result.Start, result.End);
         };
     }
 

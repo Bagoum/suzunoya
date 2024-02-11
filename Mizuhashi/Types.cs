@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reactive;
 using System.Text;
 using BagoumLib;
 using BagoumLib.Functional;
@@ -32,6 +33,9 @@ public readonly struct Position {
 
     private (int, int, int) Tuple => (Index, Line, IndexOfLineStart);
     
+    /// <summary>
+    /// Create a position struct provided the index in the source text, line, and index of line start.
+    /// </summary>
     public Position(int index, int line, int indexOfLineStart) {
         Index = index;
         Line = line;
@@ -86,7 +90,7 @@ public readonly struct Position {
     /// Advance `steps` characters, using `over` to determine the locations of newlines.
     /// <br/>Assumes that `over` is some substring Source[Index..].
     /// </summary>
-    public Position Step(ReadOnlySpan<char> over, int steps = 1) {
+    public Position Step(string over, int steps = 1) {
         var nextLine = Line;
         var nextLineStartIndex = IndexOfLineStart;
         for (int ii = 0; ii < steps; ++ii) {
@@ -108,7 +112,7 @@ public readonly struct Position {
     /// `over` to determine the locations of newlines.
     /// <br/>Assumes that `over` is some substring Source[Index..].
     /// </summary>
-    public PositionRange CreateRange(ReadOnlySpan<char> over, int steps) => new(this, Step(over, steps));
+    public PositionRange CreateRange(string over, int steps) => new(this, Step(over, steps));
 
     /// <inheritdoc/>
     public override string ToString() => Print(false);
@@ -190,6 +194,10 @@ public readonly struct PositionRange {
     /// </summary>
     public bool Empty => End.Index <= Start.Index;
     private (Position, Position) Tuple => (Start, End);
+    
+    /// <summary>
+    /// Create a position range from two positions [start, end).
+    /// </summary>
     public PositionRange(in Position start, in Position end) {
         Start = start;
         End = end;
@@ -222,6 +230,21 @@ public readonly struct PositionRange {
     public PositionRange Merge(in PositionRange second) => new(Start, second.End);
 
     /// <summary>
+    /// Merge several position ranges.
+    /// </summary>
+    public static PositionRange Merge(IEnumerable<PositionRange> pr) {
+        var start = new Position(int.MaxValue, 0, 0);
+        var end = new Position(-1, 0, 0);
+        foreach (var p in pr) {
+            if (p.Start.Index < start.Index)
+                start = p.Start;
+            if (p.End.Index > end.Index)
+                end = p.End;
+        }
+        return new(start, end);
+    }
+
+    /// <summary>
     /// True iff a position is contained within this range.
     /// </summary>
     public bool Contains(in Position p) => Start.Index <= p.Index && p.Index < End.Index;
@@ -249,28 +272,22 @@ public readonly struct PositionRange {
 /// <summary>
 /// A small struct representing the current state of an input stream.
 /// </summary>
-public readonly struct InputStreamState {
+public readonly struct InputStreamState(int index, Position sourcePosition, object state) {
     /// <summary>
     /// Index of the next token in the stream. (This is the index in the token array.)
     /// </summary>
-    public int Index { get; }
-    
+    public int Index { get; } = index;
+
     /// <summary>
     /// Position of the next token in the source string, which may not be directly visible to the input stream.
     /// <br/>Note that SourcePosition.Index is an index in the source string, NOT in the token array.
     /// </summary>
-    public Position SourcePosition { get; }
-    
+    public Position SourcePosition { get; } = sourcePosition;
+
     /// <summary>
     /// User-defined state variable.
     /// </summary>
-    public object State { get; }
-
-    public InputStreamState(int streamPosition, Position stringPosition, object state) {
-        Index = streamPosition;
-        SourcePosition = stringPosition;
-        State = state;
-    }
+    public object State { get; } = state;
 }
 
 /// <summary>
@@ -290,6 +307,12 @@ public interface IInputStream {
 public class InputStream<Token> : IInputStream {
     /// <inheritdoc/>
     public ITokenWitness TokenWitness { get; }
+
+    /// <summary>
+    /// The source stream as a string (if Token = char).
+    /// </summary>
+    internal string? SourceAsString { get; } = null;
+    
     /// <summary>
     /// Source stream.
     /// </summary>
@@ -306,28 +329,85 @@ public class InputStream<Token> : IInputStream {
     /// but that's more expensive.
     /// </summary>
     public InputStreamState Stative { get; private set; }
-    public List<LocatedParserError> Rollbacks { get; } = new();
+    
+    /// <summary>
+    /// A list of explicit rollbacks created by "Attempt" and "Try" parsers.
+    /// </summary>
+    public List<LocatedParserError> Rollbacks { get; } = [];
 
+    /// <inheritdoc cref="InputStreamState.Index"/>
     public int Index => Stative.Index;
+    
+    /// <summary>
+    /// Number of remaining tokens in the input stream.
+    /// </summary>
     public int Remaining => Source.Length - Index;
+    
+    /// <summary>
+    /// True iff the input stream is empty (no tokens are remaining).
+    /// </summary>
     public bool Empty => Index >= Source.Length;
+    
+    /// <summary>
+    /// Next token in the input stream. Throws if the stream is empty.
+    /// </summary>
     public Token Next => Source[Index];
+    
+    /// <summary>
+    /// Next token in the input stream. Returns null if the stream is empty.
+    /// </summary>
     public Token? MaybeNext => Index < Source.Length ? Source[Index] : default(Token?);
     //public string Substring(int len) => Source.Substring(Index, len);
     //public string Substring(int offset, int len) => Source.Substring(Index + offset, len);
+    
+    /// <summary>
+    /// Returns the token that is `lookahead` tokens ahead in the input stream.
+    /// Throws if this goes beyond the stream range.
+    /// </summary>
     public Token CharAt(int lookahead) => Source[Index + lookahead];
+    
+    /// <summary>
+    /// Retrieve the token that is `lookahead` tokens ahead in the input stream, iff it is within the stream range.
+    /// </summary>
     public bool TryCharAt(int lookahead, out Token chr) => Source.Try(Index + lookahead, out chr);
     
-
-    public InputStream(string description, Token[] source, object state, ITokenWitnessCreator<Token>? witnessCreator = null) {
+    /// <summary>
+    /// Get a span describing the unparsed section of the stream.
+    /// </summary>
+    public ReadOnlySpan<Token> AsSpan => Source.AsSpan(Index);
+    
+    /// <summary>
+    /// Create an input stream from an array of tokens.
+    /// <br/>A token witness must be provided, except in the default string-parsing case (Token = <see cref="char"/>)
+    /// </summary>
+    public InputStream(Token[] source, string description = "Parser", object state = default!, ITokenWitnessCreator<Token>? witness = null) {
         Source = source;
+        if (source is char[] carr)
+            SourceAsString = new(carr);
         Stative = new(0, new Position(0, 1, 0), state);
         Description = description;
-        if (witnessCreator == null && typeof(Token) == typeof(char))
-            witnessCreator = (new CharTokenWitnessCreator()) as ITokenWitnessCreator<Token>;
-        TokenWitness = (witnessCreator ?? throw new Exception("Witness creator not provided for input stream")).Create(this);
+        if (witness == null && typeof(Token) == typeof(char))
+            witness = (new CharTokenWitnessCreator()) as ITokenWitnessCreator<Token>;
+        TokenWitness = (witness ?? throw new Exception("Witness creator not provided for input stream")).Create(this);
+    }
+    
+    /// <summary>
+    /// Create an input stream from a string (only if Token == char).
+    /// <br/>A token witness is optional; <see cref="CharTokenWitnessCreator"/> will be used by default.
+    /// </summary>
+    public InputStream(string source, string description = "Parser", object state = default!, ITokenWitnessCreator<Token>? witness = null) {
+        if (typeof(Token) != typeof(char))
+            throw new Exception("The string constructor for InputStream may only be used for InputStream<char>");
+        Source = (source.ToCharArray() as Token[])!;
+        SourceAsString = source;
+        Stative = new(0, new Position(0, 1, 0), state);
+        Description = description;
+        TokenWitness = (witness ?? new CharTokenWitnessCreator(source) as ITokenWitnessCreator<Token>)!.Create(this);
     }
 
+    /// <summary>
+    /// Update the state object of the input stream.
+    /// </summary>
     public void UpdateState(object newState) {
         Stative = new (Stative.Index, Stative.SourcePosition, newState);
     }
@@ -348,6 +428,9 @@ public class InputStream<Token> : IInputStream {
         Stative = ss;
     }
 
+    /// <summary>
+    /// Advance in the input stream by the provided number of tokens.
+    /// </summary>
     public int Step(int step = 1) {
         if (step == 0) return Index;
         if (Index + step > Source.Length)
@@ -357,6 +440,9 @@ public class InputStream<Token> : IInputStream {
         return Index;
     }
 
+    /// <summary>
+    /// Pair the provided parser error with the current stream location.
+    /// </summary>
     public LocatedParserError? MakeError(ParserError? p) => p == null ? null : new(Index, p);
 
     /// <summary>
@@ -389,15 +475,15 @@ public enum ResultStatus {
     FATAL = 2
 }
 /// <summary>
-/// The result of running a parser on a string.
+/// The result of running a parser on an input stream.
 /// </summary>
 /// <typeparam name="R">Type of parser return value.</typeparam>
-public readonly struct ParseResult<R> {
+public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error, int start, int end) {
     /// <summary>
     /// Result value. If this is present, then parsing succeeded.
     /// </summary>
-    public Maybe<R> Result { get; }
-    
+    public Maybe<R> Result { get; } = result;
+
     /// <summary>
     /// Errors produced by parsing.
     /// <br/>Note that errors may be present even if the parsing was successful, specifically during no-consume successes.
@@ -405,31 +491,28 @@ public readonly struct ParseResult<R> {
     ///  error should print "expected ',' or ')'", the first part of which is provided by the optional parser.
     /// <br/>Errors are always present if parsing fails.
     /// </summary>
-    public LocatedParserError? Error { get; }
+    public LocatedParserError? Error { get; } = error;
     
     /// <summary>
     /// Get <see cref="Error"/> or throw an exception.
     /// </summary>
     /// <exception cref="Exception"></exception>
     public LocatedParserError ErrorOrThrow => Error ?? throw new Exception("Missing error");
-    
+
     /// <summary>
     /// Starting index (inclusive) of the parsed result.
     /// </summary>
-    public int Start { get; }
-    
+    public int Start { get; } = start;
+
     /// <summary>
     /// Ending index (exclusive) of the parsed result.
     /// </summary>
-    public int End { get; }
+    public int End { get; } = end;
 
     /// <summary>
     /// True iff a nonzero number of characters were consumed to produce the result.
     /// </summary>
     public bool Consumed => End > Start;
-
-    public string ShowConsumed(string s) => s[Start..End];
-    public PositionRange ShowPosition(string s) => new(new(s, Start), new(s, End));
     
     /// <summary>
     /// Result status of parsing.
@@ -442,21 +525,22 @@ public readonly struct ParseResult<R> {
                     ResultStatus.FATAL :
                     ResultStatus.ERROR);
 
-    public ParseResult(Maybe<R> result, LocatedParserError? error, int start, int end) {
-        Result = result;
-        Error = error;
-        Start = start;
-        End = end;
-    }
+    /// <inheritdoc cref="ParseResult{R}"/>
     public ParseResult(ParserError errors, int start, int? end = null) :
-        this(new LocatedParserError(start, errors), start, end) { }
-    public ParseResult(LocatedParserError? err, int start, int? end = null) {
-        Result = Maybe<R>.None;
-        Error = err ?? throw new Exception("Missing error");
-        Start = start;
-        End = end ?? start;
+        this(new LocatedParserError(start, end ?? start, errors), start, end) { }
+    
+    /// <inheritdoc cref="ParseResult{R}"/>
+    public ParseResult(LocatedParserError? err, int start, int? end = null) : this(Maybe<R>.None, err ?? throw new Exception("Missing error"), start, end ?? start) {
     }
 
+    /// <inheritdoc cref="ParseResult{R}"/>
+    /*public ParseResult(Maybe<R> result, ParserError error, int start, int end) : 
+        this(result, new LocatedParserError(start, end, error), start, end) {
+    }*/
+
+    /// <summary>
+    /// Combine the errors from two sequential parse results.
+    /// </summary>
     public LocatedParserError? MergeErrors<B>(in ParseResult<B> second) {
         if (second.Consumed)
             return second.Error;
@@ -469,6 +553,13 @@ public readonly struct ParseResult<R> {
     /// </summary>
     public ParseResult<R> WithPreceding<R2>(in ParseResult<R2> prev) => 
             new(Result, prev.MergeErrors(this), prev.Start, End);
+    
+    /// <inheritdoc cref="WithPreceding{R2}"/>
+    public ParseResult<R> WithPrecedingNullable<R2>(in ParseResult<R2>? prev) {
+        if (prev.Try(out var p))
+            return new(Result, p.MergeErrors(this), p.Start, End);
+        return this;
+    }
 
     /// <summary>
     /// Map over the value of a parse result.
@@ -477,23 +568,39 @@ public readonly struct ParseResult<R> {
         new(Result.FMap(f), Error, Start, End);
 
     /// <summary>
+    /// Map the type of a parse result to unit.
+    /// </summary>
+    public ParseResult<Unit> Erase() {
+        if (Result.Valid) {
+            return new(Unit.Default, Error, Start, End);
+        } else {
+            return new(Maybe<Unit>.None, Error, Start, End);
+        }
+    }
+
+    /// <summary>
     /// Change the value of a successful parse result.
     /// </summary>
-    public ParseResult<R2> WithResult<R2>(R2 result) =>
+    public ParseResult<R2> WithResult<R2>(R2 value) =>
         Result.Valid ?
-            new(result, Error, Start, End) :
+            new(value, Error, Start, End) :
             throw new Exception($"{nameof(WithResult)} should not be called on error parse results");
 
     /// <summary>
     /// Convert a successful parse result into an error.
     /// </summary>
-    public ParseResult<R2> AsError<R2>(LocatedParserError error, bool dontConsume = true) =>
+    public ParseResult<R2> AsError<R2>(LocatedParserError newError, bool dontConsume = true) =>
         Result.Valid ?
-            new(Maybe<R2>.None, error, Start, dontConsume ? Start : End) :
+            new(Maybe<R2>.None, newError, Start, dontConsume ? Start : End) :
             throw new Exception($"{nameof(AsError)} should not be called on error parse results");
     
     /// <inheritdoc cref="AsError{R2}(Mizuhashi.LocatedParserError,bool)"/>
-    public ParseResult<R2> AsError<R2>(ParserError error, bool dontConsume = true) => AsError<R2>(new LocatedParserError(Start, error));
+    public ParseResult<R2> AsError<R2>(ParserError newError, bool dontConsume = true) => 
+        AsError<R2>(new LocatedParserError(Start, End, newError));
+    
+    /// <inheritdoc cref="AsError{R2}(Mizuhashi.LocatedParserError,bool)"/>
+    public ParseResult<R> AsSameError(ParserError newError, bool dontConsume = true) => 
+        AsError<R>(new LocatedParserError(Start, End, newError));
 
     /// <summary>
     /// Change the type of a failed parse result.
@@ -526,14 +633,17 @@ public interface ITokenWitness {
     /// </summary>
     public string ShowErrorPosition(LocatedParserError error);
 
-    public static string ShowErrorPositionInSource(ParserError error, PositionRange errPos, string source) {
-        if (error.StartingFrom.Try(out var start)) {
-            return ($"Error between {start} and {errPos}:\n" +
-                   start.PrettyPrintLocation(source, "| <- starting from here\n") +
-                   errPos.Start.PrettyPrintLocation(source, "| <- up until here")).Replace("\n", "\n  ");
+    /// <summary>
+    /// Return a user-readable string explaining the position of an error in the source input stream.
+    /// </summary>
+    public static string ShowErrorPositionInSource(PositionRange errPos, string source) {
+        if (!errPos.Empty) {
+            return ($"Error between {errPos.Start} and {errPos.End}:\n" +
+                    errPos.Start.PrettyPrintLocation(source, "| <- starting from here\n") +
+                    errPos.End.PrettyPrintLocation(source, "| <- up until here")).Replace("\n", "\n  ");
         } else {
             return ($"Error at {errPos.ToString()}:\n" +
-                   errPos.Start.PrettyPrintLocation(source)).Replace("\n", "\n  ");
+                    errPos.Start.PrettyPrintLocation(source)).Replace("\n", "\n  ");
         }
     }
 
@@ -589,9 +699,9 @@ public record CharTokenWitness(InputStream<char> Stream, string? Source = null) 
     private string Source { get; } = Source ?? new(Stream.Source);
 
     /// <inheritdoc/>
-    public string ShowErrorPosition(LocatedParserError error) =>
-        ITokenWitness.ShowErrorPositionInSource(error.Error, 
-            new Position(Source, error.Index).CreateEmptyRange(), Source);
+    public string ShowErrorPosition(LocatedParserError error) {
+        return ITokenWitness.ShowErrorPositionInSource(new(new(Source, error.Index), new(Source, error.End)), Source);
+    }
 
     /// <inheritdoc/>
     public ParserError Unexpected(int index) => new ParserError.UnexpectedChar(Stream.Source[index]);

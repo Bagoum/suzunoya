@@ -2,6 +2,9 @@
 
 namespace Mizuhashi {
 public static partial class Combinators {
+    /// <summary>
+    /// Return the input stream that is currently being parsed.
+    /// </summary>
     public static Parser<T, InputStream<T>> GetStream<T>() => inp => new(inp, null, inp.Index, inp.Index);
 
     /// <summary>

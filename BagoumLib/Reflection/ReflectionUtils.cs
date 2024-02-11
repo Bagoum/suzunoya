@@ -12,6 +12,63 @@ namespace BagoumLib.Reflection {
 /// </summary>
 [PublicAPI]
 public static class ReflectionUtils {
+    public static readonly Type[] FuncTypesByArity = {
+        typeof(Func<>),
+        typeof(Func<,>),
+        typeof(Func<,,>),
+        typeof(Func<,,,>),
+        typeof(Func<,,,,>),
+        typeof(Func<,,,,,>),
+        typeof(Func<,,,,,,>),
+        typeof(Func<,,,,,,,>),
+        typeof(Func<,,,,,,,,>),
+        typeof(Func<,,,,,,,,,>),
+        typeof(Func<,,,,,,,,,,>),
+        typeof(Func<,,,,,,,,,,,>),
+        typeof(Func<,,,,,,,,,,,,>),
+        typeof(Func<,,,,,,,,,,,,,>),
+    };
+    public static readonly Type[] TupleTypesByArity = {
+        typeof(ValueTuple<>),
+        typeof(ValueTuple<,>),
+        typeof(ValueTuple<,,>),
+        typeof(ValueTuple<,,,>),
+        typeof(ValueTuple<,,,,>),
+        typeof(ValueTuple<,,,,,>),
+        typeof(ValueTuple<,,,,,,>),
+        typeof(ValueTuple<,,,,,,,>),
+    };
+
+    /// <summary>
+    /// Get the func type typeof(Func&lt;,,,,...&gt;), where arity is the number of generic arguments.
+    /// </summary>
+    /// <param name="arity"></param>
+    /// <returns></returns>
+    public static Type GetFuncType(int arity) {
+        if (arity <= 0 || arity > FuncTypesByArity.Length)
+            throw new Exception($"Func type arity not supported: {arity}");
+        return FuncTypesByArity[arity - 1];
+    }
+
+    /// <summary>
+    /// Make the func type typeof(Func&lt;A,B,C,...&gt;).
+    /// </summary>
+    public static Type MakeFuncType(Type[] typeArgs) {
+        return GetFuncType(typeArgs.Length).MakeGenericType(typeArgs);
+    }
+    
+    /// <summary>
+    /// Get the func type typeof(ValueTuple&lt;,,,,...&gt;), where arity is the number of generic arguments.
+    /// </summary>
+    /// <param name="arity"></param>
+    /// <returns></returns>
+    public static Type GetTupleType(int arity) {
+        if (arity <= 0 || arity > TupleTypesByArity.Length)
+            throw new Exception($"Tuple type arity not supported: {arity}");
+        return TupleTypesByArity[arity - 1];
+    }
+    
+    
     /// <summary>
     /// Alias for CSharpTypePrinter.Default.Print(t), which prints the type as close to the native
     /// C# description as possible without namespaces.

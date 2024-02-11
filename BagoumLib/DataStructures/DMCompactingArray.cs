@@ -126,7 +126,11 @@ public sealed class DeletionMarker<T> : IDeletionMarker<T> {
 /// <br/>Deletion is O(1) amortized, assuming that <see cref="AnyTypeDMCompactingArray{D}.Compact"/> is called at a reasonable frequency.
 /// </summary>
 [PublicAPI]
-public class DMCompactingArray<T> : AnyTypeDMCompactingArray<DeletionMarker<T>>, IEnumerable<T> {
+public class DMCompactingArray<T> : AnyTypeDMCompactingArray<DeletionMarker<T>>, IReadOnlyDMCompactingArray<T> {
+    /// <summary>
+    /// A statically-shared empty array.
+    /// </summary>
+    public static IReadOnlyDMCompactingArray<T> EmptyArray { get; } = new DMCompactingArray<T>(1);
 
     /// <summary>
     /// Create a new compacting array with the provided initial capacity.
@@ -161,9 +165,7 @@ public class DMCompactingArray<T> : AnyTypeDMCompactingArray<DeletionMarker<T>>,
     /// </summary>
     public ref T this[int index] => ref Data[index].Value;
 
-    /// <summary>
-    /// Get the index'th element in the array if it has not been deleted.
-    /// </summary>
+    /// <inheritdoc cref="IReadOnlyDMCompactingArray{T}.GetIfExistsAt"/>
     public bool GetIfExistsAt(int index, out T val) {
         if (Data[index].MarkedForDeletion) {
             val = default!;

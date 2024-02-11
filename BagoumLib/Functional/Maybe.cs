@@ -25,12 +25,6 @@ public readonly struct Maybe<T> {
     private (bool, T) Tuple => (Valid, Valid ? Value : default!);
     
     /// <summary>
-    /// Get the value if it is present, otherwise get default(T).
-    /// </summary>
-    [JsonIgnore]
-    public T? ValueOrNull => Valid ? Value : default(T?);
-    
-    /// <summary>
     /// Create a <see cref="Maybe{T}"/>.
     /// </summary>
     /// <param name="valid">True iff the value is present.</param>

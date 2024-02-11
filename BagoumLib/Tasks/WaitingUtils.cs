@@ -8,6 +8,9 @@ namespace BagoumLib.Tasks {
 [PublicAPI]
 public static class WaitingUtils {
     
+    /// <summary>
+    /// Get an action that completes a task.
+    /// </summary>
     public static Action GetAwaiter(out Task t) {
         var tcs = new TaskCompletionSource<bool>();
         t = tcs.Task;

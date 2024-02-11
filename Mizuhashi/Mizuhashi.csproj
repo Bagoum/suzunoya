@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <Nullable>enable</Nullable>
-        <LangVersion>9</LangVersion>
-        <TargetFrameworks>net6.0;netstandard2.1</TargetFrameworks>
+        <LangVersion>12</LangVersion>
+        <TargetFrameworks>net8.0;netstandard2.1</TargetFrameworks>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">

@@ -33,19 +33,18 @@ public class ExpressionPrinter {
     ///  use more temporary variables to ensure the correct order of exception throwing.
     /// </summary>
     public bool SafeLinearize { get; set; } = false;
-    
-    /// <summary>
-    /// Linearizes an expression and then converts it into C# source code.
-    /// </summary>
-    public string LinearizePrint(Expression e) => Print(Linearize(e));
 
     /// <summary>
     /// Linearizes an expression using LinearizeVisitor.
     /// </summary>
     public Expression Linearize(Expression e) => new LinearizeVisitor() {
         SafeExecution = SafeLinearize
-    }.Visit(e);
-
+    }.Visit(e)!;
+    
+    /// <summary>
+    /// Linearizes an expression and then converts it into C# source code.
+    /// </summary>
+    public string LinearizePrint(Expression e) => Print(Linearize(e));
     
     /// <summary>
     /// Runs PrintVisitor on an expression and then converts the output into C# source code.

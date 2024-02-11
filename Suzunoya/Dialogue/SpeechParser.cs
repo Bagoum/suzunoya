@@ -52,8 +52,7 @@ internal static partial class SpeechParser {
     /// <returns>Parsed content</returns>
     /// <exception cref="Exception">Thrown if parsing fails</exception>
     internal static List<TextUnit> Parse(string raw) => 
-        speechParser.ResultOrErrorString(new InputStream<char>("Dialogue text", raw.ToCharArray(), null!, 
-                new CharTokenWitnessCreator(raw)))
+        speechParser.ResultOrErrorString(new InputStream<char>(raw, "Dialogue text"))
             .Map(l => l, r => throw new Exception(r));
     }
 }

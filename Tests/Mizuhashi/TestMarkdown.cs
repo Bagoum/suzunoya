@@ -96,8 +96,8 @@ public class TestMarkdown {
     }
 
     private static Parser<char, List<Block>> ParseDocument(Settings s) => inp =>
-        MarkdownParser.ParseDocument(s)(new(inp.Description,
-            new string(inp.Source).Replace("\r\n", "\n").Replace("\r", "\n").ToCharArray(), inp.Stative.State));
+        MarkdownParser.ParseDocument(s)(new(new string(inp.Source).Replace("\r\n", "\n").Replace("\r", "\n"), 
+            inp.Description, inp.Stative.State));
 
     [Test]
     public void TestParagraph() {

@@ -11,6 +11,9 @@ namespace BagoumLib.Expressions {
 /// </summary>
 [PublicAPI]
 public static class ExExtensions {
+    public static readonly ExFunction StringAdd = 
+        ExFunction.Wrap<string>(nameof(string.Concat), typeof(string), typeof(string));
+    
     /// <summary>
     /// Ex.Equal (equality comparison)
     /// </summary>
@@ -25,10 +28,17 @@ public static class ExExtensions {
     /// Ex.Add (addition operator). If both sides are constants,
     /// then produces a constant expression instead of an addition expression.
     /// </summary>
-    public static Ex Add(this Ex me, Ex other) =>
-        (me.TryAsConst(out float f1) && other.TryAsConst(out float f2)) ?
-            (Ex) Ex.Constant(f1 + f2) :
-            Ex.Add(me, other);
+    public static Ex Add(this Ex me, Ex other) {
+        if (me.TryAsConst(out float f1) && other.TryAsConst(out float f2))
+            return Ex.Constant(f1 + f2);
+        //string add is a c# compiler trick
+        if (me.Type == typeof(string) && other.Type == typeof(string)) {
+            if (me.TryAsConst(out string a) && other.TryAsConst(out string b))
+                return Ex.Constant(a + b);
+            return StringAdd.Of(me, other);
+        }
+        return Ex.Add(me, other);
+    }
 
     /// <inheritdoc cref="Add(System.Linq.Expressions.Expression,System.Linq.Expressions.Expression)"/>
     public static Ex Add(this Ex me, float other) => me.Add(Ex.Constant(other));

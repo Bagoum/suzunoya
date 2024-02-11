@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Reactive;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
@@ -75,6 +76,25 @@ public record Tweener<T> : TransitionBase<T> {
     /// <param name="reverseEase">True if the easing function should be reversed for the reverse section.</param>
     /// <param name="times">Number of times to repeat the joined transition; null for indefinite.</param>
     public ITransition Yoyo(bool reverseEase = true, int? times = null) => this.Then(this.Reverse(reverseEase)).Loop(times);
+}
+
+/// <summary>
+/// A tweener that does nothing for the provided amount of time.
+/// </summary>
+public record NoopTweener : TransitionBase<Unit> {
+    public NoopTweener(float time, ICancellee? cT = null) {
+        Time = time;
+        CToken = cT;
+    }
+    
+    /// <inheritdoc/>
+    protected override Unit ApplyStart() => Unit.Default;
+
+    /// <inheritdoc/>
+    protected override void ApplyStep(Unit start, float time) { }
+
+    /// <inheritdoc/>
+    protected override void ApplyEnd(Unit start) { }
 }
 
 /// <summary>

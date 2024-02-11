@@ -127,7 +127,7 @@ public static class VisitorHelpers {
         ExpressionType.PostDecrementAssign => Right("--"),
         ExpressionType.PostIncrementAssign => Right("++"),
         ExpressionType.PreDecrementAssign => Left("--"),
-        ExpressionType.PreIncrementAssign => Left("--"),
+        ExpressionType.PreIncrementAssign => Left("++"),
         ExpressionType.Throw => Left("throw "),
         ExpressionType.UnaryPlus => Left("+"),
         

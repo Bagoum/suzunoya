@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reactive;
+using System.Text.RegularExpressions;
 using BagoumLib.Functional;
+using JetBrains.Annotations;
 
 namespace Mizuhashi {
 public static partial class Combinators {
@@ -312,6 +314,22 @@ public static partial class Combinators {
     public static Parser<char, char> Tab() => Char('\t', "Tab");
 
     /// <summary>
+    /// Parses the provided regex. Automatically prepends a `\G` to the regex so it only matches from the start.
+    /// </summary>
+    public static Parser<char, Match> Regex([RegexPattern] string pattern, RegexOptions flags = RegexOptions.Compiled) {
+        var r = new Regex(@"\G" + pattern, flags);
+        var err = new ParserError.Expected($"regex match for pattern /{pattern}/");
+        return input => {
+            var m = r.Match(input.SourceAsString!, input.Index);
+            if (m.Success) {
+                return new(new(m), null, input.Index, input.Step(m.Length));
+            } else {
+                return new(err, input.Index);
+            }
+        };
+    }
+
+    /// <summary>
     /// True iff a character is [a-zA-Z].
     /// </summary>
     public static bool IsAsciiLetter(char c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -424,7 +442,7 @@ public static partial class Combinators {
     /// Parse a sequence of digits and converts them into an integer.
     /// </summary>
     public static readonly Parser<char, int> ParseInt = Many1Satisfy(char.IsDigit, "digit").FMap(int.Parse);
-
+    
     /// <summary>
     /// Get a substring from a string stream.
     /// </summary>

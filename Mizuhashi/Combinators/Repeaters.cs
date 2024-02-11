@@ -113,14 +113,17 @@ public static partial class Combinators {
 
 
     /// <summary>
-    /// Parse `p (sep p)*`. If atleastOne is false, then allows parsing nothing. `sep` may be non-consuming.
+    /// Parse `p (sep p)*`.
+    /// <br/>If atleastOne is false, then allows parsing nothing.
+    /// <br/>`sep` may be non-consuming.
+    /// <br/>If `first` is nonnull, then it will be used to parse the first element.
     /// <br/>FParsec sepBy
     /// </summary>
-    public static Parser<T, List<R>> SepBy<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep, bool atleastOne = false) =>
+    public static Parser<T, List<R>> SepBy<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep, bool atleastOne = false, Parser<T, R>? first = null) =>
         input => {
             var results = new List<R>();
             var start = input.Index;
-            var next = ele(input);
+            var next = (first ?? ele)(input);
             if (next.Status == ResultStatus.FATAL)
                 return next.CastFailure<List<R>>();
             else if (next.Status == ResultStatus.ERROR)

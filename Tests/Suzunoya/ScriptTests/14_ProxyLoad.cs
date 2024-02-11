@@ -1,5 +1,6 @@
 ﻿using System;
 using BagoumLib.Cancellation;
+using BagoumLib.Functional;
 using NUnit.Framework;
 using Suzunoya.ControlFlow;
 using Suzunoya.Data;
@@ -28,9 +29,9 @@ public class _14SaveLoadTimeInconsistency {
 		    if (vn.GetLocalValue<int>("var1") == 7) {
 			    result = 100;
 		    }
-		    result += vn.InstanceData.TryGetChainedData<int>("outer", "inner")?.Result.ValueOrNull ?? 1;
+		    result += vn.InstanceData.TryGetChainedData<int>("outer", "inner")?.Result.ValueOrSNull() ?? 1;
 		    await InnerResult();
-		    result += vn.InstanceData.TryGetChainedData<int>("outer", "inner")?.Result.ValueOrNull ?? 2;
+		    result += vn.InstanceData.TryGetChainedData<int>("outer", "inner")?.Result.ValueOrSNull() ?? 2;
 		    
 		    reimu.speechCfg = SpeechSettings.Default with {
 			    opsPerChar = (s, i) => 1,

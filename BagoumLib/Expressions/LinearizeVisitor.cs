@@ -239,8 +239,8 @@ public class LinearizeVisitor : ExpressionVisitor {
     protected override Expression VisitNewArray(NewArrayExpression node) =>
         Linearize(args => 
             node.NodeType == ExpressionType.NewArrayInit ?
-                Ex.NewArrayInit(node.Type, args) :
-                Ex.NewArrayBounds(node.Type, args), node.Expressions.ToArray());
+                Ex.NewArrayInit(node.Type.GetElementType()!, args) :
+                Ex.NewArrayBounds(node.Type.GetElementType()!, args), node.Expressions.ToArray());
     
     //parameter, runtimevariables: no changes
 

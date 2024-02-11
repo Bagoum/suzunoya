@@ -19,7 +19,7 @@ public class CSharpTypePrinter : ITypePrinter {
     public static readonly ITypePrinter Default = new CSharpTypePrinter();
     public Func<Type, bool> PrintTypeNamespace { get; init; } = _ => false;
 
-    private static readonly Type[] tupleTypes = {
+    public static readonly Type[] tupleTypes = {
         typeof(ValueTuple<>),
         typeof(ValueTuple<,>),
         typeof(ValueTuple<,,>),

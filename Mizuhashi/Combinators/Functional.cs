@@ -51,7 +51,7 @@ public static partial class Combinators {
     public static Parser<T, B> Bind<T, A, B>(this Parser<T, A> p, Func<A, ParseResult<B>> b) => input => {
         var rx = p(input);
         if (rx.Result.Try(out var x)) {
-            return b(x);
+            return b(x).WithPreceding(in rx);
         } else
             return rx.CastFailure<B>();
     };
@@ -111,7 +111,7 @@ public static partial class Combinators {
             return new(rc.Result.Try(out var c) ?
                     new(project(a, b, c)) :
                     Maybe<R>.None,
-                rb.MergeErrors(in rc), rb.Start, rc.End);
+                rb.MergeErrors(in rc), ra.Start, rc.End);
         };
     
     
@@ -134,7 +134,7 @@ public static partial class Combinators {
             return new(rd.Result.Try(out var d) ?
                     new(project(a, b, c, d)) :
                     Maybe<R>.None,
-                rc.MergeErrors(in rd), rc.Start, rd.End);
+                rc.MergeErrors(in rd), ra.Start, rd.End);
         };
     
     
@@ -161,7 +161,7 @@ public static partial class Combinators {
             return new(re.Result.Try(out var e) ?
                     new(project(a, b, c, d, e)) :
                     Maybe<R>.None,
-                rd.MergeErrors(in re), rd.Start, re.End);
+                rd.MergeErrors(in re), ra.Start, re.End);
         };
     
     
@@ -189,7 +189,38 @@ public static partial class Combinators {
             return new(rf.Result.Try(out var f) ?
                     new(project(a, b, c, d, e, f)) :
                     Maybe<R>.None,
-                re.MergeErrors(in rf), re.Start, rf.End);
+                re.MergeErrors(in rf), ra.Start, rf.End);
+        };
+    
+    
+    /// <summary>
+    /// Sequentially parses objects of type A, B, C, D, E, F, G, then combines them using the project function.
+    /// </summary>
+    public static Parser<T, R> Pipe7<T, A, B, C, D, E, F, G, R>(this Parser<T, A> p, Parser<T, B> p2, Parser<T, C> p3, Parser<T, D> p4, Parser<T, E> p5, Parser<T, F> p6, Parser<T, G> p7, Func<A, B, C, D, E, F, G, R> project)
+        => input => {
+            var ra = p(input);
+            if (!ra.Result.Try(out var a))
+                return ra.CastFailure<R>();
+            var rb = p2(input).WithPreceding(in ra);
+            if (!rb.Result.Try(out var b))
+                return rb.CastFailure<R>();
+            var rc = p3(input).WithPreceding(in rb);
+            if (!rc.Result.Try(out var c))
+                return rc.CastFailure<R>();
+            var rd = p4(input).WithPreceding(in rc);
+            if (!rd.Result.Try(out var d))
+                return rd.CastFailure<R>();
+            var re = p5(input).WithPreceding(in rd);
+            if (!re.Result.Try(out var e))
+                return re.CastFailure<R>();
+            var rf = p6(input).WithPreceding(in re);
+            if (!rf.Result.Try(out var f))
+                return rf.CastFailure<R>();
+            var rg = p7(input);
+            return new(rg.Result.Try(out var g) ?
+                    new(project(a, b, c, d, e, f, g)) :
+                    Maybe<R>.None,
+                re.MergeErrors(in rg), ra.Start, rg.End);
         };
 
     /// <summary>
@@ -219,5 +250,9 @@ public static partial class Combinators {
         Parser<Token, T4> p4, Parser<Token, T5> p5, Parser<Token, T6> p6, Func<T1, T2, T3, T4, T5, T6, T> map) =>
         Pipe6(p1, p2, p3, p4, p5, p6, map);
 
+    /// <inheritdoc cref="Sequential{Token,T1,T2,T}"/>
+    public static Parser<Token, T> Sequential<Token, T1, T2, T3, T4, T5, T6, T7, T>(Parser<Token, T1> p1, Parser<Token, T2> p2, Parser<Token, T3> p3,
+        Parser<Token, T4> p4, Parser<Token, T5> p5, Parser<Token, T6> p6, Parser<Token, T7> p7, Func<T1, T2, T3, T4, T5, T6, T7, T> map) =>
+        Pipe7(p1, p2, p3, p4, p5, p6, p7, map);
 }
 }

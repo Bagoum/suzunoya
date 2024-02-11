@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using static BagoumLib.Unification.TypeDesignation;
 
 namespace BagoumLib.Unification {
@@ -29,7 +30,7 @@ public abstract record TypeTree {
         IReadOnlyList<ITypeTree> IMethodTypeTree<Dummy>.Arguments => Arguments;
 
         /// <inheritdoc/>
-        public bool PreferFirstOverload { get; set; } = false;
+        public bool OverloadsAreInterchangeable { get; set; } = false;
     }
 
     /// <summary>
@@ -41,6 +42,31 @@ public abstract record TypeTree {
 
         /// <inheritdoc/>
         public IRealizedImplicitCast? ImplicitCast { get; set; }
+    }
+
+    public record Arr : TypeTree, IMethodTree, IMethodTypeTree<Dummy> {
+        public ITree[] Arguments { get; }
+        private readonly Variable elementType = new();
+        public readonly Dummy[] Overloads;
+        IReadOnlyList<Dummy> IMethodTypeTree<Dummy>.Overloads => Overloads;
+        /// <inheritdoc/>
+        public (Dummy method, Dummy simplified)? SelectedOverload { get; set; }
+        /// <inheritdoc/>
+        public IRealizedImplicitCast? ImplicitCast { get; set; }
+        /// <inheritdoc/>
+        public List<Dummy>? RealizableOverloads { get; set; }
+        IReadOnlyList<ITypeTree> IMethodTypeTree<Dummy>.Arguments => Arguments;
+
+        /// <inheritdoc/>
+        public bool OverloadsAreInterchangeable { get; } = false;
+
+        public Arr(params ITree[] Arguments) {
+            this.Arguments = Arguments;
+            Overloads = new[] {
+                Dummy.Method(new Known(Known.ArrayGenericType, elementType),
+                    Arguments.Select(_ => elementType as TypeDesignation).ToArray())
+            };
+        }
     }
 }
 

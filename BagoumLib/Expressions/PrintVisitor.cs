@@ -308,7 +308,15 @@ public class PrintVisitor : PrintVisitorAbs {
 
     /// <inheritdoc />
     protected override Expression VisitGoto(GotoExpression node) {
-        Add("goto ", new Label(node.Target));
+        if (node.Kind == GotoExpressionKind.Continue)
+            Add("continue");
+        else if (node.Kind == GotoExpressionKind.Break)
+            Add("break");
+        else if (node.Kind == GotoExpressionKind.Return) {
+            Add("return ");
+            Visit(node.Value);
+        } else
+            Add("goto ", new Label(node.Target));
         return node;
     }
 
@@ -469,9 +477,14 @@ public class PrintVisitor : PrintVisitorAbs {
 
     /// <inheritdoc />
     protected override Expression VisitNew(NewExpression node) {
-        Add("new ", new TypeName(node.Type));
-        VisitArguments(node.Arguments, 
-            (node.Constructor ?? throw new Exception("No constructor provided")).GetParameters());
+        if (node.Type.IsConstructedGenericType &&
+            CSharpTypePrinter.tupleTypes.Contains(node.Type.GetGenericTypeDefinition())) {
+            VisitArguments(node.Arguments, null);
+        } else {
+            Add("new ", new TypeName(node.Type));
+            VisitArguments(node.Arguments, 
+                (node.Constructor ?? throw new Exception("No constructor provided")).GetParameters());
+        }
         return node;
     }
 

@@ -53,7 +53,8 @@ public class RegexLexer<T> {
         this.tokenizers = tokenizers;
         //\G is like ^, except it also works when you use regex.Match(str, startFromIndex).
         //See https://learn.microsoft.com/en-us/dotnet/standard/base-types/anchors-in-regular-expressions
-        regexes = tokenizers.Select(t => new Regex($"\\G{t.RegexPattern}", t.Flags)).ToArray();
+        //Use a timeout of 10ms since we can't use NoBacktracking
+        regexes = tokenizers.Select(t => new Regex($"\\G{t.RegexPattern}", t.Flags, TimeSpan.FromMilliseconds(10))).ToArray();
         groupNames = new string[tokenizers.Length];
         regex = new Regex($"\\G({string.Join("|", tokenizers.Select((h, i) => $"(?<{groupNames[i] = $"regexLexerGroup{i}"}>{h.RegexPattern})"))})",
             RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled);
@@ -70,18 +71,22 @@ public class RegexLexer<T> {
         for (int index = 0; index < source.Length;) {
             //Multiple regex implementation (somewhat slower)
             for (int it = 0; it < tokenizers.Length; ++it) {
-                var match = regexes[it].Match(source, index);
-                if (match.Success) {
-                    var token = tokenizers[it].Tokenizer(position, match);
-                    if (token.Try(out var t)) {
-                        if (t.consumed < 0)
-                            goto end;
-                        prevIndex = index;
-                        index += t.consumed;
-                        position = position.Step(match.Value, t.consumed);
-                        tokens.Add(t.token);
-                        goto nextLoop;
+                try {
+                    var match = regexes[it].Match(source, index);
+                    if (match.Success) {
+                        var token = tokenizers[it].Tokenizer(position, match);
+                        if (token.Try(out var t)) {
+                            if (t.consumed < 0)
+                                goto end;
+                            prevIndex = index;
+                            index += t.consumed;
+                            position = position.Step(match.Value, t.consumed);
+                            tokens.Add(t.token);
+                            goto nextLoop;
+                        }
                     }
+                } catch (RegexMatchTimeoutException) {
+                    //pass
                 }
             }
             var pos = new Position(source, index);

@@ -49,7 +49,7 @@ public record TypeUnifyErr {
     /// <summary>
     /// A variable type was never bound to a concrete type.
     /// </summary>
-    public record UnboundRestr(TypeDesignation.Variable Req) : TypeUnifyErr;
+    public record UnboundRestr(TypeDesignation.Variable Req, ITypeTree? Tree) : TypeUnifyErr;
 
     /// <summary>
     /// A recursive binding was found, where `LResolved` occurred in `RResolved`.
@@ -61,7 +61,7 @@ public record TypeUnifyErr {
     /// During the <see cref="ITypeTree.PossibleUnifiers"/> stage, no overload was found that could
     ///  possibly match the parameters.
     /// </summary>
-    public record NoPossibleOverload(IMethodTypeTree Tree, List<List<(TypeDesignation, Unifier)>> ArgSets) : TypeUnifyErr;
+    public record NoPossibleOverload(IMethodTypeTree Tree, IList<List<(TypeDesignation, Unifier)>> ArgSets) : TypeUnifyErr;
     
     /// <summary>
     /// During the <see cref="ITypeTree.ResolveUnifiers"/> stage, no overload could be found that unified
@@ -82,13 +82,13 @@ public record TypeUnifyErr {
     /// <summary>
     /// <see cref="ITypeTree.PossibleUnifiers(TypeResolver,Unifier)"/> returned more or less than 1 possible top-level type.
     /// </summary>
-    public record TooManyPossibleTypes(List<TypeDesignation> PossibleTypes) : TypeUnifyErr;
+    public record TooManyPossibleTypes(ITypeTree Tree, List<TypeDesignation> PossibleTypes) : TypeUnifyErr;
 
 }
 
 //array is not a generic type in C#, so we use this to floss it over.
 // ReSharper disable once UnusedTypeParameter
-internal class _ArrayGenericTypeHelperDoNotUse<A> { }
+internal class _ArrayGenericTypeHelperDoNotUse<A>;
 
 /// <summary>
 /// A restriction on an atomic type or type constructor
@@ -141,12 +141,8 @@ public abstract class TypeDesignation {
         if (ld == rd)
             return unifier;
         if (unifier.IsYetUnbound(ld, out var lv)) {
-            if (rd.Occurs(lv))
-                return new TypeUnifyErr.RecursionBinding(left, right, lv, rd);
             return unifier.Bind(left, right, lv, rd);
         } else if (unifier.IsYetUnbound(rd, out var rv)) {
-            if (ld.Occurs(rv))
-                return new TypeUnifyErr.RecursionBinding(right, left, rv, ld);
             return unifier.Bind(right, left, rv, ld);
         } else {
             if (OperatorsEqual(left, right, ld, rd) is { } eqerr)
@@ -169,8 +165,9 @@ public abstract class TypeDesignation {
     public bool Occurs(Variable v) {
         if (this == v)
             return true;
-        if (Arguments.Length > 0)
-            return Arguments.Any(c => c.Occurs(v));
+        for (int ii = 0; ii < Arguments.Length; ++ii)
+            if (Arguments[ii].Occurs(v))
+                return true;
         return false;
     }
 
@@ -203,6 +200,33 @@ public abstract class TypeDesignation {
     public abstract TypeDesignation Simplify(Unifier unifier);
 
     /// <summary>
+    /// Check if a variable would occur in this.Simplify(u).
+    /// </summary>
+    public bool OccursInSimplification(Unifier u, Variable v) {
+        if (this is Variable var)
+            return var == v || (u.TypeVarBindings.TryGetValue(var, out var nxt) && nxt.OccursInSimplification(u, v));
+        for (int ii = 0; ii < Arguments.Length; ++ii)
+            if (Arguments[ii].OccursInSimplification(u, v))
+                return true;
+        return false;
+    }
+
+    protected TypeDesignation[]? SimplifyArgs(Unifier u, TypeDesignation[] args) {
+        int diff = 0;
+        for (; diff < args.Length; ++diff) {
+            if (args[diff].Simplify(u) != args[diff])
+                goto do_simplify;
+        }
+        return null;
+        do_simplify:
+        var nargs = new TypeDesignation[args.Length];
+        for (int ii = 0; ii < args.Length; ++ii) {
+            nargs[ii] = ii < diff ? args[ii] : args[ii].Simplify(u);
+        }
+        return nargs;
+    }
+
+    /// <summary>
     /// Get all the unbound type variables (<see cref="Variable"/>) in this definition.
     /// </summary>
     public virtual IEnumerable<Variable> GetVariables() => Arguments.SelectMany(a => a.GetVariables());
@@ -219,6 +243,14 @@ public abstract class TypeDesignation {
     /// Make an array type designation for this type.
     /// </summary>
     public Known MakeArrayType() => new Known(Known.ArrayGenericType, this);
+
+    public static bool operator ==(TypeDesignation? a, TypeDesignation? b) {
+        if (a is null)
+            return b is null;
+        return a.Equals(b);
+    }
+
+    public static bool operator !=(TypeDesignation? a, TypeDesignation? b) => !(a == b);
 
     // --- subclasses ---
     
@@ -248,9 +280,24 @@ public abstract class TypeDesignation {
             this.Typ = typ;
         }
 
+        /// <summary>
+        /// Create the type Func&lt;a,b,c,d,e...&gt;.
+        /// </summary>
+        public static Known MakeFuncType(params TypeDesignation[] args) => 
+            new(ReflectionUtils.GetFuncType(args.Length), args);
+        
+        /// <summary>
+        /// Create the type (a,b,c,d,e...).
+        /// </summary>
+        public static Known MakeTupleType(params TypeDesignation[] args) => 
+            new(ReflectionUtils.GetTupleType(args.Length), args);
+
         /// <inheritdoc/>
-        public override TypeDesignation Simplify(Unifier unifier) =>
-            new Known(Typ, Arguments.Select(a => a.Simplify(unifier)).ToArray());
+        public override TypeDesignation Simplify(Unifier unifier) {
+            var nargs = SimplifyArgs(unifier, Arguments);
+            if (nargs == null) return this;
+            return new Known(Typ, nargs);
+        }
 
         /// <inheritdoc/>
         protected override TypeDesignation RecreateVariables(Dictionary<Variable, Variable> rebind)
@@ -270,16 +317,17 @@ public abstract class TypeDesignation {
                     $"Type constructor {Typ.RName()} required {Typ.GetGenericArguments().Length} args, " +
                     $"received {Arguments.Length}");
             return Arguments
-                .Select(c => c.Resolve(unifier))
-                .SequenceL()
+                .SequenceL(c => c.Resolve(unifier))
                 .FMapL(ctypes => 
                     Typ == typeof(_ArrayGenericTypeHelperDoNotUse<>) ?
                         ctypes[0].MakeArrayType() :
                         Typ.MakeGenericType(ctypes.ToArray()));
         }
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is Known k && Typ == k.Typ && Arguments.AreSame(k.Arguments);
 
+        /// <inheritdoc/>
         public override int GetHashCode() => (Typ, Arguments.ElementWiseHashCode()).GetHashCode();
 
         /// <inheritdoc/>
@@ -325,12 +373,29 @@ public abstract class TypeDesignation {
         public static Dummy Method(TypeDesignation returnTyp, params TypeDesignation[] argTyps)
             => new(METHOD_KEY, argTyps.Append(returnTyp).ToArray());
 
+        /// <summary>
+        /// For a method tree (a,b,c,d,e)->f, convert it to eg. (a,b)->Func&lt;c,d,e,f&gt; (for args=2).
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
+        public Dummy PartialApplyToFunc(int args) {
+            if (args >= Arguments.Length)
+                throw new Exception(
+                    $"Cannot partially apply {args} arguments to a method with {Arguments.Length - 1} parameters");
+            return new Dummy(METHOD_KEY, Arguments.Take(args).Append(
+                Known.MakeFuncType(Arguments.Skip(args).ToArray())
+            ).ToArray());
+        }
+
         /// <inheritdoc/>
         public override TypeDesignation Simplify(Unifier unifier) => SimplifyDummy(unifier);
         
         /// <inheritdoc cref="Simplify"/>
-        public Dummy SimplifyDummy(Unifier unifier) =>
-            new Dummy(Typ, Arguments.Select(a => a.Simplify(unifier)).ToArray());
+        public Dummy SimplifyDummy(Unifier unifier) {
+            var nargs = SimplifyArgs(unifier, Arguments);
+            if (nargs == null) return this;
+            return new Dummy(Typ, nargs);
+        }
 
         /// <inheritdoc/>
         public override Either<Type, TypeUnifyErr> Resolve(Unifier unifier) =>
@@ -347,9 +412,10 @@ public abstract class TypeDesignation {
         /// <inheritdoc cref="RecreateVariables"/>
         public Dummy RecreateVariablesD() => RecreateVariablesD(new());
         
-
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is Dummy k && Typ == k.Typ && Arguments.AreSame(k.Arguments);
 
+        /// <inheritdoc/>
         public override int GetHashCode() => (Typ, Arguments.ElementWiseHashCode()).GetHashCode();
 
         /// <inheritdoc/>
@@ -386,7 +452,7 @@ public abstract class TypeDesignation {
         /// <inheritdoc/>
         public override Either<Type, TypeUnifyErr> Resolve(Unifier unifier) {
             return unifier[this] switch {
-                Variable _ => new TypeUnifyErr.UnboundRestr(this),
+                Variable _ => new TypeUnifyErr.UnboundRestr(this, null),
                 { } d => d.Resolve(unifier)
             };
         }
@@ -409,7 +475,7 @@ public abstract class TypeDesignation {
     /// Create a type designation from a type object.
     /// </summary>
     public static TypeDesignation FromType(Type t) {
-        return FromType(t, new());
+        return FromType(t, null);
     }
 
     /// <summary>
@@ -427,383 +493,30 @@ public abstract class TypeDesignation {
         return Dummy.Method(FromType(returnType, map), paramTypes.Select(p => FromType(p, map)).ToArray());
     }
     
+    /// <inheritdoc cref="FromMethod(System.Reflection.MethodInfo)"/>
+    public static Dummy FromMethod(Type returnType, IEnumerable<Type> paramTypes, Dictionary<Type, Variable> genericMap) =>
+        Dummy.Method(FromType(returnType, genericMap), paramTypes.Select(p => FromType(p, genericMap)).ToArray());
+    
     
     /// <summary>
     /// Create a type designation from a type object.
     /// </summary>
-    public static TypeDesignation FromType(Type t, Dictionary<Type, Variable> genericMap) {
+    public static TypeDesignation FromType(Type t, Dictionary<Type, Variable>? genericMap) {
         if (t.IsArray) {
             return new Known(Known.ArrayGenericType, 
                 FromType(t.GetElementType()!, genericMap));
         } else if (t.IsGenericType) {
-            if (!t.IsConstructedGenericType)
-                throw new Exception($"Type constructor {t.RName()} used as a known type");
             return new Known(t.GetGenericTypeDefinition(), 
                 t.GetGenericArguments().Select(c => FromType(c, genericMap)).ToArray());
         } else if (t.IsGenericParameter) {
-            if (genericMap.TryGetValue(t, out var generic)) 
+            if (genericMap != null && genericMap.TryGetValue(t, out var generic)) 
                 return generic;
-            return genericMap[t] = new Variable();
+            return genericMap != null ?
+                genericMap[t] = new Variable() :
+                new Variable();
         } else
             return new Known(t);
     }
     
 }
-
-/// <summary>
-/// A wrapper around a dictionary containing type bindings.
-/// <br/>The binding dictionary is immutable.
-/// </summary>
-[PublicAPI]
-public readonly struct Unifier {
-    /// <summary>
-    /// Binding set.
-    /// </summary>
-    private ImmutableDictionary<TypeDesignation.Variable, TypeDesignation> TypeVarBindings { get; }
-    /// <summary>
-    /// Number of bindings.
-    /// </summary>
-    public int Count => TypeVarBindings.Count;
-
-    /// <summary>
-    /// A unifier with no bindings.
-    /// </summary>
-    public static readonly Unifier Empty =
-        new(ImmutableDictionary<TypeDesignation.Variable, TypeDesignation>.Empty);
-
-    private Unifier(ImmutableDictionary<TypeDesignation.Variable, TypeDesignation> bindings) {
-        TypeVarBindings = bindings;
-    }
-
-    /// <summary>
-    /// Get the ultimate binding of a variable type designation, or the designation itself if it is not variable.
-    /// </summary>
-    public TypeDesignation this[TypeDesignation d] {
-        get {
-            while (d is TypeDesignation.Variable ub && TypeVarBindings.TryGetValue(ub, out var bound))
-                d = bound;
-            return d;
-        }
-    }
-
-    /// <summary>
-    /// Returns true iff `d` is a variable designation that currently has no binding in this unifier.
-    /// </summary>
-    public bool IsYetUnbound(TypeDesignation d, out TypeDesignation.Variable ub) {
-        if (d is TypeDesignation.Variable _ub) {
-            ub = _ub;
-            return !TypeVarBindings.ContainsKey(ub);
-        }
-        ub = default!;
-        return false;
-    }
-
-    /// <summary>
-    /// Bind a variable designation to a target.
-    /// <br/>Throws if already bound, or the target is the same.
-    /// </summary>
-    public Either<Unifier, TypeUnifyErr> Bind(TypeDesignation vsource, TypeDesignation tsource, 
-            TypeDesignation.Variable v, TypeDesignation target) {
-        if (v == target)
-            throw new Exception($"Self-binding of {v} to {target}");
-        if (v.RestrictedTypes != null) {
-            if (target is TypeDesignation.Variable tv) {
-                if (tv.RestrictedTypes == null)
-                    return new Unifier(TypeVarBindings.Add(tv, v));
-                //Intersect type restrictions, create a new variable if neither is strictly better
-                var intersection = v.RestrictedTypes.Intersect(tv.RestrictedTypes).ToHashSet();
-                if (intersection.Count == tv.RestrictedTypes.Count) {
-                    return new Unifier(TypeVarBindings.Add(v, tv));
-                } else if (intersection.Count == v.RestrictedTypes.Count) {
-                    return new Unifier(TypeVarBindings.Add(tv, v));
-                } else if (intersection.Count == 1) {
-                    var k = intersection.First();
-                    return new Unifier(TypeVarBindings.Add(v, k).Add(tv, k));
-                } else if (intersection.Count == 0) {
-                    return new TypeUnifyErr.IntersectionFailure(vsource, tsource, v, tv);
-                } else {
-                    var intV = new TypeDesignation.Variable() { RestrictedTypes = intersection };
-                    return new Unifier(TypeVarBindings.Add(v, intV).Add(tv, intV));
-                }
-            } else if (target is TypeDesignation.Dummy) {
-                throw new Exception("Type-restricted variable designation cannot be bound to Dummy");
-            } else if (target is TypeDesignation.Known k) {
-                if (k.IsResolved && !v.RestrictedTypes.Contains(k))
-                    return new TypeUnifyErr.RestrictionFailure(vsource, tsource, v, k);
-                if (!k.IsResolved) {
-                    Unifier? result = null;
-                    foreach (var t in v.RestrictedTypes)
-                        if (t.Unify(k, this) is { IsLeft: true } r)
-                            //there are two valid types, this is too hard to solve so just generically bind
-                            if (result != null)
-                                goto success;
-                            else
-                                result = r.Left;
-                    //there is only one valid type, use it
-                    if (result.Try(out var res))
-                        return new Unifier(res.TypeVarBindings.Add(v, target));
-                    return new TypeUnifyErr.RestrictionFailure(vsource, tsource, v, k);
-                }
-                //otherwise, k.IsResolved and types match, fallthrough to end
-            }
-        }
-        success: ;
-        //This includes the case where target has restricted types, in which this binding "passes"
-        // the restricted types to v.
-        return new Unifier(TypeVarBindings.Add(v, target));
-    }
-}
-
-/// <summary>
-/// Information required to resolve unified types, or to disambiguate overloads, implicit casts, and other
-///  supplementary unification features.
-/// </summary>
-[PublicAPI]
-public record TypeResolver {
-    /// <summary>
-    /// The cache for resolved types.
-    /// </summary>
-    public Dictionary<TypeDesignation, Type> ResolutionCache { get; } = new();
-
-    /// <summary>
-    /// A dictionary mapping a atomic type or type definition to a list of rewrite rules
-    ///  that can cast it into another type.
-    /// <br/>eg. The rewrite rule for compiling a GCXF from an expression is (Func(TExArgCtx, TEx(_)), GCXF(_)).
-    /// <br/>eg. The rewrite rule for getting a float from an int is (int, float).
-    /// </summary>
-    private Dictionary<Type, List<IImplicitTypeConverter>> RewriteRules { get; } = new();
-    //Rewrite rules that apply to all types, eg. (_, Func(TExArgCtx, TEx(_)).
-    private List<IImplicitTypeConverter> GlobalRewriteRules { get; } = new();
-    
-    /// <summary>
-    /// A dictionary mapping a atomic type or type definition to a list of rewrite rules
-    ///  that can produce it from another type.
-    /// </summary>
-    private Dictionary<Type, List<IImplicitTypeConverter>> ReverseRewriteRules { get; } = new();
-
-    /// <inheritdoc cref="TypeResolver"/>
-    public TypeResolver(Dictionary<Type, Type[]> implicitConversions) : this(
-        (implicitConversions)
-            .SelectMany(kvs => kvs.Value.Select(v => 
-            new ImplicitTypeConverter(kvs.Key, v) as IImplicitTypeConverter)).ToArray()) { }
-    
-    /// <inheritdoc cref="TypeResolver"/>
-    public TypeResolver(params IImplicitTypeConverter[] converters) {
-        foreach (var c in converters) {
-            var m = c.NextInstance.MethodType;
-            if (m.Arguments.Length != 2)
-                throw new Exception("Implicit type converter must have exactly 1 argument");
-            var targetT = (m.Arguments[1] as TypeDesignation.Known) ??
-                          throw new Exception("Implicit type converter target type root must be known");
-            if (m.Arguments[0] is TypeDesignation.Variable) {
-                GlobalRewriteRules.Add(c);
-            } else {
-                var sourceT = (m.Arguments[0] as TypeDesignation.Known) ??
-                              throw new Exception("Implicit type converter source type root must be known");
-                if (!RewriteRules.ContainsKey(sourceT.Typ))
-                    RewriteRules[sourceT.Typ] = new();
-                RewriteRules[sourceT.Typ].Add(c);
-            }
-            if (!ReverseRewriteRules.ContainsKey(targetT.Typ))
-                ReverseRewriteRules[targetT.Typ] = new();
-            ReverseRewriteRules[targetT.Typ].Add(c);
-        }
-    }
-
-    private static readonly List<IImplicitTypeConverter> empty = new();
-    
-    /// <summary>
-    /// Return the set of type conversions where `source` is converted into another type.
-    /// </summary>
-    public bool GetImplicitCasts(TypeDesignation source, out IEnumerable<IImplicitTypeConverter> conversions) {
-        if (source is TypeDesignation.Known kt && RewriteRules.TryGetValue(kt.Typ, out var _conversions)) {
-            conversions = GlobalRewriteRules.Concat(_conversions);
-            return true;
-        } else {
-            conversions = GlobalRewriteRules;
-            return GlobalRewriteRules.Count > 0;
-        }
-    }
-
-    /// <summary>
-    /// Return the set of type conversions where `target` is constructed from another type.
-    /// </summary>
-    public bool GetImplicitSources(TypeDesignation target, out IEnumerable<IImplicitTypeConverter> conversions) {
-        if (target is TypeDesignation.Known kt && ReverseRewriteRules.TryGetValue(kt.Typ, out var _conversions)) {
-            conversions = _conversions;
-            return true;
-        } else {
-            conversions = default!;
-            return false;
-        }
-    }
-    
-    /// <summary>
-    /// Return the set of type conversions where `target` is constructed from another type.
-    /// </summary>
-    public bool GetImplicitSourcesList(TypeDesignation target, out List<IImplicitTypeConverter> conversions) {
-        if (target is TypeDesignation.Known kt && ReverseRewriteRules.TryGetValue(kt.Typ, out var _conversions)) {
-            conversions = _conversions;
-            return true;
-        } else {
-            conversions = default!;
-            return false;
-        }
-    }
-
-}
-
-/// <summary>
-/// Interface for instructions on constructing an implicit type conversions in <see cref="TypeResolver"/>.
-/// <br/>This allows for generic type conversion when <see cref="IImplicitTypeConverterInstance.Generic"/> is non-empty.
-///  For example, if <see cref="IImplicitTypeConverterInstance.MethodType"/> represents the method
-///  Foo(Var1) -> Bar(Var1), and Generic contains Var1, then this represents a generic cast from Foo{T} to Bar{T}.
-/// </summary>
-[PublicAPI]
-public interface IImplicitTypeConverter {
-    /// <summary>
-    /// An instance of this type conversion which has not yet been consumed in a unifier.
-    /// </summary>
-    public IImplicitTypeConverterInstance NextInstance { get; }
-}
-
-/// <summary>
-/// An instance of <see cref="IImplicitTypeConverter"/> that does not share generic variables with other instances,
-///  in order to prevent cross-pollution of generic conversion variables between multiple areas in a type tree.
-/// </summary>
-[PublicAPI]
-public interface IImplicitTypeConverterInstance {
-    /// <summary>
-    /// The converter definition.
-    /// </summary>
-    public IImplicitTypeConverter Converter { get; }
-    
-    /// <summary>
-    /// A method definition in one argument defining the conversion.
-    /// </summary>
-    public TypeDesignation.Dummy MethodType { get; }
-    
-    /// <summary>
-    /// Generic type variables in the method definition. Not sorted.
-    /// </summary>
-    public TypeDesignation.Variable[] Generic { get; }
-
-    /// <summary>
-    /// Get the type definitions for each of the generic type variables when this conversion is used
-    ///  in the context of the provided unifier.
-    /// </summary>
-    public TypeDesignation[] SimplifyVariables(Unifier u) => Generic.Select(g => u[g]).ToArray();
-
-    /// <summary>
-    /// Create a <see cref="IRealizedImplicitCast"/> representing the application of this converter.
-    /// </summary>
-    public IRealizedImplicitCast Realize(Unifier u);
-
-    /// <summary>
-    /// The consumer must call this method when this instance is consumed,
-    ///  and the generating <see cref="IImplicitTypeConverter"/> will
-    ///  recompute <see cref="IImplicitTypeConverter.NextInstance"/> in order to avoid cross-pollution.
-    /// </summary>
-    void MarkUsed();
-}
-
-/// <summary>
-/// Interface for information about a succesful implicit type conversion in <see cref="TypeResolver"/>.
-/// <br/>Note that when this is constructed, the result type may not be fully finished, ie. it may still have
-///  unbound type variables in it.
-/// Call <see cref="Simplify"/> to update this object if further unification is found.
-/// </summary>
-[PublicAPI]
-public interface IRealizedImplicitCast {
-    /// <summary>
-    /// The converter that made the conversion.
-    /// </summary>
-    public IImplicitTypeConverterInstance Converter { get; }
-    /// <summary>
-    /// The type to which the object was cast.
-    /// </summary>
-    public TypeDesignation ResultType { get; }
-    /// <summary>
-    /// The realized types mapped to the <see cref="IImplicitTypeConverterInstance.Generic"/> variables of the type conversion.
-    /// </summary>
-    public TypeDesignation[] Variables { get; }
-
-    /// <summary>
-    /// Update the type designations (<see cref="ResultType"/> and <see cref="Variables"/>) with more unification information.
-    /// </summary>
-    public IRealizedImplicitCast Simplify(Unifier u);
-}
-
-/// <summary>
-/// Basic implementation for <see cref="IImplicitTypeConverter"/>.
-/// </summary>
-public record ImplicitTypeConverter : IImplicitTypeConverter {
-    //don't use this for unification, it will cross-pollute
-    private TypeDesignation.Dummy SharedMethodType { get; }
-    public IImplicitTypeConverterInstance NextInstance { get; private set; }
-
-    /// <inheritdoc cref="ImplicitTypeConverter"/>
-    public ImplicitTypeConverter(Type from, Type to) : this(TypeDesignation.FromMethod(to, new[] { from }, out _)) { }
-
-    /// <summary>
-    /// Basic implementation for <see cref="IImplicitTypeConverter"/>.
-    /// </summary>
-    public ImplicitTypeConverter(TypeDesignation.Dummy MethodType) {
-        this.SharedMethodType = MethodType;
-        NextInstance = new Instance(this);
-    }
-
-    
-    /// <summary>
-    /// Basic implementation for <see cref="IImplicitTypeConverterInstance"/>.
-    /// </summary>
-    public record Instance : IImplicitTypeConverterInstance {
-        public ImplicitTypeConverter Converter { get; }
-        IImplicitTypeConverter IImplicitTypeConverterInstance.Converter => Converter;
-        public TypeDesignation.Dummy MethodType { get; }
-        /// <inheritdoc/>
-        public TypeDesignation.Variable[] Generic { get; }
-
-        public Instance(ImplicitTypeConverter conv) {
-            Converter = conv;
-            MethodType = conv.SharedMethodType.RecreateVariablesD();
-            Generic = MethodType.GetVariables().Distinct().ToArray();
-        }
-
-        /// <inheritdoc/>
-        public IRealizedImplicitCast Realize(Unifier u) => new RealizedImplicitCast(this, u);
-
-        /// <inheritdoc/>
-        public void MarkUsed() => Converter.NextInstance = new Instance(Converter);
-    }
-}
-
-
-/// <summary>
-/// Basic implementation of <see cref="IRealizedImplicitCast"/>.
-/// </summary>
-public class RealizedImplicitCast : IRealizedImplicitCast {
-    /// <inheritdoc/>
-    public IImplicitTypeConverterInstance Converter { get; }
-    /// <inheritdoc/>
-    public TypeDesignation ResultType { get; private set; }
-    /// <inheritdoc/>
-    public TypeDesignation[] Variables { get; private set; }
-
-    /// <inheritdoc cref="RealizedImplicitCast"/>
-    public RealizedImplicitCast(IImplicitTypeConverterInstance converter, Unifier unifier) {
-        this.Converter = converter;
-        //Note that these may not be fully realized at the time of casting
-        this.ResultType = Converter.MethodType.Last.Simplify(unifier);
-        this.Variables = converter.SimplifyVariables(unifier);
-    }
-
-    /// <inheritdoc/>
-    public IRealizedImplicitCast Simplify(Unifier u) {
-        ResultType = ResultType.Simplify(u);
-        Variables = Variables.Select(v => v.Simplify(u)).ToArray();
-        return this;
-    }
-}
-
 }

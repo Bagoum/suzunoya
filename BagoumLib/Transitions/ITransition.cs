@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Linq;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
@@ -124,6 +125,7 @@ public static class TransitionHelpers {
     public static ITransition Then(this ITransition tw, ITransition next) => new SequentialTransition(() => tw, () => next);
     public static ITransition Then(this ITransition tw, Func<ITransition> next) => new SequentialTransition(() => tw, next);
     public static ITransition Parallel(params ITransition[] tws) => new ParallelTransition(tws);
+    public static ITransition Parallel(this ITransition tw, params ITransition[] tws) => new ParallelTransition(tws.Prepend(tw).ToArray());
     public static ITransition Loop(this ITransition tw, int? times = null) => new LoopTransition(tw, times);
 }
 }

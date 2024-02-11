@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Reactive;
+using System.Text.RegularExpressions;
 using BagoumLib.Functional;
 using Mizuhashi;
 using NUnit.Framework;
@@ -107,6 +108,16 @@ public class TestParsing1 {
         parse3Emails.AssertSuccess("a@b.net\nb@c.com\nc@d.com\n", new() {
             new("a", "b", "net"), new("b", "c", "com"), new("c", "d", "com")
         });
+    }
+
+    [Test]
+    public void TestRegex() {
+        var parser = Char('!').IgThen(Regex("hello (world|sekai)"));
+        parser.AssertFail("hello world", new ExpectedChar('!'));
+        parser.AssertFail("!hello foobar", new Expected("regex match for pattern /hello (world|sekai)/"));
+        parser.AssertSuccessAny("!hello sekai hello world", m => m.Groups[1].Value == "sekai");
+        Char('!').IgThen(Regex("hello (world|sekai)").Many1())
+            .AssertSuccessAny("!hello sekaihello world", ms => ms[0].Groups[1].Value == "sekai" && ms[1].Groups[1].Value == "world");
     }
 
 }
