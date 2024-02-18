@@ -177,6 +177,20 @@ public static partial class Combinators {
     };
     
     /// <summary>
+    /// Parse one of the three provided parsers, returning an <see cref="OneOf{A,B,C}"/>
+    ///  indicating which was used and its result.
+    /// </summary>
+    public static Parser<T, OneOf<R1,R2,R3>> OneOf<T,R1,R2,R3>(Parser<T, R1> a, Parser<T, R2> b, Parser<T, R3> c) => input => {
+        var ra = a(input);
+        if (ra.Status != ResultStatus.ERROR) //success or fatal
+            return ra.FMap<OneOf<R1,R2,R3>>(x => x);
+        var rb = b(input).WithPreceding(in ra);
+        if (rb.Status != ResultStatus.ERROR)
+            return rb.FMap<OneOf<R1,R2,R3>>(x => x);
+        return c(input).WithPreceding(in ra).FMap<OneOf<R1, R2, R3>>(x => x);
+    };
+    
+    /// <summary>
     /// Parse any of the provided parsers. If no parsers are provided, always fails.
     /// </summary>
     public static Parser<T, R> Choice<T, R>(params Parser<T, R>[] ps) {
@@ -264,9 +278,21 @@ public static partial class Combinators {
     /// </summary>
     public static Parser<T, Maybe<R>> Opt<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
-        return result.Status == ResultStatus.ERROR ? 
-            new ParseResult<Maybe<R>>(Maybe<R>.None, result.Error, result.Start, result.End) : 
-            result.FMap(Maybe<R>.Of);
+        return result.Result.Try(out var res) ? 
+            new ParseResult<Maybe<R>>(Maybe<R>.Of(res), result.Error, result.Start, result.End) : 
+            result.Status == ResultStatus.ERROR ?
+                new ParseResult<Maybe<R>>(Maybe<R>.None, result.Error, result.Start, result.End) :
+                result.CastFailure<Maybe<R>>();
+    };
+    
+    /// <inheritdoc cref="Opt{T,R}"/>
+    public static Parser<T, R?> OptN<T, R>(this Parser<T, R> p) where R : struct => input => {
+        var result = p(input);
+        return result.Result.Try(out var res) ? 
+            new ParseResult<R?>(res, result.Error, result.Start, result.End) : 
+            result.Status == ResultStatus.ERROR ?
+                new ParseResult<R?>(Maybe<R?>.Of(null), result.Error, result.Start, result.End) :
+                result.CastFailure<R?>();
     };
     
     /// <summary>

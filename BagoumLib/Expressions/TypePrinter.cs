@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Expressions {
 /// <summary>
@@ -15,10 +16,25 @@ public interface ITypePrinter {
 /// <summary>
 /// Tries really hard to convert a type to its C# representation, eg. "int[]" or "Func&lt;bool, string&gt;".
 /// </summary>
+[PublicAPI]
 public class CSharpTypePrinter : ITypePrinter {
+    /// <summary>
+    /// Default printer with <see cref="UseSimpleTypeNames"/> = true, <see cref="PrintTypeNamespace"/> = false.
+    /// </summary>
     public static readonly ITypePrinter Default = new CSharpTypePrinter();
+    /// <summary>
+    /// If true, will represent simple system types like int/Int32 as "int" instead of "System.Int32".
+    /// </summary>
+    public bool UseSimpleTypeNames { get; init; } = true;
+    
+    /// <summary>
+    /// Whether or not to print the namespace of types.
+    /// </summary>
     public Func<Type, bool> PrintTypeNamespace { get; init; } = _ => false;
 
+    /// <summary>
+    /// The non-empty tuple types ordered by arity.
+    /// </summary>
     public static readonly Type[] tupleTypes = {
         typeof(ValueTuple<>),
         typeof(ValueTuple<,>),
@@ -30,9 +46,32 @@ public class CSharpTypePrinter : ITypePrinter {
         typeof(ValueTuple<,,,,,,,>)
     };
     
+    /// <summary>
+    /// Map of simple types, such as int/Int32, to their simple names, such as "int"
+    /// </summary>
+    public static readonly Dictionary<Type, string> SimpleTypeNameMap = new() {
+        {typeof(bool), "bool"},
+        {typeof(byte), "byte"},
+        {typeof(sbyte), "sbyte"},
+        {typeof(char), "char"},
+        {typeof(decimal), "decimal"},
+        {typeof(double), "double"},
+        {typeof(float), "float"},
+        {typeof(int), "int"},
+        {typeof(uint), "uint"},
+        {typeof(nint), "nint"},
+        {typeof(nuint), "nuint"},
+        {typeof(long), "long"},
+        {typeof(ulong), "ulong"},
+        {typeof(short), "short"},
+        {typeof(ushort), "ushort"},
+        {typeof(object), "object"},
+        {typeof(string), "string"},
+    };
+    
     /// <inheritdoc/>
     public virtual string Print(Type t) {
-        if (SimpleTypeNameMap.TryGetValue(t, out var v))
+        if (UseSimpleTypeNames && SimpleTypeNameMap.TryGetValue(t, out var v))
             return v;
         string PrependEnclosure(string s) {
             if (t.IsGenericParameter) return s;
@@ -59,25 +98,6 @@ public class CSharpTypePrinter : ITypePrinter {
         return PrependEnclosure(t.Name);
     }
     
-    public static readonly Dictionary<Type, string> SimpleTypeNameMap = new() {
-        {typeof(bool), "bool"},
-        {typeof(byte), "byte"},
-        {typeof(sbyte), "sbyte"},
-        {typeof(char), "char"},
-        {typeof(decimal), "decimal"},
-        {typeof(double), "double"},
-        {typeof(float), "float"},
-        {typeof(int), "int"},
-        {typeof(uint), "uint"},
-        {typeof(nint), "nint"},
-        {typeof(nuint), "nuint"},
-        {typeof(long), "long"},
-        {typeof(ulong), "long"},
-        {typeof(short), "short"},
-        {typeof(ushort), "ushort"},
-        {typeof(object), "object"},
-        {typeof(string), "string"},
-    };
 }
 
 }

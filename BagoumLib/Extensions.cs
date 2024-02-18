@@ -722,6 +722,16 @@ public static class DictExtensions {
     }
     
     /// <summary>
+    /// For a nested dictionary whose values are lists, add an element to the list associated with the given key pair,
+    ///  or create a new list if none are yet associated.
+    /// </summary>
+    public static void AddToList2<K, K2, V>(this Dictionary<K, Dictionary<K2, List<V>>> dict, K key, K2 key2, V val) where K2 : notnull where K : notnull {
+        if (!dict.TryGetValue(key, out var dct2))
+            dct2 = dict[key] = new Dictionary<K2, List<V>>();
+        dct2.AddToList(key2, val);
+    }
+    
+    /// <summary>
     /// For a nested dictionary, try to get the value at dict[key1][key2].
     /// </summary>
     public static bool TryGet2<K, K2, V>(this Dictionary<K, Dictionary<K2, V>> dict, K key, K2 key2, out V val) where K2 : notnull where K : notnull {
