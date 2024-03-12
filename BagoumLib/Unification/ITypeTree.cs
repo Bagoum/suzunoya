@@ -117,7 +117,7 @@ public interface IMethodTypeTree<T>: IMethodTypeTree where T: IMethodDesignation
 
     /// <summary>
     /// Whether or not the parameter at `index` can receive implicit casts for the given overload.
-    /// <br/>Left: The parameter must use the given implicit cast.
+    /// <br/>Left: The parameter must match exactly or use the given implicit cast.
     /// <br/>Right: The parameter is allowed or not allowed to use any implicit casts at its level.
     /// </summary>
     Either<IImplicitTypeConverter, bool> ImplicitParameterCast(T overload, int index) => new(true);
@@ -224,23 +224,25 @@ public interface IMethodTypeTree<T>: IMethodTypeTree where T: IMethodDesignation
             } else {
                 bool success = false;
                 var impCast = me.ImplicitParameterCast(overload, ii);
-                //By default, try to unify this argument index without implicit casts
+                //By default, try to unify this argument index without implicit casts or
+                // with only using the explicitly-provided cast
                 for (int jj = 0; jj < argSets[ii].Count; ++jj) {
                     var argT = argSets[ii][jj].Item1;
-                    if (!impCast.TryL(out var reqCast)) {
-                        if (method.Arguments[ii].Unify(argT, u).TryL(out var argU)) {
-                            wkArgs[ii] = argT;
-                            success |= CheckUnifications(implicitCasts, overload, ii + 1, argU);
-                        }
-                    } else {
+                    var explicitCastSuccess = false;
+                    if (impCast.TryL(out var reqCast)) {
                         var cinst = reqCast.NextInstance;
                         var invoke = Dummy.Method(method.Arguments[ii].Simplify(u), argT.Simplify(u));
                         if (invoke.Unify(cinst.MethodType, u).TryL(out var reqCastU)) {
                             cinst.MarkUsed();
                             wkArgs[ii] = invoke.Last;
-                            success |= CheckUnifications(implicitCasts, overload, ii + 1, reqCastU);
+                            success |= (explicitCastSuccess = 
+                                CheckUnifications(implicitCasts, overload, ii + 1, reqCastU));
                         }
                     }
+                    if (!explicitCastSuccess && method.Arguments[ii].Unify(argT, u).TryL(out var argU)) {
+                        wkArgs[ii] = argT;
+                        success |= CheckUnifications(implicitCasts, overload, ii + 1, argU);
+                    } 
                 }
                 if (success || !implicitCasts || impCast is not { IsRight: true, Right: true })
                     return success;
@@ -312,9 +314,11 @@ public interface IMethodTypeTree<T>: IMethodTypeTree where T: IMethodDesignation
         List<(TypeDesignation, TypeUnifyErr)> finalizeErrs = new();
         List<(TypeDesignation, TypeUnifyErr)>? noImplicitFinalizeErrs = null;
         if (me.RealizableOverloads == null) me.PossibleUnifiers(resolver, unifier);
-        if (implicitCasts.IsRight && TryUseAnyDirect(false) is { } dret)
-                return dret;
         var reqTyp = resultType.Simplify(unifier);
+        if (TryUseProvidedImplicit(false) is { } eret)
+            return eret;
+        if (TryUseAnyDirect(false) is { } dret)
+            return dret;
         if (TryUseAnyImplicit(false) is { } ret)
             return ret;
 
@@ -331,7 +335,9 @@ public interface IMethodTypeTree<T>: IMethodTypeTree where T: IMethodDesignation
         finalizeErrs.Clear();
         overloadErrs.Clear();
         
-        if (implicitCasts.IsRight && TryUseAnyDirect(true) is { } dretimp)
+        if (TryUseProvidedImplicit(true) is { } eretimp)
+            return eretimp;
+        if (TryUseAnyDirect(true) is { } dretimp)
             return dretimp;
         if (TryUseAnyImplicit(true) is { } retimp)
             return retimp;
@@ -397,15 +403,23 @@ public interface IMethodTypeTree<T>: IMethodTypeTree where T: IMethodDesignation
             }
             return null;
         }
-        Either<(TypeDesignation, Unifier), TypeUnifyErr>? TryUseAnyImplicit(bool allowChildCasts) {
+        Either<(TypeDesignation, Unifier), TypeUnifyErr>? TryUseProvidedImplicit(bool allowChildCasts) {
             if (implicitCasts.TryL(out var reqCast)) {
                 for (var im = 0; im < me.RealizableOverloads!.Count; im++) {
                     var m = me.RealizableOverloads[im];
                     var invoke = Dummy.Method(reqTyp, m.Method.Last.Simplify(unifier));
                     if (TryUseImplicit(m, invoke, reqCast, allowChildCasts) is { } ret)
                         return ret;
+                    
                 }
-            } else if (result == null && implicitCasts is { IsRight: true, Right: true }) {
+            }
+            if (result.Try(out var r))
+                return r.Item1;
+            else return null;
+        }
+        
+        Either<(TypeDesignation, Unifier), TypeUnifyErr>? TryUseAnyImplicit(bool allowChildCasts) {
+            if (implicitCasts is { IsRight: true, Right: true }) {
                 if (resolver.GetImplicitSourcesList(reqTyp, out var convsl)) {
                     for (var im = 0; im < me.RealizableOverloads!.Count; im++) {
                         var m = me.RealizableOverloads[im];
@@ -545,44 +559,27 @@ public interface IAtomicTypeTree : ITypeTree {
             Either<IImplicitTypeConverter, bool> implicitCasts, bool paramImplicitCasts) {
         (Unifier, TypeDesignation, IImplicitTypeConverterInstance?)? result = null;
         List<(TypeDesignation, TypeUnifyErr)> overloadErrs = new();
-        if (implicitCasts.IsRight) {
-            foreach (var t in me.PossibleTypes) {
-                var unified = t.Unify(resultType, unifier);
-                if (unified.IsLeft) {
-                    if (result != null)
-                        return new TypeUnifyErr.MultipleOverloads(me, resultType,
-                            result.Value.Item2, t.Simplify(unified.Left));
-                    result = (unified.Left, t.Simplify(unified.Left), null);
-                } else
-                    overloadErrs.Add((t, unified.Right));
-            }
-        }
-        
-        
-        Either<(TypeDesignation, Unifier), TypeUnifyErr>? TryUseImplicit(TypeDesignation t, Dummy invoke, IImplicitTypeConverter cast) {
-            if (!cast.SourceAllowed(t))
-                return null;
-            var cinst = cast.NextInstance;
-            var unified = cinst.MethodType.Unify(invoke, unifier);
-            if (unified.IsLeft) {
-                if (result != null)
-                    return new TypeUnifyErr.MultipleImplicits(me, resultType, 
-                        result.Value.Item2, t.Simplify(unified.Left));
-                cinst.MarkUsed();
-                result = (unified.Left, t.Simplify(unified.Left), cinst);
-            }
-            return null;
-        }
-        
-        //Cast into resultType if possible, else cast from possibleTypes
         var reqTyp = resultType.Simplify(unifier);
+        //Use the explicitly-provided cast if available
         if (implicitCasts.TryL(out var reqCast)) {
             foreach (var t in me.PossibleTypes) {
                 if (TryUseImplicit(t, Dummy.Method(reqTyp, t), reqCast) is
                     { } ret)
                     return ret;
             }
-        } else if (result == null && implicitCasts is { IsRight: true, Right: true }) {
+        }
+        if (result.HasValue) goto finalize;
+        //Then try direct matching
+        foreach (var t in me.PossibleTypes) {
+            var unified = t.Unify(resultType, unifier);
+            if (unified.IsLeft) {
+                result = (unified.Left, t.Simplify(unified.Left), null);
+                goto finalize;
+            } else
+                overloadErrs.Add((t, unified.Right));
+        }
+        //Then match general implicits if permitted
+        if (result == null && implicitCasts is { IsRight: true, Right: true }) {
             if (resolver.GetImplicitSources(reqTyp, out var convs)) {
                 foreach (var cast in convs)
                 foreach (var t in me.PossibleTypes) {
@@ -601,6 +598,7 @@ public interface IAtomicTypeTree : ITypeTree {
                     }
                 }
         }
+        finalize:
         if (result.Try(out var r)) {
             var overload = r.Item2.Simplify(r.Item1);
             var u = me.WillSelectOverload(overload, r.Item3, r.Item1);
@@ -613,6 +611,21 @@ public interface IAtomicTypeTree : ITypeTree {
         return overloadErrs.Count == 1 ?
             overloadErrs[0].Item2 :
             new TypeUnifyErr.NoResolvableOverload(me, resultType, overloadErrs);
+        
+        Either<(TypeDesignation, Unifier), TypeUnifyErr>? TryUseImplicit(TypeDesignation t, Dummy invoke, IImplicitTypeConverter cast) {
+            if (!cast.SourceAllowed(t))
+                return null;
+            var cinst = cast.NextInstance;
+            var unified = cinst.MethodType.Unify(invoke, unifier);
+            if (unified.IsLeft) {
+                if (result != null)
+                    return new TypeUnifyErr.MultipleImplicits(me, resultType, 
+                        result.Value.Item2, t.Simplify(unified.Left));
+                cinst.MarkUsed();
+                result = (unified.Left, t.Simplify(unified.Left), cinst);
+            }
+            return null;
+        }
     }
     
     void ITypeTree.FinalizeUnifiers(Unifier unifier) {

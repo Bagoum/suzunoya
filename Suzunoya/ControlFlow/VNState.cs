@@ -736,7 +736,8 @@ public class VNState : IVNState {
         }
         var dsp = Entities.Add(ent);
         if (ent is IDialogueBox dlg) {
-            MainDialogue ??= dlg;
+            if (MainDialogue?.EntityActive.Value != EntityState.Active)
+                MainDialogue = dlg;
             dlg.DialogueStarted.Subscribe(DialogueLog.OnNext);
         }
         ent.AddToVNState(this, dsp);

@@ -4,6 +4,7 @@
         <Nullable>enable</Nullable>
         <LangVersion>12</LangVersion>
         <TargetFrameworks>netstandard2.1;net8.0</TargetFrameworks>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
@@ -15,6 +16,7 @@
       <PackageReference Include="JetBrains.Annotations" Version="2021.1.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
       <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
+      <PackageReference Include="System.Linq.Async" Version="6.0.1" />
       <PackageReference Include="System.Reactive" Version="5.0.0" />
     </ItemGroup>
 

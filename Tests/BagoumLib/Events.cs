@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reactive.Linq;
 using BagoumLib;
 using BagoumLib.Events;
@@ -11,6 +12,30 @@ using static Tests.AssertHelpers;
 
 namespace Tests.BagoumLib {
 public class Events {
+    [Test]
+    public void ArrayOverlap1() {
+        var ev = new ArrayOverlapperEvent<int>(4, 1);
+        var l = new List<int[]>();
+        ev.Subscribe(x => l.Add(x.ToArray()));
+        ev.OnNext(new[]{1,2,3,4});
+        ev.OnNext(new[]{5,6,7,8});
+        ListEq(l, new[]{new[]{1,2,3,4}, new[]{5,6,7,8}});
+        
+        ev = new ArrayOverlapperEvent<int>(4, 0.5);
+        l = new List<int[]>();
+        ev.Subscribe(x => l.Add(x.ToArray()));
+        ev.OnNext(new[]{1,2,3,4});
+        ev.OnNext(new[]{5,6,7,8});
+        ListEq(l, new[]{new[]{1,2,3,4}, new[]{3,4,5,6}, new[]{5,6,7,8}});
+        
+        ev = new ArrayOverlapperEvent<int>(4, 0.25);
+        l = new List<int[]>();
+        ev.Subscribe(x => l.Add(x.ToArray()));
+        ev.OnNext(new[]{1,2,3,4});
+        ev.OnNext(new[]{5,6,7,8});
+        ListEq(l, new[]{new[]{1,2,3,4}, new[]{2,3,4,5}, new[]{3,4,5,6}, new[]{4,5,6,7}, new[]{5,6,7,8}});
+    }
+    
     [Test]
     public void TestAddRemove() {
         var ev = new Event<int>();

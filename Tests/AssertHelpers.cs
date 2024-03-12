@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -24,7 +25,10 @@ public static class AssertHelpers {
         string extraFail = (left.Count == right.Count) ? "" : $"Lengths are mismatched: {left.Count}, {right.Count}. ";
         for (int ii = 0; ii < left.Count && ii < right.Count; ++ii) {
             if (!Equals(left[ii], right[ii])) {
-                Assert.Fail($"{extraFail}At index {ii}, left is {left[ii]} and right is {right[ii]}.");
+                if (left[ii] is IEnumerable lie && right[ii] is IEnumerable rie) {
+                    IEnumEq(lie.Cast<object?>(), rie.Cast<object?>());
+                } else
+                    Assert.Fail($"{extraFail}At index {ii}, left is {left[ii]} and right is {right[ii]}.");
             }
         }
         if (extraFail.Length > 0) {

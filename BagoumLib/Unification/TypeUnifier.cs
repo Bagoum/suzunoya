@@ -316,12 +316,18 @@ public abstract class TypeDesignation {
                 throw new Exception(
                     $"Type constructor {Typ.RName()} required {Typ.GetGenericArguments().Length} args, " +
                     $"received {Arguments.Length}");
-            return Arguments
-                .SequenceL(c => c.Resolve(unifier))
-                .FMapL(ctypes => 
-                    Typ == typeof(_ArrayGenericTypeHelperDoNotUse<>) ?
-                        ctypes[0].MakeArrayType() :
-                        Typ.MakeGenericType(ctypes.ToArray()));
+            var ctypes = new Type[Arguments.Length];
+            for (int ii = 0; ii < Arguments.Length; ++ii) {
+                var rtyp = Arguments[ii].Resolve(unifier);
+                if (!rtyp.TryL(out var typ))
+                    return rtyp.Right;
+                ctypes[ii] = rtyp.Left;
+            }
+            if (Typ == typeof(_ArrayGenericTypeHelperDoNotUse<>))
+                return ctypes[0].MakeArrayType();
+            if (ctypes[^1] == typeof(void) && ReflectionUtils.FuncTypesByArity.Contains(Typ))
+                return ReflectionUtils.MakeFuncType(ctypes); //make action type
+            return Typ.MakeGenericType(ctypes);
         }
 
         /// <inheritdoc/>

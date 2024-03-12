@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Suzunoya", "Suzunoya\Suzuno
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mizuhashi", "Mizuhashi\Mizuhashi.csproj", "{CE8A0D33-2A89-4435-B5FB-9A56F11573ED}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatDetectorApp", "BeatDetectorApp\BeatDetectorApp.csproj", "{BB1823E8-7FBB-4B70-A122-83AD110F52E4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{CE8A0D33-2A89-4435-B5FB-9A56F11573ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CE8A0D33-2A89-4435-B5FB-9A56F11573ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CE8A0D33-2A89-4435-B5FB-9A56F11573ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

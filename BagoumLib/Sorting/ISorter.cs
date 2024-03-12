@@ -6,6 +6,7 @@ namespace BagoumLib.Sorting {
 /// Returns true iff a is less than or equal to b.
 /// </summary>
 public delegate bool LeqCompare<T>(in T a, in T b);
+
 internal interface ISorter<T> {
     void Sort(T[] array, int start, int end, LeqCompare<T> comp);
 }

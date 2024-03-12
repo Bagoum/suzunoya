@@ -18,6 +18,7 @@ BagoumLib is a small class library with some convenient functionality, including
 - Easing, lerping, and tweening (see BagoumLib.Transitions)
 - Convenient data structures such as compacting arrays and coroutine iterators (see BagoumLib.DataStructures)
 - Low-garbage event classes (see BagoumLib.Events)
+- Beat detection algorithms for video games (see BagoumLib.SignalProcessing)
 - Utilities for type unification, including type unification of an entire program with generics, return type disambiguation, implicit casting, and method overloads (see BagoumLib.Unification)
   - This doesn't yet support type constraints, such as `T : IMyInterface`
 - Helpers for expression trees, including functionality to print expressions to source code (see BagoumLib.Expressions.ExpressionPrinter)
@@ -42,6 +43,10 @@ Consumes BagoumLib and Mizuhashi.
 [SuzunoyaUnity](https://github.com/Bagoum/suzunoya-unity) (separate repository) is the Suzunoya adapter for the Unity game engine.
 
 Consumes BagoumLib, Mizuhashi, and Suzunoya.
+
+### BeatDetectorApp
+
+BeatDetectorApp is an Avalonia desktop application for testing and debugging the beat detection algorithms in BagoumLib.
 
 # Licensing
 

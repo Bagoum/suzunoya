@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
@@ -197,6 +198,11 @@ public static class Extensions {
         }));
         return new ListDisposable(tokens);
     }
+
+    /// <summary>
+    /// Returns the square magnitude of a complex number.
+    /// </summary>
+    public static double SqrMagnitude(this Complex num) => num.Real * num.Real + num.Imaginary * num.Imaginary;
 }
 
 /// <summary>
@@ -285,6 +291,22 @@ public static class ArrayExtensions {
             else break;
         }
         return result;
+    }
+    
+    /// <summary>
+    /// Update each element of an array in-place using the mapping function.
+    /// </summary>
+    public static T[] SelectInPlace<T>(this T[] arr, Func<T, T> map) {
+        for (int ii = 0; ii < arr.Length; ++ii)
+            arr[ii] = map(arr[ii]);
+        return arr;
+    }
+    
+    /// <inheritdoc cref="SelectInPlace{T}(T[],System.Func{T,T})"/>
+    public static T[] SelectInPlace<T>(this T[] arr, Func<T, int, T> map) {
+        for (int ii = 0; ii < arr.Length; ++ii)
+            arr[ii] = map(arr[ii], ii);
+        return arr;
     }
 }
 
@@ -595,6 +617,46 @@ public static class IEnumExtensions {
         }
         return max;
     }
+
+    /// <summary>
+    /// Get a task that is set to true when the observable is completed.
+    /// </summary>
+    /// <param name="src"></param>
+    /// <typeparam name="T"></typeparam>
+    public static async Task WaitForCompletion<T>(this IObservable<T> src) {
+        var tcs = new TaskCompletionSource<Unit>();
+        using var _ = src.Subscribe(x => {}, () => tcs.SetResult(default));
+        await tcs.Task;
+    }
+
+    /// <summary>
+    /// Calls `src.Subscribe` and returns `src`.
+    /// </summary>
+    public static OT WithSubscribe<OT, T>(this OT src, IObserver<T> observer, out IDisposable token) where OT : IObservable<T> {
+        token = src.Subscribe(observer);
+        return src;
+    }
+
+    /*
+    public static async IAsyncEnumerable<T> AsEnumerable<T>(this IObservable<T> src) {
+        TaskCompletionSource<T> nxt = new();
+        TaskCompletionSource<Unit> complete = new();
+        using var _ = src.Subscribe(v => nxt.SetResult(v), () => complete.SetResult(default));
+        var tasks = new Task[2];
+        while (true) {
+            tasks[0] = nxt.Task;
+            tasks[1] = complete.Task;
+            await Task.WhenAny(tasks);
+            while (tasks[0].IsCompleted) {
+                var res = nxt.Task.Result;
+                nxt = new();
+                tasks[0] = nxt.Task;
+                yield return res;
+            }
+            if (tasks[1].IsCompleted)
+                break;
+        }
+    }*/
 }
 
 /// <summary>
@@ -602,6 +664,15 @@ public static class IEnumExtensions {
 /// </summary>
 [PublicAPI]
 public static class ListExtensions {
+    /// <summary>
+    /// Update each element of a list in-place using the mapping function.
+    /// </summary>
+    public static List<T> SelectInPlace<T>(this List<T> arr, Func<T, T> map) {
+        for (int ii = 0; ii < arr.Count; ++ii)
+            arr[ii] = map(arr[ii]);
+        return arr;
+    }
+    
     /// <summary>
     /// Get a hash code based only on the elements of the list.
     /// </summary>

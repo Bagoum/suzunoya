@@ -26,8 +26,8 @@ public class DataStructures {
         Assert.AreEqual(cl.SafeIndexFromBack(1), 11);
         Assert.AreEqual(cl.SafeIndexFromBack(2), 10);
         Assert.AreEqual(cl.SafeIndexFromBack(15), 10);
-        Assert.AreEqual(cl[0], 10);
-        Assert.AreEqual(cl[1], 11);
+        Assert.AreEqual(cl.RelativeIndex(0), 10);
+        Assert.AreEqual(cl.RelativeIndex(1), 11);
         cl.Add(12);
         cl.Add(13);
         cl.Add(14);
@@ -37,10 +37,10 @@ public class DataStructures {
         Assert.AreEqual(cl.SafeIndexFromBack(4), 12);
         Assert.AreEqual(cl.SafeIndexFromBack(5), 12);
         //the first element gets pushed forwards
-        Assert.AreEqual(cl[0], 12);
-        Assert.AreEqual(cl[1], 13);
-        Assert.AreEqual(cl[2], 14);
-        Assert.AreEqual(cl[3], 15);
+        Assert.AreEqual(cl.RelativeIndex(0), 12);
+        Assert.AreEqual(cl.RelativeIndex(1), 13);
+        Assert.AreEqual(cl.RelativeIndex(2), 14);
+        Assert.AreEqual(cl.RelativeIndex(3), 15);
     }
 
     [Test]

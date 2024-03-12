@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BeatDetectorApp.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+        mc:Ignorable="d" d:DesignWidth="250" d:DesignHeight="450"
+        x:Class="BeatDetectorApp.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="BeatDetectorApp">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE,
+             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+    
+    <Grid ColumnDefinitions="*" RowDefinitions="Auto,Auto,*,*,Auto">
+        <Button Command="{Binding PlayNew}" Grid.Row="0" Grid.Column="0"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+        >PLAY AUDIO TEST</Button>
+        <TextBlock Text="{Binding Time}" Grid.Row="1" Grid.Column="0"
+                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                   ></TextBlock>
+        
+        <LayoutTransformControl Grid.Row="2">
+            <LayoutTransformControl.LayoutTransform><RotateTransform Angle="-90"/></LayoutTransformControl.LayoutTransform>
+            <ScottPlot:AvaPlot Grid.Row="2" Name="Spectral"></ScottPlot:AvaPlot>
+        </LayoutTransformControl>
+        <LayoutTransformControl Grid.Row="3">
+            <LayoutTransformControl.LayoutTransform><RotateTransform Angle="90"/></LayoutTransformControl.LayoutTransform>
+            <ScottPlot:AvaPlot Name="History"></ScottPlot:AvaPlot>
+        </LayoutTransformControl>
+        
+        <Button Grid.Row="4" Grid.Column="0"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                Command="{Binding PlayPause}"
+        >
+            <TextBlock FontFamily="{StaticResource FontAwesome}" Text="&#xf144;" />
+        </Button>
+    </Grid>
+</Window>

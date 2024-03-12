@@ -67,6 +67,7 @@ public class CSharpTypePrinter : ITypePrinter {
         {typeof(ushort), "ushort"},
         {typeof(object), "object"},
         {typeof(string), "string"},
+        {typeof(void), "void"}
     };
     
     /// <inheritdoc/>

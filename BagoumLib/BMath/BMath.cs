@@ -98,18 +98,59 @@ public static class BMath {
     /// Lerp between a and b, but do not clamp t, so the result can be outside the range [a, b].
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float LerpU(float a, float b, float t) => a * (1 - t) + b * t;
+    public static float LerpU(float a, float b, float t) => a + (b - a) * t;
     
     /// <summary>
     /// Lerp between a and b with t as a controller (clamped to [0, 1]).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Lerp(float a, float b, float t) => LerpU(a, b, Clamp(0, 1, t));
+    public static double Lerp(double a, double b, double t) {
+        if (t < 0) return a;
+        if (t > 1) return b;
+        return a + (b - a) * t;
+    }
+    
+    /// <summary>
+    /// Lerp between a and b with t as a controller (clamped to [0, 1]).
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Lerp(float a, float b, float t) {
+        if (t < 0) return a;
+        if (t > 1) return b;
+        return a + (b - a) * t;
+    }
 
     /// <summary>
     /// Element-wise <see cref="Mod(float, float)"/>.
     /// </summary>
     public static Vector3 Mod(float by, Vector3 v) => new Vector3(Mod(by, v.X), Mod(by, v.Y), Mod(by, v.Z));
+    
+    /// <summary>
+    /// HLSL smoothstep. Return a smoothed value of Ratio.
+    /// WARNING: Unity's Mathf.Smoothstep returns something different.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Smoothstep(float low, float high, float t) {
+        var t1 = Clamp(0, 1, (t - low) / (high - low));
+        return t1 * t1 * (3 - 2 * t1);
+    }
+
+    /// <summary>
+    /// Returns (x - a) / (b - a); ie. t such that LerpUnclamped(a, b, t) = x.
+    /// </summary>
+    public static double Ratio(double a, double b, double x) => (x - a) / (b - a);
+    public static float Ratio(float a, float b, float x) => (x - a) / (b - a);
+    
+    /// <summary>
+    /// Returns (x - a) / (b - a) clamped to (0, 1).
+    /// </summary>
+    
+    public static float RatioC(float a, float b, float x) => Clamp(0, 1, (x - a) / (b - a));
+    
+    /// <summary>
+    /// =sin(pi*x)/(pi*x)
+    /// </summary>
+    public static double Sinc(double x) => x == 0 ? 1 : Math.Sin(PI * x) / (PI * x);
 
     /// <summary>
     /// Returns (target+n*mod) to minimize |src - (target+n*mod)|.

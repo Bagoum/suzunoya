@@ -34,6 +34,12 @@ public static class Easers {
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOSine(float x) => 0.5f - 0.5f * (float) Math.Cos(PI * x);
+    
+    /// <summary>
+    /// Derivative of <see cref="EOutSine"/>.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float DEOutSine(float x) => HPI * (float) Math.Cos(HPI * x);
 
     /// <summary>
     /// Quadratic easer (slow at beginning).
@@ -122,12 +128,14 @@ public static class Easers {
     /// f(x) = x. Same as EIdentity.
     /// </summary>
     public static float ELinear(float x) => x;
+    
     /// <summary>
     /// f(x) = x. Same as ELinear.
     /// </summary>
     public static float EIdentity(float x) => x;
 
-    public static Easer CEOutPow(float pow) => x => 1f - (float) Math.Pow(1 - x, pow);
+    
+    public static float CEOutPow(float x, float pow) => 1f - (float) Math.Pow(1 - x, pow);
     
     /// <summary>
     /// </summary>

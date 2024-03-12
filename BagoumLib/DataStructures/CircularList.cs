@@ -9,11 +9,17 @@ namespace BagoumLib.DataStructures {
 /// A list with a fixed capacity that wraps around and overwrites the oldest items.
 /// </summary>
 [PublicAPI]
-public class CircularList<T> : IEnumerable<T> {
+public class CircularList<T> : IEnumerable<T>, IReadOnlyList<T> {
     /// <summary>
     /// Number of elements in the list. Note that this is bounded by the initialized size.
     /// </summary>
     public int Count { get; private set; }
+    
+    /// <summary>
+    /// The total number of items that were added to the list. Since old items are overwritten,
+    ///  only the items in the range [TotalAdds-Count,TotalAdds) are accessible.
+    /// </summary>
+    public int TotalAdds { get; private set; }
     private readonly T[] arr;
     private int pointer;
 
@@ -34,6 +40,7 @@ public class CircularList<T> : IEnumerable<T> {
         arr[pointer] = obj;
         pointer = (pointer + 1) % arr.Length;
         Count = Math.Min(Count + 1, arr.Length);
+        ++TotalAdds;
     }
 
     /// <summary>
@@ -47,23 +54,35 @@ public class CircularList<T> : IEnumerable<T> {
     }
 
     /// <summary>
+    /// Get the ii'th added element. If the ii'th added element has not been overwritten,
+    ///  then this is equivalent to indexing into an unbounded array holding the added values at index ii.
+    /// </summary>
+    public ref T TrueIndex(int ii) => ref arr[BMath.Mod(arr.Length, ii)];
+    
+    /// <inheritdoc/>
+    T IReadOnlyList<T>.this[int index] => TrueIndex(index);
+    
+    /// <summary>
+    /// Retrieve the (size-index)'th most recently added element.
+    /// <br/>Eg. ii=0 is the oldest element still in the list; ii=Count-1 is the newest element.
+    /// </summary>
+    public ref T RelativeIndex(int ii) => ref arr[BMath.Mod(arr.Length, pointer - Count + ii)];
+
+    /// <summary>
     /// Clear all emenets in the container.
     /// </summary>
     public void Clear() {
         Count = 0;
+        TotalAdds = 0;
         pointer = 0;
-        for (int ii = 0; ii < arr.Length; ++ii) arr[ii] = default!;
+        Array.Clear(arr, 0, arr.Length);
     }
     
-    /// <summary>
-    /// Retrieve the (size-index)'th most recently added element.
-    /// </summary>
-    public ref T this[int index] => ref arr[BMath.Mod(arr.Length, pointer - Count + index)];
 
     /// <inheritdoc/>
     public IEnumerator<T> GetEnumerator() {
         for (int ii = 0; ii < Count; ++ii) {
-            yield return this[ii];
+            yield return this.RelativeIndex(ii);
         }
     }
 

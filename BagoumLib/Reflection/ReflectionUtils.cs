@@ -28,6 +28,22 @@ public static class ReflectionUtils {
         typeof(Func<,,,,,,,,,,,,>),
         typeof(Func<,,,,,,,,,,,,,>),
     };
+    private static readonly Type[] ActionTypesByArity = {
+        typeof(Action<>),
+        typeof(Action<,>),
+        typeof(Action<,,>),
+        typeof(Action<,,,>),
+        typeof(Action<,,,,>),
+        typeof(Action<,,,,,>),
+        typeof(Action<,,,,,,>),
+        typeof(Action<,,,,,,,>),
+        typeof(Action<,,,,,,,,>),
+        typeof(Action<,,,,,,,,,>),
+        typeof(Action<,,,,,,,,,,>),
+        typeof(Action<,,,,,,,,,,,>),
+        typeof(Action<,,,,,,,,,,,,>),
+        typeof(Action<,,,,,,,,,,,,,>),
+    };
     public static readonly Type[] TupleTypesByArity = {
         typeof(ValueTuple<>),
         typeof(ValueTuple<,>),
@@ -42,18 +58,27 @@ public static class ReflectionUtils {
     /// <summary>
     /// Get the func type typeof(Func&lt;,,,,...&gt;), where arity is the number of generic arguments.
     /// </summary>
-    /// <param name="arity"></param>
-    /// <returns></returns>
     public static Type GetFuncType(int arity) {
         if (arity <= 0 || arity > FuncTypesByArity.Length)
             throw new Exception($"Func type arity not supported: {arity}");
         return FuncTypesByArity[arity - 1];
+    }
+    
+    /// <summary>
+    /// Get the action type typeof(Action&lt;,,,,...&gt;), where arity is the number of generic arguments.
+    /// </summary>
+    public static Type GetActionType(int arity) {
+        if (arity <= 0 || arity > FuncTypesByArity.Length)
+            throw new Exception($"Action type arity not supported: {arity}");
+        return ActionTypesByArity[arity - 1];
     }
 
     /// <summary>
     /// Make the func type typeof(Func&lt;A,B,C,...&gt;).
     /// </summary>
     public static Type MakeFuncType(Type[] typeArgs) {
+        if (typeArgs[^1] == typeof(void))
+            return GetActionType(typeArgs.Length - 1).MakeGenericType(typeArgs.Take(typeArgs.Length - 1).ToArray());
         return GetFuncType(typeArgs.Length).MakeGenericType(typeArgs);
     }
     
