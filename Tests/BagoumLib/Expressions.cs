@@ -190,5 +190,12 @@ if (x > default(int)) {
         Assert.AreEqual(p.Print("hello\"world"), "\"hello\\\"world\"");
         Assert.AreEqual(p.Print("hello\nworld"), "\"hello\\nworld\"");
     }
+
+    [Test]
+    public void TypePrinter() {
+        var p = new CSharpTypePrinter(){PrintTypeNamespace = _ => true};
+        Assert.AreEqual("System.Func<float, float>", p.Print(typeof(Func<float,float>)));
+        Assert.AreEqual("float[]", p.Print(typeof(float[])));
+    }
 }
 }

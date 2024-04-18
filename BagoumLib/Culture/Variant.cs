@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using BagoumLib.Events;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
@@ -53,15 +54,21 @@ public class Variant<T> : IVariant<T> {
     /// Default value to realize if the locale is null or there is no handling for the provided locale.
     /// </summary>
     public readonly T defaultValue;
-    [JsonProperty] private readonly (string, T)[] variants;
+    
     /// <summary>
-    /// A map from locales to the object value for that locale.
+    /// A list of locales and their mapped values.
     /// </summary>
-    protected readonly Dictionary<string, T> langToValueMap = new();
+    [JsonProperty] public readonly (string locale, T val)[] variants;
+    
     /// <summary>
     /// The <see cref="ILocaleProvider"/> used to get the current locale.
     /// </summary>
     protected readonly ILocaleProvider? localeP;
+
+    /// <summary>
+    /// The set of locales for which alternate values are provided.
+    /// </summary>
+    [JsonIgnore] public IEnumerable<string> MyLocales => variants.Select(x => x.locale);
     
     /// <summary>
     /// The current value of the locale-variant object, with the locale defined by <see cref="localeP"/>
@@ -76,19 +83,27 @@ public class Variant<T> : IVariant<T> {
         this.variants = variants;
         this.localeP = localeP;
         this.defaultValue = defaultValue;
-        foreach (var (locale, value) in variants) {
-            langToValueMap[locale] = value;
-        }
     }
 
     /// <summary>
     /// Whether or not there is handling for the provided locale.
     /// </summary>
-    public bool HasLang(string lang) => langToValueMap.ContainsKey(lang);
+    public bool HasLang(string locale) {
+        for (int ii = 0; ii < variants.Length; ++ii)
+            if (variants[ii].Item1 == locale)
+                return true;
+        return false;
+    }
 
     /// <inheritdoc/>
-    public T Realize(string? locale) => 
-        locale != null && langToValueMap.TryGetValue(locale, out var val) ? val : defaultValue;
+    public T Realize(string? locale) {
+        if (locale is null) goto end;
+        for (int ii = 0; ii < variants.Length; ++ii)
+            if (variants[ii].Item1 == locale)
+                return variants[ii].Item2;
+        end:
+        return defaultValue;
+    }
 
     /// <inheritdoc/>
     public object RealizeObj(string? locale) => Realize(locale)!;

@@ -596,11 +596,11 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
     
     /// <inheritdoc cref="AsError{R2}(Mizuhashi.LocatedParserError,bool)"/>
     public ParseResult<R2> AsError<R2>(ParserError newError, bool dontConsume = true) => 
-        AsError<R2>(new LocatedParserError(Start, End, newError));
+        AsError<R2>(new LocatedParserError(Start, End, newError), dontConsume);
     
     /// <inheritdoc cref="AsError{R2}(Mizuhashi.LocatedParserError,bool)"/>
     public ParseResult<R> AsSameError(ParserError newError, bool dontConsume = true) => 
-        AsError<R>(new LocatedParserError(Start, End, newError));
+        AsError<R>(new LocatedParserError(Start, End, newError), dontConsume);
 
     /// <summary>
     /// Change the type of a failed parse result.

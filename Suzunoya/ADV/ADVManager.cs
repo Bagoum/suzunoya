@@ -57,7 +57,7 @@ public class ADVManager : ITokenized {
     /// <summary>
     /// The current <see cref="State"/> of the game.
     /// </summary>
-    public DisturbedEvented<State> ADVState { get; } = new DisturbedFold<State>(State.Investigation, 
+    public DisturbedEvented<State, State> ADVState { get; } = new DisturbedFold<State>(State.Investigation, 
         (x, y) => (x > y) ? x : y);
 
     /// <inheritdoc/>

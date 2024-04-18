@@ -41,6 +41,11 @@ public interface IVNState : IConfirmationReceiver {
     /// Within the update loop, this is set to the delta-time of the frame.
     /// </summary>
     float dT { get; }
+    
+    /// <summary>
+    /// True iff the VN state has computed its update loop for this frame.
+    /// </summary>
+    bool HasVNUpdatedThisFrame { get; }
 
     /// <summary>
     /// The main dialogue box, if it exists.
@@ -380,7 +385,8 @@ public class VNState : IVNState {
     /// </summary>
     public bool DefaultLoadSkipUnit { get; set; } = false;
     
-    private bool vnUpdated = false;
+    /// <inheritdoc/>
+    public bool HasVNUpdatedThisFrame { get; private set; } = false;
     private readonly Coroutines cors = new();
     private DMCompactingArray<IEntity> Entities { get; } = new();
     /// <inheritdoc/>
@@ -676,7 +682,7 @@ public class VNState : IVNState {
         this.AssertActive();
         dT = deltaTime;
         cors.Step();
-        vnUpdated = true;
+        HasVNUpdatedThisFrame = true;
         for (int ii = 0; ii < RenderGroups.Count; ++ii) {
             if (RenderGroups.ExistsAt(ii))
                 RenderGroups[ii].Update(deltaTime);
@@ -687,7 +693,7 @@ public class VNState : IVNState {
                 Entities[ii].Update(deltaTime);
         }
         Entities.Compact();
-        vnUpdated = false;
+        HasVNUpdatedThisFrame = false;
     }
     
     /// <summary>
@@ -794,9 +800,8 @@ public class VNState : IVNState {
     /// <inheritdoc/>
     public void Run(IEnumerator ienum) {
         this.AssertActive();
-        cors.Run(ienum,
-            //Correct for the one-frame delay created by TryStepPrepend if this is called after VN finishes its cors.step
-            new CoroutineOptions(ExecType: vnUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend));
+        //Correct for the one-frame delay created by TryStepPrepend if this is called after VN finishes its cors.step
+        cors.Run(ienum, CoroutineOptions.ProcessThisFrame(HasVNUpdatedThisFrame));
     }
 
     /// <summary>

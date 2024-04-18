@@ -11,6 +11,11 @@ public interface ITokenized : IDisposable {
     /// </summary>
     public List<IDisposable> Tokens { get; }
 
+    /// <summary>
+    /// Add a token to <see cref="Tokens"/>.
+    /// </summary>
+    public void AddToken(IDisposable token) => Tokens.Add(token);
+
     void IDisposable.Dispose() => Tokens.DisposeAll();
 }
 }

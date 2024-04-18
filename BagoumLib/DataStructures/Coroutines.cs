@@ -37,15 +37,27 @@ public enum CoroutineType {
 /// <param name="Droppable">True iff the coroutine can be deleted without waiting for cancellation when
 ///  the coroutine container is deleted.</param>
 /// <param name="ExecType">Instructions on how to add the new coroutine to the existing list.</param>
-public record CoroutineOptions(bool Droppable = false, CoroutineType ExecType = CoroutineType.TryStepPrepend) {
+public record CoroutineOptions(CoroutineType ExecType, bool Droppable = false) {
     /// <summary>
-    /// Default coroutine options (non-droppable and <see cref="CoroutineType.TryStepPrepend"/>)
+    /// Default coroutine options (non-droppable and <see cref="CoroutineType.StepTryPrepend"/>)
     /// </summary>
-    public static readonly CoroutineOptions Default = new();
+    public static readonly CoroutineOptions Default = new(CoroutineType.StepTryPrepend, false);
     /// <summary>
-    /// Default coroutine options (droppable and <see cref="CoroutineType.TryStepPrepend"/>)
+    /// Default coroutine options (droppable and <see cref="CoroutineType.StepTryPrepend"/>)
     /// </summary>
-    public static readonly CoroutineOptions DroppableDefault = new(true);
+    public static readonly CoroutineOptions DroppableDefault = new(CoroutineType.StepTryPrepend, true);
+
+    /// <summary>
+    /// Return <see cref="DroppableDefault"/> if `droppable` is true, else <see cref="Default"/>.
+    /// </summary>
+    public static CoroutineOptions DefaultWith(bool droppable) => droppable ? DroppableDefault : Default;
+
+    /// <summary>
+    /// Return a CoroutineOptions with StepTryPrepend if the entity has updated this frame, or TryStepPrepend
+    ///  if it has not yet updated. This ensures that the coroutine receives one update this frame.
+    /// </summary>
+    public static CoroutineOptions ProcessThisFrame(bool hasUpdated) =>
+        new(hasUpdated ? CoroutineType.StepTryPrepend : CoroutineType.TryStepPrepend);
 }
 
 /// <summary>

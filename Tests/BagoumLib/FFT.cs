@@ -27,6 +27,8 @@ public class FFT {
     private static readonly IFFT[] providers = {
         new OouraFFT(), new CombFFT(), new RecursiveFFT(),
     };
+    private static readonly Random rng = new();
+    private static readonly OouraFFT fft = new();
 
     private double Sinc(double x) => x == 0 ? 1 : Sin(PI * x) / (PI * x);
 
@@ -40,17 +42,18 @@ public class FFT {
         x => f(BMath.Mod(p, x - p/2));
     private double WrapAround(double x, double p) => BMath.Mod(p, x - p/2);
 
-    private Signal GraphRealSignals(Plot spec, double sr, IReadOnlyCollection<Complex> signals, int? actualSamples = null, double xOffset = 0, Maybe<Color>? color = null,
+    private Signal GraphRealSignals(Plot spec, double sr, IEnumerable<Complex> signals, int? actualSamples = null, double xOffset = 0, Maybe<Color>? color = null,
             IXAxis? xAxis = null, IYAxis? yAxis = null) {
         var cl = color.HasValue ? color.Value.ValueOrSNull() : Colors.Navy;
-        var time = spec.Add.Signal(signals.Select(x => x.Real).ToArray(), 1/sr, cl);
+        var data = signals.Select(x => x.Real).ToArray();
+        var time = spec.Add.Signal(data, 1/sr, cl);
         //time.LineStyle.IsVisible = false;
         time.Data.XOffset = xOffset;
         time.Axes.YAxis = yAxis ??= spec.Axes.Left;
         time.Axes.XAxis = xAxis ??= spec.Axes.Bottom;
         xAxis.Label.Text = "Time";
         xAxis.Min = 0;
-        xAxis.Max = xOffset + (actualSamples ?? signals.Count) / sr;
+        xAxis.Max = xOffset + (actualSamples ?? data.Length) / sr;
         yAxis.Label.Text = "Signal Amplitude";
         if (cl.Try(out var c)) {
             time.LineStyle.Color = c;
@@ -154,7 +157,6 @@ public class FFT {
                                    0.4 * (1 + 3 * Sin(0.4 * i)) * Filters.Hann(i - 140, 180), N).NormalizeReals();
         var l1 = GraphRealSignals(plt, sr, data1, color: Colors.ForestGreen.WithAlpha(0.8));
         l1.Label = "Time Signal";
-        var fft = new OouraFFT();
         var freqs = fft.FFTToFreq(data1.ToArray());
         var l2 = GraphFrequencies(plt, sr, freqs);
         l2.LineStyle.Pattern = LinePattern.Dashed;
@@ -171,6 +173,96 @@ public class FFT {
         
         plt.ShowLegend();
         plt.SavePng("../../../../../correlation02.png", 3200, 700);
+    }
+
+    /// <summary>
+    /// Creates graph wavelet_basic which shows how wavelets compare to standard waves:
+    /// "Full wave matching" is a constant value, regardless of the amplitude of the original signal at a specific time.
+    /// Each Morlet wave is localized in time, but the more localized it is, the more subject it is to interference
+    ///  from other waves.
+    /// </summary>
+    [Test]
+    public async Task Wavelet1() {
+        var N = 2048;
+        var sr = 5120.0;
+        var plt = new Plot();
+        //Interference will occur at (73-60) = 13Hz intervals
+        var data = DataForFnAtRate(x => 2 * BMath.Lerp(0.18, 0.22, x, Cos(Tau * 55 * x), 0)
+                +  1 * Cos(Tau * 73 * x)
+            , sr, N);
+        var l1 = GraphRealSignals(plt, sr, data, color: Colors.Gray);
+        l1.Label = "Raw data";
+        l1.LineStyle.Pattern = LinePattern.Dotted;
+        var l1f = GraphFrequencies(plt, sr, fft.FFTToFreq(data.ToArray()));
+        l1f.Label = "Raw data as frequencies";
+
+        var wave = DataForFnAtRate(x => BMath.Cis(0.5, 60, x), sr, N).Normalize();
+
+        //Full wave matching matches against the "average" of the 60Hz wave, so it's a constant value over the range,
+        // even though the 60Hz wave fades out.
+        var ac = fft.Correlate(data.ToArray(), wave);
+        var lac = GraphRealSignals(plt, sr, ac.Select(x => new Complex(x.Magnitude, 0)), color: Maybe<Color>.None);
+        lac.Label = $"Full wave matching";
+
+        foreach (var ms in new[] { 50, 100, 200, 360 }) {
+                var morlet = DataForFilter(i => Filters.Morlet(i, (int)(sr * ms/1000.0), 60 / sr) * 10, N).Normalize();
+                var lmor = GraphRealSignals(plt, sr, morlet.Select(x => x * 100),
+                    color: Maybe<Color>.None);
+                lmor.LineStyle.Pattern = LinePattern.Dashed;
+                lmor.Label = $"{ms}ms Morlet wave (x100)";
+                var acm = fft.Correlate(data.ToArray(), morlet);
+                var lcm = GraphRealSignals(plt, sr, acm.Select(x => new Complex(x.Magnitude, 0)), color: Maybe<Color>.None);
+                lcm.Label = $"{ms}ms Morlet matching";
+        }
+        /*
+        var lr = GraphRealSignals(plt, sr, ac, color: Maybe<Color>.None);
+        lr.Label = $"Cos matching";
+        lr.LineStyle.Pattern = LinePattern.Dashed;
+        var li = GraphRealSignals(plt, sr, ac.Select(x => new Complex(x.Imaginary, 0)), color: Maybe<Color>.None);
+        li.Label = $"Sin matching";
+        li.LineStyle.Pattern = LinePattern.Dashed;*/
+
+        plt.Axes.Left.Min = -1;
+        plt.Axes.Left.Max = 2.4;
+        plt.ShowLegend();
+        plt.SavePng("../../../../../wavelet_basic.png", 3200, 1000);
+    }
+    
+    [Test]
+    public async Task Wavelet2() {
+        var N = 16384;
+        var sr = 44100.0;
+        var plt = new Plot();
+        var data = DataForFnAtRate(x => 
+            //Note how both the 60 and 80 Hz wavelets have synchronized depressions at a 20Hz rate-
+            // this is because a X Hz and Y Hz wave go entirely out of phase every (X-Y) Hz
+            BMath.Lerp(0.08, 0.24, x, 1.7 * Cos(Tau * 60 * x), 0) +
+            BMath.Lerp(0.2, 0.29, x, 1.2 * Cos(Tau * 80 * x + 1), 0) +
+            BMath.Lerp(0.24, 0.32, x, 0, 2 * Cos(Tau * 30 * x + 2))
+            , sr, N);
+        var l1 = GraphRealSignals(plt, sr, data, yAxis: plt.Axes.Right, color: Colors.Gray);
+        l1.Label = "Raw data";
+        l1.LineStyle.Pattern = LinePattern.Dotted;
+        //var l2 = GraphFrequencies(plt, sr, fft.FFTToFreq(data.ToArray()));
+        //l2.Label = "FFT frequencies";
+
+        foreach (var freq in new[] { 20, 30, 40, 50, 60, 70, 80, 90 }) {
+            var gauss = DataForFilter(i => Filters.Gaussian(i, 8096, sr/freq*0.1), N).NormalizeReals();
+            var ml = DataForFilter(i => Filters.Morlet(i, (int)(sr * 0.1), freq/sr), N).Conjugate();
+            ml = fft.ConvolveFilters(gauss, ml);
+            var eval = fft.Convolve(data.ToArray(), ml);
+            //eval = fft.Convolve(gauss, eval);
+            var l = GraphRealSignals(plt, sr, eval.SelectInPlace(x => x.Magnitude), color: Maybe<Color>.None);
+            l.Label = $"Morlet {freq}";
+            if (freq is 30 or 50 or 80)
+                l.LineStyle.Width = 4;
+        }
+
+        plt.Axes.Left.Min = 0;
+        plt.Axes.Left.Max = 40;
+        
+        plt.ShowLegend();
+        plt.SavePng("../../../../../wavelet_fft.png", 3200, 1000);
     }
     
     /// <summary>
@@ -232,14 +324,17 @@ public class FFT {
         var sr = 5120.0;
         var times = 5;
         var plt = new Plot();
+        var rng = new Random();
+        var fft = new OouraFFT();
         var data = Enumerable.Range(0, times).Select(i =>
-                DataForFn(x => 1 - Cos(Tau * 16 * (x + i * N) / sr), N))
+                DataForFn(x => 1 - Cos(Tau * 16 * (x + i * N) / sr) + rng.NextDouble() * 0.3, N))
             .Select((data, ii) => {
                 GraphRealSignals(plt, sr, data, xOffset: ii * N / sr, 
-                    color: Maybe<Color>.None);
+                    color: Maybe<Color>.None).LineStyle.Pattern = LinePattern.Dashed;
                 return data;
             });
-        var smear = new ChunkConvolver(new OouraFFT(), N, DataForFn(i => Filters.HalfHann(i, 511), 512).NormalizeReals());
+        var hhann = DataForFn(i => Filters.HalfHann(i, 121), 512).NormalizeReals();
+        var smear = new ChunkConvolver(new OouraFFT(), N, hhann);
         var ii = 0;
         smear.Subscribe(cv => GraphRealSignals(plt, sr, cv, xOffset: ii++ * N / sr));
         data.ToObservable().Subscribe(smear);
@@ -287,7 +382,7 @@ public class FFT {
         //Since SR/2=2560<2820, the 2820 frequency will appear as 2300
         //Since sr/N=5, all the frequencies except 1283 will have no leakage
         var freqs = new[] { 640, 1283, 1900, 2820 };
-        double Signal(double x) {
+        Complex Signal(double x) {
             double total = 0;
             for (int ii = 0; ii < freqs.Length; ++ii)
                 total += Cos(Tau * freqs[ii] * x);
@@ -442,7 +537,7 @@ public class FFT {
     [Test]
     public async Task TestPowerCalculationOnAudio() {
         //v2: logic based on power calculation
-        var fn = "../../../../../1-09 DYWTYLM.mp3";
+        var fn = "../../../../../short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
         double sr = file.WaveFormat.SampleRate;
         var fft = new OouraFFT();
@@ -507,6 +602,27 @@ public class FFT {
         
     }
 
+    
+    
+    [Test]
+    public async Task TestAutocorrelationCalculationOnAudio() {
+        var fn = "../../../../../short-perc-loop.mp3";
+        var file = new AudioFileReader(fn);
+        double sr = file.WaveFormat.SampleRate;
+        var fft = new OouraFFT();
+        var mp1 = new Plot();
+        var N = 262144;
+        var data = ChunkAudio(file, N).First();
+        GraphRealSignals(mp1, sr, data, color: Colors.FireBrick).Label = "Raw";
+        fft.Correlate(data, data.ToArray());
+        var l4 = GraphRealSignals(mp1, sr, data, yAxis: mp1.Axes.Right, color: Colors.BlueViolet);
+        l4.Label = "Autocorrelation";
+        
+        mp1.ShowLegend();
+        mp1.SavePng("../../../../../convSoundTimeAutocorrelation.png", 3800, 900);
+    }
+
+    
     [Test]
     public void TestFFT() {
         var indices = Enumerable.Range(0, 16).Select(x => new Complex(x, 0)).ToArray();
@@ -574,10 +690,10 @@ public class FFT {
         DoTest(true);
     }
     
-    private static double ExF1(double t) =>
+    private static Complex ExF1(double t) =>
         5 + 2 * Cos(Tau * t - PI / 2) + 3 * Cos(2 * Tau * t);
     
-    private static double ExF2(double t) =>
+    private static Complex ExF2(double t) =>
         5 + 4 * Cos(Tau * 1.4 * t - PI / 3) + 2.5 * Cos(1.7 * Tau * t);
 
 
@@ -586,7 +702,7 @@ public class FFT {
         Assert.AreEqual(a.Real, b.Real, err);
         Assert.AreEqual(a.Imaginary, b.Imaginary, err);
     }
-    private static void TestFourierForFn(IFFT fft, Func<double, double> fn, double period, int samples, bool print=false) {
+    private static void TestFourierForFn(IFFT fft, Func<double, Complex> fn, double period, int samples, bool print=false) {
         var data = DataForFnOverPeriod(fn, period, samples);
         if (print)
             PrintArr(data, x => $"{x.Real:F2}");

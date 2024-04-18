@@ -26,7 +26,9 @@ public class PrintAsReturnVisitor : DerivativePrintVisitor {
                 throw new Exception("Cannot return a loop/switch/try. Is this expression linearized?");
             case (BlockExpression bx):
                 return VisitBlock(bx);
-            case LabelExpression:
+            case LabelExpression le:
+                if (le.DefaultValue != null)
+                    return Visit(le.DefaultValue);
                 throw new Exception("Cannot return a label.");
             case UnaryExpression ue:
                 //Throw statements are their own returns

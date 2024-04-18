@@ -94,7 +94,7 @@ public abstract record TransitionBase<T> : ITransition {
         if (CToken?.IsHardCancelled() == true)
             throw new OperationCanceledException();
         var ienum = RunIEnum(ApplyStart(), WaitingUtils.GetCompletionAwaiter(out var t));
-        cors.Run(ienum, options ?? new CoroutineOptions(CToken == null));
+        cors.Run(ienum, options ?? CoroutineOptions.DefaultWith(CToken == null));
         return await t;
     }
 
@@ -122,8 +122,8 @@ public static class TransitionHelpers {
         ICancellee? cT = null) =>
         TweenTo(start, GetMulOp<T>()(start, by), time, apply, ease, cT);
 
-    public static ITransition Then(this ITransition tw, ITransition next) => new SequentialTransition(() => tw, () => next);
-    public static ITransition Then(this ITransition tw, Func<ITransition> next) => new SequentialTransition(() => tw, next);
+    public static ITransition Then(this ITransition tw, ITransition next) => new SequentialTransition(new(tw), new(next));
+    public static ITransition Then(this ITransition tw, Func<ITransition> next) => new SequentialTransition(new(tw), next);
     public static ITransition Parallel(params ITransition[] tws) => new ParallelTransition(tws);
     public static ITransition Parallel(this ITransition tw, params ITransition[] tws) => new ParallelTransition(tws.Prepend(tw).ToArray());
     public static ITransition Loop(this ITransition tw, int? times = null) => new LoopTransition(tw, times);

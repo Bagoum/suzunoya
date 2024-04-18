@@ -104,7 +104,7 @@ public class Rendered : Transform, IRendered {
     public void AddToRenderGroup(RenderGroup group, int? sortingID = null) {
         if (group.Container != Container)
             throw new Exception($"Cannot add rendered {this} to a render group in a different VNState");
-        SortingID.OnNext(sortingID ?? group.NextSortingID());
+        SortingID.BaseValue = sortingID ?? group.NextSortingID();
         renderGroupToken?.Dispose();
         renderGroupToken = group.Add(this);
         RenderGroup.Value = group;

@@ -101,6 +101,26 @@ public class Cancellable : ICancellable {
     
     /// <inheritdoc/>
     public ICancellee Token => this;
+
+    /// <summary>
+    /// Cancel a token, and then replace it with a new one.
+    /// </summary>
+    public static ICancellee Replace(ref Cancellable? cT) {
+        cT?.Cancel();
+        return cT = new();
+    }
+
+    /// <summary>
+    /// Return a <see cref="MinCancellee"/> that is cancelled when both
+    ///  of the source cancellees are cancelled.
+    /// </summary>
+    public static ICancellee Extend(ICancellee cT, ICancellee? other) {
+        if (other?.Cancelled is not false)
+            return cT;
+        if (cT.Cancelled)
+            return other;
+        return new MinCancellee(cT, other);
+    }
 }
 
 /// <summary>
@@ -108,6 +128,7 @@ public class Cancellable : ICancellable {
 /// <br/>Note that `new JointCancellable(parent)` is almost the same as `new JointCancellee(parent, new Cancellable())`,
 ///  but this is slightly more garbage-efficient.
 /// </summary>
+[PublicAPI]
 public class JointCancellable : ICancellable {
     private int localCancelLevel;
     /// <summary>
@@ -118,6 +139,12 @@ public class JointCancellable : ICancellable {
     public int CancelLevel => Math.Max(Parent.CancelLevel, localCancelLevel);
     /// <inheritdoc/>
     public bool Cancelled => CancelLevel > 0;
+    
+    /// <summary>
+    /// True if Cancel was called on this token, regardless of whether or not
+    /// the parent token is cancelled.
+    /// </summary>
+    public bool LocallyCancelled => localCancelLevel > 0;
 
     /// <summary>
     /// Create a <see cref="JointCancellable"/>.
@@ -191,8 +218,26 @@ public class JointCancellee : ICancellee {
     /// </summary>
     public static ICancellee From(ICancellee? c1, ICancellee? c2) {
         if (c1 == null) return c2 ?? Cancellable.Null;
-        if (c2 == null) return c1 ?? Cancellable.Null;
+        if (c2 == null) return c1;
         return new JointCancellee(c1, c2);
+    }
+}
+
+/// <summary>
+/// A cancel token that is cancelled when both of its parents are cancelled.
+/// </summary>
+[PublicAPI]
+public class MinCancellee(ICancellee c1, ICancellee c2) : ICancellee {
+    /// <inheritdoc/>
+    public int CancelLevel => Math.Min(c1.CancelLevel, c2.CancelLevel);
+
+    /// <summary>
+    /// Create a cancellee from two parents. If either is null, the other will be directly returned.
+    /// </summary>
+    public static ICancellee From(ICancellee? c1, ICancellee? c2) {
+        if (c1 is null) return c2 ?? Cancellable.Null;
+        if (c2 is null) return c1;
+        return new MinCancellee(c1, c2);
     }
 }
 

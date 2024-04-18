@@ -12,48 +12,50 @@ namespace BagoumLib.Events {
 /// An observable that tracks its last published value.
 /// </summary>
 [PublicAPI]
-public interface IBObservable<T> : IObservable<T> {
+public interface IBObservable<out T> : IObservable<T> {
     /// <summary>
-    /// The last value published by this observable.
+    /// Whether or not this observable has ever published a vlaue.
     /// </summary>
-    Maybe<T> LastPublished { get; }
+    bool HasValue { get; }
+    
+    /// <summary>
+    /// The last published value of this observable.
+    /// <br/>Undefined behavior if <see cref="HasValue"/> is false.
+    /// </summary>
+    T Value { get; }
 }
 
 /// <summary>
 /// An observable that has a "current" value.
 /// </summary>
 [PublicAPI]
-public interface ICObservable<T> : IBObservable<T> {
-    Maybe<T> IBObservable<T>.LastPublished => Value;
-    /// <summary>
-    /// The current value of this observable. <see cref="IBObservable{T}.LastPublished"/> always points to this.
-    /// </summary>
-    T Value { get; }
+public interface ICObservable<out T> : IBObservable<T> {
+    bool IBObservable<T>.HasValue => true;
 }
 
 /// <summary>
 /// A subject that tracks its last published observable value.
 /// </summary>
 [PublicAPI]
-public interface IBSubject<T, U> : ISubject<T, U>, IBObservable<U> { }
+public interface IBSubject<in T, out U> : ISubject<T, U>, IBObservable<U>;
 
 /// <summary>
 /// A subject that has a "current" value.
 /// </summary>
 [PublicAPI]
-public interface ICSubject<T, U> : IBSubject<T, U>, ICObservable<U> { }
+public interface ICSubject<in T, out U> : IBSubject<T, U>, ICObservable<U>;
 
 /// <summary>
 /// A subject that tracks its last published observable value.
 /// </summary>
 [PublicAPI]
-public interface IBSubject<T> : ISubject<T>, IBSubject<T, T> { }
+public interface IBSubject<T> : ISubject<T>, IBSubject<T, T>;
 
 /// <summary>
 /// A subject that has a "current" value.
 /// </summary>
 [PublicAPI]
-public interface ICSubject<T> : IBSubject<T>, ICSubject<T, T> { }
+public interface ICSubject<T> : IBSubject<T>, ICSubject<T, T>;
 
 /// <summary>
 /// A subject that observes elements of type T, maps them to type U, and publishes mapped elements to observers.
@@ -62,9 +64,11 @@ public interface ICSubject<T> : IBSubject<T>, ICSubject<T, T> { }
 public class Event<T, U> : IBSubject<T, U> {
     private readonly DMCompactingArray<IObserver<U>> callbacks = new();
     private readonly List<IDisposable> tokens = new();
-    
     /// <inheritdoc/>
-    public Maybe<U> LastPublished { get; private set; } = Maybe<U>.None;
+    public bool HasValue { get; private set; } = false;
+
+    /// <inheritdoc/>
+    public U Value { get; private set; } = default!;
     
     
     private readonly Func<T, U> mapper;
@@ -103,7 +107,8 @@ public class Event<T, U> : IBSubject<T, U> {
     /// <inheritdoc/>
     public virtual void OnNext(T value) {
         var mvalue = mapper(value);
-        LastPublished = Maybe<U>.Of(mvalue);
+        HasValue = true;
+        Value = mvalue;
         var ct = callbacks.Count;
         var nulled = 0;
         for (int ii = 0; ii < ct; ++ii) {

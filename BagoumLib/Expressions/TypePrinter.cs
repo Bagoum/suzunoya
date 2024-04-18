@@ -83,13 +83,13 @@ public class CSharpTypePrinter : ITypePrinter {
                     s;
         }
         if (t.IsArray)
-            return PrependEnclosure($"{Print(t.GetElementType()!)}[]");
+            return $"{Print(t.GetElementType()!)}[]";
         if (t.IsConstructedGenericType) {
             var gt = t.GetGenericTypeDefinition();
             var args = string.Join(", ", t.GenericTypeArguments.Select(Print));
-            return PrependEnclosure(tupleTypes.Contains(gt) ? 
+            return tupleTypes.Contains(gt) ? 
                 $"({args})" : 
-                $"{Print(gt)}<{args}>");
+                $"{Print(gt)}<{args}>";
         }
         if (t.IsGenericType) {
             int cutFrom = t.Name.IndexOf('`');

@@ -8,6 +8,23 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.Events {
 /// <summary>
+/// <see cref="DisturbedEvented{D,V}"/> with only the first type parameter (type of disturbance effect).
+/// </summary>
+public interface IDisturbable<D> {
+    /// <summary>
+    /// Add a disturbance.
+    /// Whenver the disturbance receives a new value, this aggregate will update as well.
+    /// </summary>
+    IDisposable AddDisturbance(IBObservable<D> disturbance);
+    
+    /// <summary>
+    /// Add a constant value disturbance.
+    /// This aggregate will also update immediately.
+    /// </summary>
+    IDisposable AddConst(D value);
+}
+
+/// <summary>
 /// DisturbedEvented is a wrapper around a core value (eg. a location) that can be modified by any number
 ///  of disturbance effects (eg. shake effects) that all use the same aggregation function (eg. addition).
 /// <br/>Note that <see cref="get_Value"/> and the event listeners
@@ -16,51 +33,53 @@ namespace BagoumLib.Events {
 ///  will also set the core value.
 /// <br/>Note that, like <see cref="Evented{T}"/>, new subscribers will be sent the current value immediately.
 /// </summary>
+/// <typeparam name="D">Type of disturbance effect.</typeparam>
+/// <typeparam name="V">Type of output value.</typeparam>
 [PublicAPI]
-public abstract class DisturbedEvented<T> : ICSubject<T> {
-    private T _baseValue;
+public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> {
+    private V _baseValue;
     /// <summary>
     /// Initial (aggregation seed) value.
     /// </summary>
-    public T BaseValue {
+    public V BaseValue {
         get => _baseValue;
         set {
             this._baseValue = value;
             DoPublishIfNotSame();
         }
     }
-    private T ComputeValue() {
+    private V ComputeValue() {
         var agg = _baseValue;
         disturbances.Compact();
         for (int ii = 0; ii < disturbances.Count; ++ii)
-            if (disturbances[ii].LastPublished.Try(out var right))
-                agg = Fold(agg, right);
+            if (disturbances[ii].HasValue)
+                agg = Fold(agg, disturbances[ii].Value);
         return agg;
     }
     
     /// <summary>
     /// Aggregate value. Note that the set operator modifies <see cref="BaseValue"/>.
     /// </summary>
-    public T Value {
+    public V Value {
         get => onSet.Value;
         set => BaseValue = value;
     }
 
-    private readonly Evented<T> onSet;
-    private readonly DMCompactingArray<IBObservable<T>> disturbances = new();
+    private readonly Evented<V> onSet;
+    private readonly DMCompactingArray<IBObservable<D>> disturbances = new();
 
     /// <summary>
     /// The initial value is published to onSet.
     /// </summary>
-    public DisturbedEvented(T val) {
+    public DisturbedEvented(V val) {
         _baseValue = val;
-        onSet = new Evented<T>(ComputeValue());
+        onSet = new Evented<V>(ComputeValue());
     }
 
     /// <summary>
     /// Get the aggregate value.
     /// </summary>
-    public static implicit operator T(DisturbedEvented<T> evo) => evo.Value;
+    public static implicit operator V(DisturbedEvented<D, V> evo) => evo.Value;
 
     /// <summary>
     /// Function that aggregates values.
@@ -68,34 +87,28 @@ public abstract class DisturbedEvented<T> : ICSubject<T> {
     /// <param name="acc">Accumulated value</param>
     /// <param name="next">Next value to fold into acc</param>
     /// <returns></returns>
-    protected abstract T Fold(T acc, T next);
+    protected abstract V Fold(V acc, D next);
     
-    /// <summary>
-    /// Add a disturbance.
-    /// Whenver the disturbance receives a new value, this aggregate will update as well.
-    /// </summary>
-    public IDisposable AddDisturbance(IBObservable<T> disturbance) {
+    /// <inheritdoc/>
+    public IDisposable AddDisturbance(IBObservable<D> disturbance) {
         var trackToken = disturbances.Add(disturbance);
         var updateToken = disturbance.Subscribe(_ => DoPublishIfNotSame());
         return new JointDisposable(DoPublishIfNotSame, trackToken, updateToken);
     }
 
-    /// <summary>
-    /// Add a constant value disturbance.
-    /// This aggregate will also update immediately.
-    /// </summary>
-    public IDisposable AddConst(T value) {
-        var trackToken = disturbances.Add(new ConstantObservable<T>(value));
+    /// <inheritdoc/>
+    public IDisposable AddConst(D value) {
+        var trackToken = disturbances.Add(new ConstantObservable<D>(value));
         DoPublishIfNotSame();
         return new JointDisposable(DoPublishIfNotSame, trackToken);
     }
 
     /// <summary>
-    /// Copy the disturbances from another <see cref="DisturbedEvented{T}"/>.
+    /// Copy the disturbances from another <see cref="DisturbedEvented{T,U}"/>.
     /// The copied disturbances will be bound by the same <see cref="IDisposable"/>s as the original.
     /// </summary>
     /// <param name="src"></param>
-    public void CopyDisturbances(DisturbedEvented<T> src) {
+    public void CopyDisturbances(DisturbedEvented<D,V> src) {
         for (int ii = 0; ii < src.disturbances.Count; ++ii)
             if (src.disturbances.GetMarkerIfExistsAt(ii, out var m)) {
                 m.DisallowPooling();
@@ -106,7 +119,7 @@ public abstract class DisturbedEvented<T> : ICSubject<T> {
 
     private void DoPublishIfNotSame() {
         var nxt = ComputeValue();
-        if (EqualityComparer<T>.Default.Equals(nxt, Value))
+        if (EqualityComparer<V>.Default.Equals(nxt, Value))
             return;
         onSet.OnNext(nxt);
     }
@@ -120,10 +133,10 @@ public abstract class DisturbedEvented<T> : ICSubject<T> {
     }
     
     /// <inheritdoc/>
-    public IDisposable Subscribe(IObserver<T> observer) => onSet.Subscribe(observer);
+    public IDisposable Subscribe(IObserver<V> observer) => onSet.Subscribe(observer);
 
     /// <inheritdoc/>
-    public void OnNext(T value) => BaseValue = value;
+    public void OnNext(V value) => BaseValue = value;
 
     /// <inheritdoc/>
     public void OnError(Exception error) => onSet.OnError(error);
@@ -138,36 +151,98 @@ public abstract class DisturbedEvented<T> : ICSubject<T> {
 /// <summary>
 /// An aggregator that does a fold (reduction) over all values using the provided monoidal addition function.
 /// </summary>
-/// <typeparam name="T"></typeparam>
 [PublicAPI]
-public class DisturbedFold<T> : DisturbedEvented<T> {
-    private readonly Func<T, T, T> folder;
+public class DisturbedFold<D> : DisturbedEvented<D, D> {
+    private readonly Func<D, D, D> folder;
     /// <summary>
     /// </summary>
-    public DisturbedFold(T val, Func<T, T, T> folder) : base(val) {
+    public DisturbedFold(D val, Func<D, D, D> folder) : base(val) {
         this.folder = folder;
     }
     /// <inheritdoc/>
-    protected override T Fold(T acc, T next) => folder(acc, next);
+    protected override D Fold(D acc, D next) => folder(acc, next);
+}
+
+/// <summary>
+/// An aggregator that does a fold (reduction) over all values using the provided combination function.
+/// </summary>
+[PublicAPI]
+public class DisturbedFold<D, V> : DisturbedEvented<D, V> {
+    private readonly Func<V, D, V> folder;
+    /// <summary>
+    /// </summary>
+    public DisturbedFold(V val, Func<V, D, V> folder) : base(val) {
+        this.folder = folder;
+    }
+    /// <inheritdoc/>
+    protected override V Fold(V acc, D next) => folder(acc, next);
+}
+
+/// <summary>
+/// Interface for elements that can be combined in <see cref="DisturbedAggregation{D}"/>.
+/// </summary>
+/// <typeparam name="D"></typeparam>
+public interface IAggregator<D> {
+    /// <summary>
+    /// Fold this value onto the accumulated value.
+    /// </summary>
+    D FoldOnto(D acc);
+}
+
+/// <summary>
+/// An element that can be combined in <see cref="DisturbedAggregation{D}"/>.
+/// </summary>
+public record Aggregator<D, I> : IAggregator<D> {
+    /// <summary>
+    /// Data contained in this element.
+    /// </summary>
+    public I Data { get; set; }
+    /// <summary>
+    /// Method for combining this element's data with the accumulator.
+    /// </summary>
+    public Func<D,I,D> Folder { get; set; }
+    
+    /// <inheritdoc cref="Aggregator{D,I}"/>
+    public Aggregator(I Data, Func<D,I,D> Folder) {
+        this.Data = Data;
+        this.Folder = Folder;
+    }
+
+    /// <inheritdoc/>
+    public D FoldOnto(D acc) => Folder(acc, Data);
+}
+
+/// <summary>
+/// An aggregator that folds functions of type T->T onto a base value of type T.
+/// </summary>
+[PublicAPI]
+public class DisturbedAggregation<D> : DisturbedEvented<IAggregator<D>, D> {
+    /// <summary>
+    /// </summary>
+    public DisturbedAggregation(D val) : base(val) {
+    }
+
+    /// <inheritdoc/>
+    protected override D Fold(D acc, IAggregator<D> next) => next.FoldOnto(acc);
 }
 
 /// <summary>
 /// Get the most recent value.
 /// </summary>
 [PublicAPI]
-public class OverrideEvented<T> : DisturbedEvented<T> {
+public class OverrideEvented<D> : DisturbedEvented<D, D> {
     /// <summary>
     /// </summary>
-    public OverrideEvented(T val) : base(val) { }
+    public OverrideEvented(D val) : base(val) { }
     /// <inheritdoc/>
-    protected override T Fold(T acc, T next) => next;
+    protected override D Fold(D acc, D next) => next;
 }
 
 /// <summary>
 /// Get the sum of all values.
 /// </summary>
 [PublicAPI]
-public class DisturbedSum<T> : DisturbedEvented<T> {
+public class DisturbedSum<T> : DisturbedEvented<T, T> {
     private static readonly (T zero, Func<T, T, T> add) monoid = GenericOps.GetAddOp<T>();
     /// <summary>
     /// Get the sum of all values with the monoidal zero.
@@ -191,7 +266,7 @@ public class DisturbedSum<T> : DisturbedEvented<T> {
 /// Get the product of all values.
 /// </summary>
 [PublicAPI]
-public class DisturbedProduct<T> : DisturbedEvented<T> {
+public class DisturbedProduct<T> : DisturbedEvented<T, T> {
     private static readonly (T zero, Func<T, T, T> add) monoid = GenericOps.GetVecMulOp<T>();
     
     /// <summary>
@@ -217,7 +292,7 @@ public class DisturbedProduct<T> : DisturbedEvented<T> {
 /// Get the AND of all provided values (true when all values are true).
 /// </summary>
 [PublicAPI]
-public class DisturbedAnd : DisturbedEvented<bool> {
+public class DisturbedAnd : DisturbedEvented<bool, bool> {
     /// <summary>
     /// </summary>
     /// <param name="first">Initial value (true by default)</param>
@@ -231,7 +306,7 @@ public class DisturbedAnd : DisturbedEvented<bool> {
 /// Get the OR of all provided values (true when any value is true).
 /// </summary>
 [PublicAPI]
-public class DisturbedOr : DisturbedEvented<bool> {
+public class DisturbedOr : DisturbedEvented<bool, bool> {
     /// <summary>
     /// </summary>
     /// <param name="first">Initial value (false by default)</param>

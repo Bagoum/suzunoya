@@ -29,6 +29,7 @@ public static class ReflectionUtils {
         typeof(Func<,,,,,,,,,,,,,>),
     };
     private static readonly Type[] ActionTypesByArity = {
+        typeof(Action),
         typeof(Action<>),
         typeof(Action<,>),
         typeof(Action<,,>),
@@ -68,9 +69,9 @@ public static class ReflectionUtils {
     /// Get the action type typeof(Action&lt;,,,,...&gt;), where arity is the number of generic arguments.
     /// </summary>
     public static Type GetActionType(int arity) {
-        if (arity <= 0 || arity > FuncTypesByArity.Length)
+        if (arity < 0 || arity > FuncTypesByArity.Length)
             throw new Exception($"Action type arity not supported: {arity}");
-        return ActionTypesByArity[arity - 1];
+        return ActionTypesByArity[arity];
     }
 
     /// <summary>
@@ -195,5 +196,10 @@ public static class ReflectionUtils {
     public static T _StaticField<T>(this Type t, string prop) => (T) (t
         .GetField(prop, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(null)
     ?? throw new Exception($"static {prop}<{typeof(T)}> not found"));
+
+    /// <summary>
+    /// Get all the values of the enum `T`.
+    /// </summary>
+    public static T[] GetEnumVals<T>() => Enum.GetValues(typeof(T)).Cast<T>().ToArray();
 }
 }

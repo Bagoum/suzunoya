@@ -17,6 +17,9 @@ public static class WaitingUtils {
         return () => tcs.SetResult(true);
     }
 
+    /// <summary>
+    /// Get an action that completes a task.
+    /// </summary>
     public static Action<Completion> GetCompletionAwaiter(out Task<Completion> t) {
         var tcs = new TaskCompletionSource<Completion>();
         t = tcs.Task;

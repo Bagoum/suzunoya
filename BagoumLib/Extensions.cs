@@ -203,6 +203,11 @@ public static class Extensions {
     /// Returns the square magnitude of a complex number.
     /// </summary>
     public static double SqrMagnitude(this Complex num) => num.Real * num.Real + num.Imaginary * num.Imaginary;
+
+    /// <summary>
+    /// Create a delegate that returns a value.
+    /// </summary>
+    public static Func<T> Freeze<T>(this T obj) => () => obj;
 }
 
 /// <summary>
@@ -284,13 +289,24 @@ public static class ArrayExtensions {
     /// Returns the first T such that the associated priority is LEQ the given priority.
     /// Make sure the array is sorted from lowest to highest priority.
     /// </summary>
-    public static T GetBounded<T>(this (int priority, T)[] arr, int priority, T deflt) {
-        var result = deflt;
+    public static Maybe<T> GetBounded<T>(this (int priority, T)[] arr, int priority) {
+        var result = Maybe<T>.None;
         for (int ii = 0; ii < arr.Length; ++ii) {
             if (priority >= arr[ii].priority) result = arr[ii].Item2;
             else break;
         }
         return result;
+    }
+    
+    /// <summary>
+    /// Returns the first T such that the associated priority is EQUAL TO the given priority.
+    /// </summary>
+    public static Maybe<T> GetAtPriority<T>(this (int priority, T)[] arr, int priority) {
+        for (int ii = 0; ii < arr.Length; ++ii) {
+            if (priority == arr[ii].priority) 
+                return arr[ii].Item2;
+        }
+        return Maybe<T>.None;
     }
     
     /// <summary>
@@ -660,10 +676,19 @@ public static class IEnumExtensions {
 }
 
 /// <summary>
-/// Static class providing extensions for <see cref="List{T}"/>
+/// Static class providing extensions for <see cref="List{T}"/>.
 /// </summary>
 [PublicAPI]
 public static class ListExtensions {
+    /// <summary>
+    /// Remove and return the last element of a list.
+    /// </summary>
+    public static T Pop<T>(this List<T> arr) {
+        var last = arr[^1];
+        arr.RemoveAt(arr.Count - 1);
+        return last;
+    }
+    
     /// <summary>
     /// Update each element of a list in-place using the mapping function.
     /// </summary>
@@ -911,12 +936,28 @@ public static class DataStructureExtensions {
 /// </summary>
 [PublicAPI]
 public static class EventExtensions {
+    /// <summary>
+    /// Run `ev.OnNext` and then `ev.OnCompleted`.
+    /// </summary>
+    public static void Finalize<T>(this IObserver<T> ev, T value) {
+        ev.OnNext(value);
+        ev.OnCompleted();
+    }
 
     /// <summary>
     /// Get an <see cref="IObservable{Unit}"/> that is triggered when the source event is triggered,
     ///  but does not carry its value.
     /// </summary>
     public static IBObservable<Unit> Erase<T>(this IBObservable<T> ev) => ev.Map(_ => Unit.Default);
+
+    /// <summary>
+    /// Create an <see cref="Evented{T,U}"/> that maps the source values into another type.
+    /// </summary>
+    public static ICObservable<U> Select<T, U>(this ICObservable<T> source, Func<T, U> map) {
+        var mapEv = new Evented<T, U>(map(source.Value), map);
+        source.Subscribe(mapEv);
+        return mapEv;
+    }
 }
 
 }

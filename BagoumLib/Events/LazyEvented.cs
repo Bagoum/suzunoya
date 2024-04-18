@@ -9,7 +9,8 @@ namespace BagoumLib.Events {
 /// <summary>
 /// An event wrapper around a zero-argument function whose value may change unpredictably.
 /// <br/>This wrapper will only publish return values of the wrapped function when
-///  one of the provided triggers is updated.
+///  one of the provided triggers is updated or <see cref="Recompute"/> is called.
+/// <br/>If the value does not change, this wrapper will not publish anything.
 /// </summary>
 [PublicAPI]
 public class LazyEvented<T> : ICSubject<T> {

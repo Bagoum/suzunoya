@@ -20,19 +20,23 @@ public class TestTween {
 
     private static Task<Completion> TestSteps<T>(ITransition t, Coroutines? cors, Func<T> value, T[] expected, Action<T, T> assertEq, bool lastIsComplete = true) {
         cors ??= new Coroutines();
-        var tw = t.Run(cors);
-        for (int ii = 0; ii < expected.Length; ++ii) {
-            cors.Step();
-            if (lastIsComplete && ii == expected.Length - 1)
-                Assert.IsTrue(tw.IsCompleted);
-            else
-                Assert.IsFalse(tw.IsCompleted);
+        var tw = t.Run(cors, CoroutineOptions.Default);
+        void DoCompare(int ii) {
             try {
                 assertEq(value(), expected[ii]);
             } catch (Exception e) {
                 Console.WriteLine($"Failed steps comparison at index {ii}");
                 throw;
             }
+        }
+        DoCompare(0);
+        for (int ii = 1; ii < expected.Length; ++ii) {
+            cors.Step();
+            DoCompare(ii);
+            if (lastIsComplete && ii == expected.Length - 1)
+                Assert.IsTrue(tw.IsCompleted);
+            else
+                Assert.IsFalse(tw.IsCompleted);
         }
         return tw;
     }
@@ -72,32 +76,38 @@ public class TestTween {
         var v = new Vector2(-2, -2);
         var cors = new Coroutines();
         var ct = new Cancellable();
-        var tw = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct)).Run(cors);
-        cors.Step();
+        var tw = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct))
+            .Run(cors, CoroutineOptions.Default);
+        VecEq(v, Vector2.Zero);
         cors.Step();
         VecEq(v, Vector2.One / 20f);
+        cors.Step();
+        VecEq(v, Vector2.One / 10f);
         ct.Cancel(1);
         cors.Step();
         VecEq(v, Vector2.One);
         Assert.AreEqual(tw.Result, Completion.SoftSkip);
         
         ct = new Cancellable();
-        tw = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct)).Run(cors);
-        cors.Step();
+        tw = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 20, x => v = x, Easers.ELinear, ct))
+            .Run(cors, CoroutineOptions.Default);
+        VecEq(v, Vector2.Zero);
         cors.Step();
         VecEq(v, Vector2.One / 20f);
+        cors.Step();
+        VecEq(v, Vector2.One / 10f);
         ct.Cancel(2);
         cors.Step();
-        VecEq(v, Vector2.One / 20f);
+        VecEq(v, Vector2.One / 10f);
         Assert.IsTrue(tw.IsCanceled);
         
         
         ct = new Cancellable();
         var t0 = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 5, x => v = x, Easers.ELinear, ct));
-        tw = t0.Then(t0.Reverse()).Run(cors);
-        cors.Step();
+        tw = t0.Then(t0.Reverse()).Run(cors, CoroutineOptions.Default);
         cors.Step();
         VecEq(v, new Vector2(0.2f, 0.2f));
+        cors.Step();
         ct.Cancel(1);
         cors.Step();
         VecEq(v, Vector2.Zero);
@@ -105,13 +115,13 @@ public class TestTween {
         
         ct = new Cancellable();
         t0 = (TransitionHelpers.TweenTo(Vector2.Zero, Vector2.One, 5, x => v = x, Easers.ELinear, ct));
-        tw = t0.Then(t0.Reverse()).Run(cors);
-        cors.Step();
+        tw = t0.Then(t0.Reverse()).Run(cors, CoroutineOptions.Default);
         cors.Step();
         VecEq(v, new Vector2(0.2f, 0.2f));
+        cors.Step();
         ct.Cancel(2);
         cors.Step();
-        VecEq(v, new Vector2(0.2f, 0.2f));
+        VecEq(v, new Vector2(0.4f, 0.4f));
         Assert.IsTrue(tw.IsCanceled);
     }
     

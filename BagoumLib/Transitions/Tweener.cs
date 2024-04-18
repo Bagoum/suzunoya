@@ -183,14 +183,17 @@ public record DeltaTweener<T> : TransitionBase<T> {
     
 }
 
-public record SequentialTransition(params Func<ITransition>[] states) : ITransition {
+/// <summary>
+/// A transition that runs multiple transitions in sequence.
+/// </summary>
+public record SequentialTransition(params Delayed<ITransition>[] states) : ITransition {
     /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
         var c = Completion.Standard;
         for (int ii = 0; ii < states.Length; ++ii) {
             try {
                 //Report last state
-                c = await states[ii]().Run(cors, options);
+                c = await states[ii].Value.Run(cors, options);
             } catch (OperationCanceledException) {
                 c = Completion.Cancelled;
             }
@@ -201,9 +204,13 @@ public record SequentialTransition(params Func<ITransition>[] states) : ITransit
 
     /// <inheritdoc/>
     public ITransition With(ICancellee cT, Func<float> dTProvider) =>
-        new SequentialTransition(states.Select<Func<ITransition>, Func<ITransition>>(s => () => s().With(cT, dTProvider)).ToArray());
+        new SequentialTransition(states.Select(s => s.FMap(tr => tr.With(cT, dTProvider))).ToArray());
 }
 
+
+/// <summary>
+/// A transition that runs multiple transitions in parallel.
+/// </summary>
 public record ParallelTransition(params ITransition[] states) : ITransition {
     /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {
@@ -224,6 +231,10 @@ public record ParallelTransition(params ITransition[] states) : ITransition {
         new ParallelTransition(states.Select(s => s.With(cT, dTProvider)).ToArray());
 }
 
+
+/// <summary>
+/// A transition that loops a child transition.
+/// </summary>
 public record LoopTransition(ITransition subj, int? count = null) : ITransition {
     /// <inheritdoc/>
     public async Task<Completion> Run(ICoroutineRunner cors, CoroutineOptions? options = null) {

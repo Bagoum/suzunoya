@@ -250,21 +250,26 @@ public class PrintVisitor : PrintVisitorAbs {
         Add(undoNewline, dedent, newline, "}");
         return node;
     }
+    
+    public Expression VisitConditionalAsIfElse(ConditionalExpression node) {
+        Add("if (");
+        Visit(node.Test);
+        Add(") {", indent, newline);
+        Stmter.Visit(node.IfTrue);
+        Add(undoNewline, dedent, newline, "}");
+        if (node.IfFalse is not DefaultExpression) {
+            Add(" else {", indent, newline);
+            Stmter.Visit(node.IfFalse);
+            Add(undoNewline, dedent, newline, "}");
+        }
+        return node;
+    }
 
     /// <inheritdoc />
     protected override Expression VisitConditional(ConditionalExpression node) {
         if (node.Type == typeof(void)) {
             //if/else handling
-            Add("if (");
-            Visit(node.Test);
-            Add(") {", indent, newline);
-            Stmter.Visit(node.IfTrue);
-            Add(undoNewline, dedent, newline, "}");
-            if (node.IfFalse is not DefaultExpression) {
-                Add(" else {", indent, newline);
-                Stmter.Visit(node.IfFalse);
-                Add(undoNewline, dedent, newline, "}");
-            }
+            return VisitConditionalAsIfElse(node);
         } else {
             //ternary handling
             Parener.Visit(node.Test);
@@ -273,8 +278,8 @@ public class PrintVisitor : PrintVisitorAbs {
             Add(" :", newline);
             Parener.Visit(node.IfFalse);
             Add(dedent);
+            return node;
         }
-        return node;
     }
 
     /// <inheritdoc />
@@ -313,8 +318,7 @@ public class PrintVisitor : PrintVisitorAbs {
         else if (node.Kind == GotoExpressionKind.Break)
             Add("break");
         else if (node.Kind == GotoExpressionKind.Return) {
-            Add("return ");
-            Visit(node.Value);
+            Returner.Visit(node.Value);
         } else
             Add("goto ", new Label(node.Target));
         return node;
@@ -471,6 +475,15 @@ public class PrintVisitor : PrintVisitorAbs {
                 Add(new TypeName(node.Method.DeclaringType));
         }
         Add($".{node.Method.Name}");
+        if (node.Method.IsGenericMethod) {
+            Add("<");
+            var gargs = node.Method.GetGenericArguments();
+            foreach (var (i, t) in gargs.Enumerate()) {
+                if (i > 0) Add(",");
+                Add(new TypeName(t));
+            }
+            Add(">");
+        }
         VisitArguments(node.Arguments, node.Method.GetParameters());
         return node;
     }

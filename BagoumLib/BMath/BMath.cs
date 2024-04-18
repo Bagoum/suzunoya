@@ -111,6 +111,13 @@ public static class BMath {
     }
     
     /// <summary>
+    /// Lerp between `a` and `b` (clamped) based on `controller` being between `low` and `high`.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static double Lerp(double low, double high, double controller, double a, double b) =>
+        Lerp(a, b, (controller - low) / (high - low));
+    
+    /// <summary>
     /// Lerp between a and b with t as a controller (clamped to [0, 1]).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -151,6 +158,17 @@ public static class BMath {
     /// =sin(pi*x)/(pi*x)
     /// </summary>
     public static double Sinc(double x) => x == 0 ? 1 : Math.Sin(PI * x) / (PI * x);
+
+    /// <summary>
+    /// =e^ix
+    /// </summary>
+    public static Complex Cis(double x) => new(Math.Cos(x), Math.Sin(x));
+    
+    /// <summary>
+    /// =amp * e^2ipi*freq*x
+    /// </summary>
+    public static Complex Cis(double amplitude, double freq, double x) => 
+        new(amplitude * Math.Cos(2 * Math.PI * freq * x), amplitude * Math.Sin(2 * Math.PI * freq * x));
 
     /// <summary>
     /// Returns (target+n*mod) to minimize |src - (target+n*mod)|.

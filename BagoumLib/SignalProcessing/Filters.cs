@@ -30,7 +30,7 @@ public static class Filters {
     /// <summary>
     /// A filter that returns the same source data.
     /// </summary>
-    public static double Identity(int i) => (i == 0) ? 1 : 0;
+    public static Complex Identity(int i) => (i == 0) ? 1 : 0;
 
     /// <summary>
     /// The symmetric Tukey window over the range [-(N-1)/2,(N-1)/2]. Any outside elements will be zeroed.
@@ -51,6 +51,7 @@ public static class Filters {
     }
 
     private static readonly double sqrtTau = Math.Sqrt(2 * Math.PI);
+    private static readonly double sqrtSqrtPi = Math.Sqrt(Math.Sqrt(PI));
     
     /// <summary>
     /// Gaussian filter centered at 0. (Has an inbuilt Tukey filter to zero out elements outside the range.)
@@ -78,7 +79,22 @@ public static class Filters {
                / (sigma * sigma * sigma * sqrtTau)
                 * Tukey(i, N, 0.1);
     }
-    
+
+    /// <summary>
+    /// Create a Morlet wavelet with a normalized energy of 1.
+    /// </summary>
+    /// <param name="i">Sample index in the range [-N/2,N/2).</param>
+    /// <param name="N">Total number of samples for the filter duration. The standard deviation of the Gaussian will be one-eighth of this.</param>
+    /// <param name="freq">Frequency of the wave as a fraction of sampling rate.</param>
+    /// <returns></returns>
+    public static Complex Morlet(int i, int N, double freq) {
+        var lim = (N - 1) / 2.0;
+        if (i > lim || i < -lim) return 0;
+        var cx = Math.PI * 2 * freq * i;
+        var sigma = N / 8.0;
+        var mult = Math.Pow(Math.E, -i * i / (2 * sigma * sigma)) / (Math.Sqrt(sigma) * sqrtSqrtPi);
+        return new(Math.Cos(cx) * mult, Math.Sin(cx) * mult);
+    }
     
     
     /// <summary>

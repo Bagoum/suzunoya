@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 
 namespace BagoumLib.Expressions {
 public interface IObjectPrinter {
@@ -48,6 +50,16 @@ public class CSharpObjectPrinter : IObjectPrinter {
             return $"new {TypePrinter.Print(typ.GetElementType()!)}[] {{ " +
                    $"{string.Join(", ", Enumerable.Range(0, arr.Length).Select(i => Print(arr.GetValue(i))))} }}";
         }
+        if (typ.IsConstructedGenericType && typ.GetGenericTypeDefinition() == typeof(List<>)) {
+            var arr = (o as IList)!;
+            return $"new List<{TypePrinter.Print(typ.GetGenericArguments()[0])}>() {{" +
+                   $"{string.Join(", ", Enumerable.Range(0, arr.Count).Select(i => Print(arr[i])))} }}";
+        }
+        if (o is ITuple tup) {
+            return $"({string.Join(", ", Enumerable.Range(0, tup.Length).Select(i => Print(tup[i])))})";
+        }
+        if (typ.IsEnum)
+            return $"{TypePrinter.Print(typ)}.{o.ToString()}";
         if (CastTypes.Contains(typ))
             return $"(({TypePrinter.Print(typ)}){o})";
         return FormattableString.Invariant(o switch {
@@ -63,12 +75,17 @@ public class CSharpObjectPrinter : IObjectPrinter {
             string s => $"\"{string.Join("", s.Select(PrintChar))}\"",
             Exception e => $"new {TypePrinter.Print(e.GetType())}({Print(e.Message)})",
             Type t => $"typeof({TypePrinter.Print(t)})",
-            { } obj => 
-                FallbackToToString ? 
-                    (FormattableString)$"{obj.ToString()}" :
-                    throw new Exception($"Couldn't print object {obj} of type {typ}")
+            { } obj => NoPrintMethodFallback(obj)
         });
     }
+
+    /// <summary>
+    /// Method called when no standard method of printing the object succeeded.
+    /// </summary>
+    protected virtual FormattableString NoPrintMethodFallback(object obj) =>
+        FallbackToToString ?
+            (FormattableString)$"{obj.ToString()}" :
+            throw new Exception($"Couldn't print object {obj} of type {obj.GetType()}");
 }
 
 

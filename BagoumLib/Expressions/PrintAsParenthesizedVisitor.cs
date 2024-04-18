@@ -29,6 +29,7 @@ public class PrintAsParenthesizedVisitor : DerivativePrintVisitor {
             case NewExpression:
             case NewArrayExpression:
             case ParameterExpression:
+            case UnaryExpression { NodeType: ExpressionType.Throw }:
                 return parent.Visit(node);
             case BlockExpression:
             case LoopExpression:

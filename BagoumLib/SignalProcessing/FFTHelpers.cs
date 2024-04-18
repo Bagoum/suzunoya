@@ -165,44 +165,74 @@ public static class FFTHelpers {
     }
 
     /// <summary>
-    /// Normalizes the real components only of a data stream in-place, so that they sum to 1.
+    /// Normalizes the real components only of a data stream in-place, so that the real components to 1.
     /// </summary>
     public static Complex[] NormalizeReals(this Complex[] data) {
         double total = 0;
         for (int ii = 0; ii < data.Length; ++ii)
             total += data[ii].Real;
+        total = 1 / total;
         for (int ii = 0; ii < data.Length; ++ii)
-            data[ii] = new(data[ii].Real / total, 0);
+            data[ii] = new(data[ii].Real * total, 0);
+        return data;
+    }
+
+    /// <summary>
+    /// Normalize the values of a data stream in-place, such that their magnitudes sum to 1.
+    /// </summary>
+    public static Complex[] Normalize(this Complex[] data) {
+        double total = 0;
+        for (int ii = 0; ii < data.Length; ++ii)
+            total += data[ii].Magnitude;
+        total = 1 / total;
+        for (int ii = 0; ii < data.Length; ++ii)
+            data[ii] = new(data[ii].Real * total, data[ii].Imaginary * total);
+        return data;
+    }
+    
+
+    /// <summary>
+    /// Normalizes a vector such that the square of square magnitudes sums to 1.
+    /// </summary>
+    public static Complex[] NormalizeEnergy(this Complex[] data) {
+        double total = 0;
+        for (int ii = 0; ii < data.Length; ++ii)
+            total += data[ii].SqrMagnitude();
+        if (total > 0) {
+            total = 1 / Math.Sqrt(total);
+            for (int ii = 0; ii < data.Length; ++ii)
+                data[ii] *= total;
+        }
         return data;
     }
     
     /// <summary>
-    /// Create an array of complex numbers whose real parts are the values of `fn` evaluated between 0 and `period`.
+    /// Create an array of complex numbers whose values are the values of `fn` evaluated between 0 and `period`.
     /// </summary>
-    public static Complex[] DataForFnOverPeriod(Func<double, double> fn, double period, int samples) {
+    public static Complex[] DataForFnOverPeriod(Func<double, Complex> fn, double period, int samples) {
         var data = new Complex[samples];
         for (int ii = 0; ii < samples; ++ii)
-            data[ii] = new(fn(period * ii / samples), 0);
+            data[ii] = fn(period * ii / samples);
         return data;
     }
     
     /// <summary>
-    /// Create an array of complex numbers whose real parts are the values of `fn` evaluated between 0 and `samples/samplingRate`.
+    /// Create an array of complex numbers whose values are values of `fn` evaluated between 0 and `samples/samplingRate`.
     /// </summary>
-    public static Complex[] DataForFnAtRate(Func<double, double> fn, double samplingRate, int samples) {
+    public static Complex[] DataForFnAtRate(Func<double, Complex> fn, double samplingRate, int samples) {
         var data = new Complex[samples];
         for (int ii = 0; ii < samples; ++ii)
-            data[ii] = new(fn(ii / samplingRate), 0);
+            data[ii] = fn(ii / samplingRate);
         return data;
     }
     
     /// <summary>
-    /// Create an array of complex numbers whose real parts are the values of `fn` evaluated between 0 and `samples`.
+    /// Create an array of complex numbers whose values are the values of `fn` evaluated between 0 and `samples`.
     /// </summary>
-    public static Complex[] DataForFn(Func<int, double> fn, int samples) {
+    public static Complex[] DataForFn(Func<int, Complex> fn, int samples) {
         var data = new Complex[samples];
         for (int ii = 0; ii < samples; ++ii)
-            data[ii] = new(fn(ii), 0);
+            data[ii] = fn(ii);
         return data;
     }
     
@@ -214,16 +244,16 @@ public static class FFTHelpers {
     }
     
     /// <summary>
-    /// Create an array of complex numbers whose real parts are the values of `fn` evaluated between 0 and `samples`,
+    /// Create an array of complex numbers whose values are the values of `fn` evaluated between 0 and `samples`,
     /// and the indices are passed to the provided function as follows:
     /// <br/>0 1 2 3... (N/2-2) (N/2-1) -N/2 -N/2+1 ... -3 -2 -1
     /// <br/>ie. The first half of the array is nonnegative, and the second half is negative.
     /// <br/>This function should be used for the filters in <see cref="Filters"/>.
     /// </summary>
-    public static Complex[] DataForFilter(Func<int, double> fn, int samples) {
+    public static Complex[] DataForFilter(Func<int, Complex> fn, int samples) {
         var data = new Complex[samples];
         for (int ii = 0; ii < samples; ++ii)
-            data[ii] = new(fn(WrapIndex(ii, samples)), 0);
+            data[ii] = fn(WrapIndex(ii, samples));
         return data;
     }
 
@@ -231,7 +261,7 @@ public static class FFTHelpers {
     /// Convolve two periodic sequences in the time domain together.
     /// <br/>The arrays must be the same length, and this length must be a power of two.
     /// <br/>Overwrites both arrays and returns data1.
-    /// <br/>Note that convolution is symmetric if all data is real.
+    /// <br/>Note that convolution is commutative (Convolve(a,b) = Convolve(b,a)).
     /// </summary>
     public static Complex[] Convolve(this IFFT fft, Complex[] data1, Complex[] data2) {
         if (data1.Length != data2.Length)
@@ -248,6 +278,8 @@ public static class FFTHelpers {
     /// Correlates two periodic sequences in the time domain together.
     /// <br/>The arrays must be the same length, and this length must be a power of two.
     /// <br/>Overwrites both arrays and returns data1.
+    /// <br/>Note that Correlate(x, y) = Convolve(x, Conjugate(y)).
+    /// Correlation is not commutative, but convolution is.
     /// </summary>
     public static Complex[] Correlate(this IFFT fft, Complex[] data1, Complex[] data2) {
         if (data1.Length != data2.Length)

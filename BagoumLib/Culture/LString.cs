@@ -50,7 +50,7 @@ public class LString : Variant<string> {
         new(FirstProvider(fmtString, args),
             FormatLocale(null, fmtString, args),
             args.Append(fmtString)
-                .SelectMany(l => l.langToValueMap.Keys)
+                .SelectMany(l => l.MyLocales)
                 .Distinct()
                 .Select(lang => (lang, FormatLocale(lang, fmtString, args)))
                 .ToArray());
@@ -68,7 +68,7 @@ public class LString : Variant<string> {
     public static LString FormatFn(Func<string[], string> formatter, params LString[] args) =>
         new(FirstProvider(null, args),
             FormatFnLocale(null, formatter, args),
-            args.SelectMany(l => l.langToValueMap.Keys)
+            args.SelectMany(l => l.MyLocales)
                 .Distinct()
                 .Select(lang => (lang, FormatFnLocale(lang, formatter, args)))
                 .ToArray());
@@ -80,7 +80,7 @@ public class LString : Variant<string> {
     public LString Or(LString second) => new(localeP ?? second.localeP, 
         defaultValue.Or(second.defaultValue),
         new[] {this, second}
-            .SelectMany(l => l.langToValueMap.Keys)
+            .SelectMany(l => l.MyLocales)
             .Distinct()
             .Select(lang => {
                 var val = HasLang(lang) ?
@@ -98,7 +98,7 @@ public class LString : Variant<string> {
     /// <param name="mapper">Locale -> String -> New String</param>
     public LString FMap(Func<string?, string, string> mapper) => 
         new(localeP, mapper(null, defaultValue), 
-            langToValueMap.Select(x => (x.Key, mapper(x.Key, x.Value))).ToArray());
+            variants.Select(x => (x.locale, mapper(x.locale, x.val))).ToArray());
 }
 
 }

@@ -13,6 +13,7 @@ namespace BagoumLib.Events {
 public class TriggerEvent<T> : Event<T> {
     private bool OnNextAllowed { get; set; } = true;
 
+    /// <inheritdoc/>
     public override void OnNext(T value) {
         if (!OnNextAllowed) return;
         OnNextAllowed = false;

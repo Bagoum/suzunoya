@@ -34,6 +34,16 @@ public readonly struct Unifier {
         TypeVarBindings = bindings;
     }
 
+    private Unifier(IEnumerable<KeyValuePair<TypeDesignation.Variable, TypeDesignation>> kvs) {
+        TypeVarBindings = kvs.ToImmutableDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
+    /// <summary>
+    /// Return a unifier that does not have any bindings with the given variable.
+    /// </summary>
+    public Unifier Without(TypeDesignation.Variable v) =>
+        new Unifier(TypeVarBindings.Where(b => b.Key != v && b.Value != v));
+
     /// <summary>
     /// Get the ultimate binding of a variable type designation, or the designation itself if it is not variable.
     /// </summary>

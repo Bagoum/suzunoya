@@ -179,14 +179,14 @@ public static class Helpers {
                 };
 
     /// <summary>
-    /// Add a disturbance effect over time to a <see cref="DisturbedEvented{T}"/>.
+    /// Add a disturbance effect over time to a <see cref="IDisturbable{T}"/>.
     /// </summary>
     /// <param name="ent">Entity on which the coroutine for the disturbance effect should be run.</param>
     /// <param name="dist">Base value to which to add the effect.</param>
     /// <param name="valuer">Function that produces the value of the disturbance.</param>
     /// <param name="time">Amount of time for which to run the disturbance effect.</param>
     /// <param name="timeTo01">True iff `valuer` operates over the range [0, 1], false iff over [0, time].</param>
-    public static VNOperation Disturb<T>(this Entity ent, DisturbedEvented<T> dist, Func<float, T> valuer, 
+    public static VNOperation Disturb<T>(this Entity ent, IDisturbable<T> dist, Func<float, T> valuer, 
         float time, bool timeTo01=true) => ent.MakeVNOp(cT => {
         IEnumerator _Disturb(Action done) {
             if (cT.CancelLevel == 0) {

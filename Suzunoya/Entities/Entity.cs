@@ -131,9 +131,9 @@ public abstract class Entity : IEntity {
     /// <summary>
     /// Run a corountine on this entity.
     /// </summary>
-    public void Run(IEnumerator ienum, CoroutineOptions? opts = null) {
+    public void Run(IEnumerator ienum) {
         this.AssertActive();
-        cors.Run(ienum, opts);
+        cors.Run(ienum, CoroutineOptions.ProcessThisFrame(Container.HasVNUpdatedThisFrame));
     }
 
     /// <summary>
@@ -148,7 +148,8 @@ public abstract class Entity : IEntity {
     
     /// <inheritdoc/>
     public VNOperation Tween(ITransition tweener) => this.AssertActive().MakeVNOp(ct => 
-        tweener.With(this.BindLifetime(ct), () => Container.dT).Run(cors));
+        tweener.With(this.BindLifetime(ct), () => Container.dT)
+            .Run(cors, CoroutineOptions.ProcessThisFrame(Container.HasVNUpdatedThisFrame)));
 
     
     /// <inheritdoc/>
@@ -187,6 +188,7 @@ public abstract class Entity : IEntity {
             throw new Exception($"Some entity coroutines were not closed in the cull process. " +
                                 $"{this} has {cors.Count} remaining.");
         _EntityActive.OnNext(EntityState.Deleted);
+        _EntityActive.OnCompleted();
         if (!Container.Logs.CanSkipMessage(LogLevel.DEBUG1))
             Container.Logs.Log($"The entity {GetType().RName()} has been deleted.", LogLevel.DEBUG1);
     }
