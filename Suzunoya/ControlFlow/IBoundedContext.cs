@@ -60,7 +60,12 @@ public record BoundedContext<T>(IVNState VN, string ID, Func<Task<T>> InnerTask)
     /// <summary>
     /// Task to run
     /// </summary>
-    protected Func<Task<T>> InnerTask { get; init; } = InnerTask;
+    internal Func<Task<T>> InnerTask { get; init; } = InnerTask;
+
+    /// <summary>
+    /// A cancellation token that affects all VN operations run during the lifetime of this BCTX.
+    /// </summary>
+    public ICancellee? LocalCToken { get; init; } = null;
     
     /// <inheritdoc/>
     public bool Identifiable => !string.IsNullOrWhiteSpace(ID);
@@ -80,7 +85,7 @@ public record BoundedContext<T>(IVNState VN, string ID, Func<Task<T>> InnerTask)
     /// <summary>
     /// Run the contents of this bounded context on the VN.
     /// </summary>
-    public Task<T> Execute() => VN.ExecuteContext(this, InnerTask);
+    public Task<T> Execute() => VN.ExecuteContext(this);
 
     /// <summary>
     /// Syntactic sugar for `await ctx.Execute()`.

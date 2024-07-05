@@ -71,12 +71,13 @@ x + 2f;");
         var x = VF("x");
         var yi = VF("y");
         var zi = VF("z");
-        var ex = Ex.Condition(Ex.Block(zi.Is(ExC(5f)), zi.Add(x).GT(ExC(5f))),
+        var wi = VF("w");
+        var ex = wi.Is(Ex.Condition(Ex.Block(zi.Is(ExC(5f)), zi.Add(x).GT(ExC(5f))),
             Ex.Block(new[] {yi},
                 yi.Is(ExC(5f)),
                 yi.Add(x)),
             ExC(2f)
-        );
+        ));
         LinPrints(ex, @"
 float flatTernary0;
 z = 5f;
@@ -86,7 +87,7 @@ if ((z + x) > 5f) {
 } else {
     flatTernary0 = 2f;
 }
-flatTernary0;");
+w = flatTernary0;");
         LinPrints(Ex.Lambda<Func<float, float, float>>(ex, x, zi), @"
 (Func<float, float, float>) ((float x, float z) => {
     float flatTernary0;
@@ -97,18 +98,18 @@ flatTernary0;");
     } else {
         flatTernary0 = 2f;
     }
-    return flatTernary0;
+    return w = flatTernary0;
 })");
         //ternary ok
-        var ex2 = Ex.Condition(Ex.Block(zi.Is(ExC(5f)), ExC(true)),
+        var ex2 = wi.Is(Ex.Condition(Ex.Block(zi.Is(ExC(5f)), ExC(true)),
             yi.Add(x),
             ExC(2f)
-        );
+        ));
         LinPrints(ex2, @"
 z = 5f;
-true ?
+w = (true ?
     (y + x) :
-    2f;");
+    2f);");
         //cond can be simplified
         var ex3 = Ex.Condition(Ex.GreaterThan(zi, ExC(5f)),
             yi.Add(x),
@@ -139,10 +140,8 @@ x = flatSwitch0;
         LinPrints(untypedSwitch, @"
 switch (x) {
     case (5):
-        4;
         break;
     default:
-        3;
         break;
 }
 ");
@@ -225,24 +224,18 @@ int a = (1 + (z + 3));
         var x = Prm<int>("x");
         var ex = x.Is(Ex.Block(ExC(3), ExC(2).Add(ExC(5))).Add(Ex.Block(ExC(6), ExC(7).Sub(ExC(2)))));
         LinPrints(ex, @"
-3;
-6;
 x = ((2 + 5) + (7 - 2));
 ");
         SafeLinPrints(ex, @"
-3;
 int flatBlock0 = (2 + 5);
-6;
 int flatBlock1 = (7 - 2);
 x = (flatBlock0 + flatBlock1);
 ");
         var tex = x.Is(Ex.Block(ExC(3), ExC(2).Add(ExC(5))).Add(Ex.Block(ExC(6), 
             Ex.Throw(Ex.New(typeof(Exception)), typeof(int)))));
         LinPrints(tex, @"
-3;
 int flatBlock0 = (2 + 5);
-6;
-int flatBlock1 = (throw new Exception());
+int flatBlock1 = throw new Exception();
 x = (flatBlock0 + flatBlock1);
 ");
     }
@@ -251,23 +244,22 @@ x = (flatBlock0 + flatBlock1);
     public void TestAndOr() {
         var x = Prm<bool>("x");
         var y = Prm<bool>("y");
-        var exAnd = Ex.AndAlso(x, Ex.Block(ExC(5), y));
-        var exOr = Ex.OrElse(Ex.Block(ExC(7), x), y);
+        var z = Prm<bool>("z");
+        var exAnd = z.Is(Ex.AndAlso(x, Ex.Block(ExC(5), y)));
+        var exOr = z.Is(Ex.OrElse(Ex.Block(ExC(7), x), y));
         LinPrints(exAnd, @"
 bool flatTernary0;
 if (x) {
-    5;
     flatTernary0 = y;
 } else {
     flatTernary0 = false;
 }
-flatTernary0;
+z = flatTernary0;
 ");
         LinPrints(exOr, @"
-7;
-x ?
+z = (x ?
     true :
-    y;
+    y);
 ");
     }
 

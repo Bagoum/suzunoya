@@ -39,14 +39,12 @@ public class Expressions {
         var _1 = Prm<int>(null!);
         var _2 = Prm<Func<float,bool>>(null!);
         var _3 = Prm<string[]>(null!);
-        AssertEx(Ex.Block(new[]{x,x2,_1,_2,_3}, x.Add(x2).Add(_1), _2, _3), @"int x;
+        AssertEx(Ex.Block(new[]{x,x2,_1,_2,_3}, x.Add(x2).Add(_1)), @"int x;
 int int0;
 int int1;
 Func<float, bool> funcOfFloatAndBool2;
 string[] stringArray3;
 (x + int0) + int1;
-funcOfFloatAndBool2;
-stringArray3;
 ");
     }
     
@@ -77,8 +75,7 @@ while (true) {
         ++x;
     }
 }
-break_me:;
-x;");
+break_me:;");
     }
 
     [Test]

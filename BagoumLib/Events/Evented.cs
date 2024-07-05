@@ -14,6 +14,14 @@ namespace BagoumLib.Events {
 public class Evented<T, U> : ISubject<T, U>, ICObservable<U> {
     internal U _value;
     private readonly Func<T, U> mapper;
+
+    /// <summary>
+    /// Allow the same value to be published multiple times in a row.
+    /// <br/>True by default. Note that <see cref="PublishIfNotSame"/> will not
+    ///  publish a value if it is the same as the previous one, regardless of this
+    ///  setting.
+    /// </summary>
+    public bool AllowSameValueUpdate { get; set; } = true;
     
     /// <inheritdoc />
     public U Value {
@@ -22,7 +30,7 @@ public class Evented<T, U> : ISubject<T, U>, ICObservable<U> {
     }
     
     /// <summary>
-    /// Event that fires when the value changes. You can subscribe to this directly if you do not want
+    /// Event that fires when the value updates. You can subscribe to this directly if you do not want
     ///  to receive the existing value on subscription.
     /// </summary>
     public Event<U> OnChange { get; }
@@ -44,7 +52,12 @@ public class Evented<T, U> : ISubject<T, U>, ICObservable<U> {
     }
 
     /// <inheritdoc />
-    public void OnNext(T value) => Value = mapper(value);
+    public void OnNext(T value) {
+        if (AllowSameValueUpdate)
+            Value = mapper(value);
+        else
+            PublishIfNotSame(value);
+    }
 
     /// <inheritdoc />
     public void OnError(Exception error) => OnChange.OnError(error);
@@ -58,7 +71,7 @@ public class Evented<T, U> : ISubject<T, U>, ICObservable<U> {
     public void PublishIfNotSame(T value) {
         var next = mapper(value);
         if (!EqualityComparer<U>.Default.Equals(next, _value))
-            OnNext(value);
+            Value = next;
     }
 
     /// <summary>

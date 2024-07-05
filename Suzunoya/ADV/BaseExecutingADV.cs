@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Reactive;
 using System.Threading.Tasks;
 using BagoumLib;
+using BagoumLib.Assertions;
 using BagoumLib.Cancellation;
 using BagoumLib.DataStructures;
 using BagoumLib.Events;
@@ -23,23 +24,38 @@ namespace Suzunoya.ADV {
 public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADVIdealizedState where D : ADVData {
     /// <inheritdoc/>
     public ADVInstance Inst { get; }
+    
     /// <inheritdoc/>
     public ADVManager Manager => Inst.Manager;
+    
     /// <inheritdoc cref="ADVInstance.VN"/>
     public IVNState VN => Inst.VN;
+    
     //Note that underlying data may change due to proxy loading
     /// <inheritdoc cref="ADVInstance.ADVData"/>
-    protected D Data => (Inst.ADVData as D) ?? throw new Exception("Instance data is of wrong type");
+    public D Data => (Inst.ADVData as D) ?? throw new Exception("Instance data is of wrong type");
+    
+    /// <summary>
+    /// Version counter incremented whenever save data is changed.
+    /// This is updated right before <see cref="DataChanged"/> is fired.
+    /// </summary>
+    public int DataVersion { get; private set; }
+
     /// <summary>
     /// Event called immediately after save data is changed, and before assertions are recomputed.
     /// </summary>
-    public Evented<D> DataChanged { get; }
+    public ICObservable<D> DataChanged => _dataChanged;
+    private Evented<D> _dataChanged;
+    
     private string prevMap;
+    
     /// <summary>
     /// Handler for managing maps and assertions.
     /// </summary>
     public MapStateManager<I, D> MapStates { get; private set; }
+    
     private MapStateTransition<I, D> mapTransition;
+    
     /// <inheritdoc cref="MapStateTransition{I,D}.MapUpdateTask"/>
     protected Task MapTransitionTask => mapTransition.MapUpdateTask ?? Task.CompletedTask;
     /// <summary>
@@ -73,7 +89,7 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
         prevMap = Data.CurrentMap;
         MapWillUpdate = new((null, prevMap));
         tokens.Add(VN.InstanceDataChanged.Subscribe(_ => UpdateDataV(_ => { })));
-        DataChanged = new Evented<D>(Data);
+        _dataChanged = new Evented<D>(Data);
 
         //Listen to common events
         VN.ContextStarted.Subscribe(c => {
@@ -118,15 +134,16 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     ///  want to await the update task.
     /// <br/>This uses SimultaneousActualization by default.
     /// </summary>
-    protected void UpdateDataV(Action<D> updater, MapStateTransitionSettings<I>? transition = null) {
-        _ = UpdateData(updater, transition ?? new() { SimultaneousActualization = true }).ContinueWithSync();
+    public void UpdateDataV(Action<D> updater, MapStateTransitionSettings<I>? transition = null) {
+        _ = UpdateData(updater, transition ?? new() { Options = ActualizeOptions.Simultaneous }).ContinueWithSync();
     }
     /// <summary>
     /// Update the game data and recompute map assertions.
     /// </summary>
-    protected Task UpdateData(Action<D> updater, MapStateTransitionSettings<I>? transition = null) {
+    public Task UpdateData(Action<D> updater, MapStateTransitionSettings<I>? transition = null) {
         updater(Data);
-        DataChanged.OnNext(Data);
+        ++DataVersion;
+        _dataChanged.OnNext(Data);
         return UpdateMap(transition);
     }
 
@@ -155,11 +172,12 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     /// <param name="id">ID by which teh inner context is identified.</param>
     /// <param name="innerTask">Inner executed content for the bounded context.</param>
     /// <param name="isTrivialTask">See <see cref="BoundedContext{T}"/>.<see cref="BoundedContext{T}.Trivial"/></param>
-    protected BoundedContext<Unit> Context(string id, Func<Task> innerTask, bool isTrivialTask=false) {
+    /// <param name="localCt">See <see cref="BoundedContext{T}"/>.<see cref="BoundedContext{T}.LocalCToken"/></param>
+    protected BoundedContext<Unit> Context(string id, Func<Task> innerTask, bool isTrivialTask=false, ICancellee? localCt = null) {
         var ctx = new BoundedContext<Unit>(VN, id, async () => {
             await innerTask();
             return default;
-        }) { Trivial = isTrivialTask };
+        }) { Trivial = isTrivialTask, LocalCToken = localCt };
         if (ctx.Identifiable) {
             if (bctxes.ContainsKey(ctx.ID))
                 throw new Exception($"Multiple BCTXes are defined for key {ctx.ID}");

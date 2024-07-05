@@ -171,7 +171,9 @@ public class VNProcessGroup : ICancellee {
     public VNProcessGroup(VNInterruptionLayer ih, bool allowUserSkip) {
         ProcessLayer = ih;
         userSkipAllowed = allowUserSkip;
-        OperationCToken = new JointCancellee(ih.VN.CToken, OperationCTS);
+        OperationCToken = new JointCancellee(
+            JointCancellee.From(ih.VN.CToken, ih.VN.MaybeLowestContext?.CtxCToken), 
+            OperationCTS);
     }
 
     /// <summary>

@@ -60,6 +60,20 @@ public class ADVManager : ITokenized {
     public DisturbedEvented<State, State> ADVState { get; } = new DisturbedFold<State>(State.Investigation, 
         (x, y) => (x > y) ? x : y);
 
+    /// <summary>
+    /// The current <see cref="State"/> of the game, excepting <see cref="State.Waiting"/>.
+    /// </summary>
+    public State NonWaitingState {
+        get {
+            var basis = ADVState.BaseValue;
+            for (int ii = 0; ii < ADVState.Disturbances.Count; ++ii)
+                if (ADVState.Disturbances.GetIfExistsAt(ii, out var x) 
+                    && x.HasValue && x.Value != State.Waiting && x.Value > basis)
+                    basis = x.Value;
+            return basis;
+        }
+    }
+
     /// <inheritdoc/>
     public List<IDisposable> Tokens { get; } = new();
 
@@ -156,10 +170,11 @@ public class ADVManager : ITokenized {
             vn.ResetInterruptStatus();
             ADVData.RemovePreservedData();
             vn.Logs.Log($"Completed VN segment {task.ID}. Final state: {inst.Inst.Tracker.ToCompletion()}");
-            stateToken.Dispose();
             if (pendingVNExecutions.TryDequeue(out var action))
                 action();
-            //TODO: require a smarter way to handle "reverting to previous state"
+            //Do this last so listeners on stateToken don't receive an update if a pendingVNExection
+            // was dequeued
+            stateToken.Dispose();
         }
     }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reactive;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -12,8 +13,8 @@ public static class Utilities {
     /// <summary>
     /// Return a task that is completed when both provided tasks are completed.
     /// </summary>
-    public static Task And(this Task t1, Task? t2) {
-        if (t1.IsCompletedSuccessfully)
+    public static Task And(this Task? t1, Task? t2) {
+        if (t1?.IsCompletedSuccessfully ?? true)
             return t2 ?? Task.CompletedTask;
         if (t2?.IsCompletedSuccessfully ?? true)
             return t1;
@@ -87,8 +88,10 @@ public static class Utilities {
         try {
             await t;
         } finally {
-            if (t.IsCanceled) tcs.SetCanceled();
-            else if (t.IsFaulted) tcs.SetException(t.Exception ?? new Exception("Unknown task failure"));
+            if (t.IsCanceled) 
+                tcs.SetCanceled();
+            else if (t.IsFaulted) 
+                tcs.SetException(t.Exception ?? new Exception("Unknown task failure"));
             else
                 tcs.SetResult(t.Result);
         }
@@ -100,8 +103,10 @@ public static class Utilities {
         try {
             await t;
         } finally {
-            if (t.IsCanceled) tcs.SetCanceled();
-            else if (t.IsFaulted) tcs.SetException(t.Exception ?? new Exception("Unknown task failure"));
+            if (t.IsCanceled) 
+                tcs.SetCanceled();
+            else if (t.IsFaulted) 
+                tcs.SetException(t.Exception ?? new Exception("Unknown task failure"));
             else
                 tcs.SetResult(default);
         }

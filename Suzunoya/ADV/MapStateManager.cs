@@ -17,10 +17,9 @@ public record MapStateTransitionSettings<I> {
     /// Action making extra assertions on <see cref="ADVIdealizedState"/> for the map described by the string
     /// </summary>
     public Action<string, I>? ExtraAssertions { get; init; }
-    /// <summary>
-    /// Whether or not previous state deactualization should occur at the same time as next state actualization
-    /// </summary>
-    public bool SimultaneousActualization { get; init; } = false;
+    
+    /// <inheritdoc cref="ActualizeOptions"/>
+    public ActualizeOptions Options { get; init; } = ActualizeOptions.Default;
 }
 
 
@@ -100,10 +99,11 @@ public record MapStateManager<I, D>(IExecutingADV ADV, Func<I> Constructor) : IM
     /// Update all map definitions with a new game data object.
     /// </summary>
     public async Task UpdateMaps(D data, string newCurrentMap, MapStateTransitionSettings<I>? settings = null) {
+        var opts = settings?.Options ?? ActualizeOptions.Default;
         ADV.VN.Logs.Log($"Updating map state for next map {newCurrentMap} (current map is {CurrentMap})...");
         if (newCurrentMap != CurrentMap && mapStates.TryGetValue(CurrentMap, out var s)) {
             ADV.VN.Logs.Log($"As the map has changed, the current map {CurrentMap} will be end-state deactualized.");
-            await s.State.DeactualizeOnEndState();
+            await s.State.DeactualizeOnEndState(opts);
             MapEndStateDeactualized.OnNext(default);
         }
         var generics = new Dictionary<string, List<IAssertion>>();
@@ -120,14 +120,14 @@ public record MapStateManager<I, D>(IExecutingADV ADV, Func<I> Constructor) : IM
         foreach (var (map, cfg) in mapStates) {
             //Create a new idealized state and apply assertions to it
             var ns = Constructor();
+            settings?.ExtraAssertions?.Invoke(map, ns);
             cfg.StateConstructor(ns, data);
             if (generics.TryGetValue(map, out var lis))
                 ns.Assert(lis);
-            settings?.ExtraAssertions?.Invoke(map, ns);
             cfg.State = ns;
         }
         //Actualize only the current map based on its previous state
-        await mapStates[CurrentMap].State.Actualize(prevStateForCurrMap, settings?.SimultaneousActualization ?? false);
+        await mapStates[CurrentMap].State.Actualize(prevStateForCurrMap, opts);
 
         ADV.VN.Logs.Log($"Finished updating map state for next map {newCurrentMap}.");
     }

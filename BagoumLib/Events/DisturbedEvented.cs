@@ -50,10 +50,10 @@ public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> 
     }
     private V ComputeValue() {
         var agg = _baseValue;
-        disturbances.Compact();
-        for (int ii = 0; ii < disturbances.Count; ++ii)
-            if (disturbances[ii].HasValue)
-                agg = Fold(agg, disturbances[ii].Value);
+        Disturbances.Compact();
+        for (int ii = 0; ii < Disturbances.Count; ++ii)
+            if (Disturbances[ii].HasValue)
+                agg = Fold(agg, Disturbances[ii].Value);
         return agg;
     }
     
@@ -66,7 +66,11 @@ public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> 
     }
 
     private readonly Evented<V> onSet;
-    private readonly DMCompactingArray<IBObservable<D>> disturbances = new();
+    
+    /// <summary>
+    /// List of disturbance effects applied to the core value.
+    /// </summary>
+    public DMCompactingArray<IBObservable<D>> Disturbances { get; } = new();
 
     /// <summary>
     /// The initial value is published to onSet.
@@ -91,14 +95,14 @@ public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> 
     
     /// <inheritdoc/>
     public IDisposable AddDisturbance(IBObservable<D> disturbance) {
-        var trackToken = disturbances.Add(disturbance);
+        var trackToken = Disturbances.Add(disturbance);
         var updateToken = disturbance.Subscribe(_ => DoPublishIfNotSame());
         return new JointDisposable(DoPublishIfNotSame, trackToken, updateToken);
     }
 
     /// <inheritdoc/>
     public IDisposable AddConst(D value) {
-        var trackToken = disturbances.Add(new ConstantObservable<D>(value));
+        var trackToken = Disturbances.Add(new ConstantObservable<D>(value));
         DoPublishIfNotSame();
         return new JointDisposable(DoPublishIfNotSame, trackToken);
     }
@@ -109,10 +113,10 @@ public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> 
     /// </summary>
     /// <param name="src"></param>
     public void CopyDisturbances(DisturbedEvented<D,V> src) {
-        for (int ii = 0; ii < src.disturbances.Count; ++ii)
-            if (src.disturbances.GetMarkerIfExistsAt(ii, out var m)) {
+        for (int ii = 0; ii < src.Disturbances.Count; ++ii)
+            if (src.Disturbances.GetMarkerIfExistsAt(ii, out var m)) {
                 m.DisallowPooling();
-                disturbances.AddPriority(m);
+                Disturbances.AddPriority(m);
             }
         DoPublishIfNotSame();
     }
@@ -128,7 +132,7 @@ public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> 
     /// Remove all additional provided values. 
     /// </summary>
     public void ClearDisturbances() {
-        disturbances.Empty();
+        Disturbances.Empty();
         DoPublishIfNotSame();
     }
     

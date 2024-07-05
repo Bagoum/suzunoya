@@ -1,4 +1,5 @@
 ﻿using System;
+using BagoumLib.Cancellation;
 using BagoumLib.Functional;
 using Suzunoya.Data;
 
@@ -9,9 +10,22 @@ namespace Suzunoya.ControlFlow {
 /// </summary>
 public interface OpenedContext {
     /// <summary>
+    /// True iff <see cref="Data"/> is saved to the VN instance data on completion.
+    /// <br/>(By default, this is <see cref="BCtx"/>.<see cref="IBoundedContext.Identifiable"/>.)
+    /// </summary>
+    public bool DataIsSaved => BCtx.Identifiable;
+    
+    /// <summary>
     /// The bounded context that is currently being executed.
     /// </summary>
     public IBoundedContext BCtx { get; }
+    
+    /// <summary>
+    /// The joint cancellee of the executing <see cref="BoundedContext{T}"/>'s
+    ///  <see cref="BoundedContext{T}.LocalCToken"/> with all executing parent context's tokens.
+    /// </summary>
+    public ICancellee? CtxCToken { get; }
+    
     /// <summary>
     /// The local data of the bounded context
     /// </summary>
@@ -28,6 +42,7 @@ public interface OpenedContext {
 /// <inheritdoc cref="OpenedContext"/>
 public class OpenedContext<T> : OpenedContext, IDisposable {
     private readonly IVNState vn;
+    
     /// <inheritdoc cref="OpenedContext.BCtx"/>
     public BoundedContext<T> BCtx { get; }
     IBoundedContext OpenedContext.BCtx => BCtx;
@@ -35,6 +50,10 @@ public class OpenedContext<T> : OpenedContext, IDisposable {
     public BoundedContextData<T> Data { get; private set; }
     BoundedContextData OpenedContext.Data => Data;
     private OpenedContext? Parent { get; }
+    
+    /// <inheritdoc />
+    public ICancellee? CtxCToken { get; }
+    
     /// <summary>
     /// Open a bounded context in the executing VN state,
     /// </summary>
@@ -43,12 +62,13 @@ public class OpenedContext<T> : OpenedContext, IDisposable {
         this.BCtx = bCtx;
         Data = new BoundedContextData<T>(bCtx.ID, Maybe<T>.None, new KeyValueRepository(), new());
         vn.ContextStarted.OnNext(this);
-        if (BCtx.Identifiable) {
+        if ((this as OpenedContext).DataIsSaved) {
             if (vn.Contexts.Count > 0) {
                 (Parent = vn.Contexts[^1]).Data.SaveNested(Data, vn.AllowsRepeatContextExecution);
             } else
                 vn.InstanceData.SaveBCtxData(Data, vn.AllowsRepeatContextExecution);
         }
+        CtxCToken = JointCancellee.MaybeFrom(Parent?.CtxCToken, bCtx.LocalCToken);
         vn.Contexts.Add(this);
     }
 

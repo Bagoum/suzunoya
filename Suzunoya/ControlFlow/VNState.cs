@@ -99,6 +99,12 @@ public interface IVNState : IConfirmationReceiver {
     OpenedContext LowestContext => Contexts[^1];
 
     /// <summary>
+    /// The most recently opened bounded context (<see cref="Contexts"/>[^1]), or null
+    ///  if none are executing.
+    /// </summary>
+    OpenedContext? MaybeLowestContext => ContextExecuting ? LowestContext : null;
+
+    /// <summary>
     /// Returns the type of skipping the VN currently has active.
     /// </summary>
     SkipMode? SkippingMode { get; }
@@ -217,8 +223,7 @@ public interface IVNState : IConfirmationReceiver {
     /// <summary>
     /// Executes the bounded context, saves the output value in instance save data, and returns the output value.
     /// </summary>
-    /// <returns></returns>
-    Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask);
+    Task<T> ExecuteContext<T>(BoundedContext<T> ctx);
     
     /// <summary>
     /// Record a gallery object as having been viewed ingame. (WIP)
@@ -526,11 +531,10 @@ public class VNState : IVNState {
     /// Execute a <see cref="BoundedContext{T}"/>, nesting its execution within any currently-running contexts.
     /// </summary>
     /// <param name="ctx"><see cref="BoundedContext{T}"/> providing metadata of execution</param>
-    /// <param name="innerTask">Task code to execute</param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
-    public async Task<T> ExecuteContext<T>(BoundedContext<T> ctx, Func<Task<T>> innerTask) {
+    public async Task<T> ExecuteContext<T>(BoundedContext<T> ctx) {
         this.AssertActive();
         using var openCtx = new OpenedContext<T>(ctx);
         OperationID.OnNext(OPEN_OPID + "::" + ctx.ID);
@@ -568,12 +572,16 @@ public class VNState : IVNState {
                 throw new Exception($"Requested to load-skip context {ContextsDescriptor}, " +
                                     "but save data does not have corresponding information");
         }
-        var result = await innerTask();
+        var result = await ctx.InnerTask();
         if (ctx is StrongBoundedContext<T> sbc_)
             sbc_.OnFinish?.Invoke();
-        Logs.Log($"Saving result {result} to context {ContextsDescriptor}");
         openCtx.Data.Result = result;
-        InstanceDataChanged.OnNext(InstanceData);
+        if ((openCtx as OpenedContext).DataIsSaved) {
+            Logs.Log($"Saving result {result} to context {ContextsDescriptor}");
+            InstanceDataChanged.OnNext(InstanceData);
+        } else {
+            Logs.Log($"Result {result} for context {ContextsDescriptor} will not be saved");
+        }
         return result;
     }
 
@@ -779,7 +787,10 @@ public class VNState : IVNState {
         return new VNOperation(this.AssertActive(), cT => {
             Run(WaitingUtils.WaitFor(condition, WaitingUtils.GetCompletionAwaiter(out var t), cT));
             return t;
-        });
+        }) {
+            //Don't allow user skip on condition-based waits
+            AllowUserSkip = false
+        };
     }
 
     //TODO make this take cT -> Task<T>

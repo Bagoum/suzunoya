@@ -58,24 +58,24 @@ public class StateAssertions {
         s.Assert(a1);
         Assert.AreEqual(a1.Realized, null);
         
-        await s.Actualize(null);
+        await s.Actualize(null, ActualizeOptions.Default);
         var r1 = a1.Realized;
         Assert.AreEqual(r1.X, 13);
         var s2 = new IdealizedState(a2, a1 with { Value = 17 });
         Assert.AreEqual(a2.Realized, null);
-        await s2.Actualize(s);
+        await s2.Actualize(s, ActualizeOptions.Default);
         var r2 = a2.Realized;
         Assert.AreEqual(r1.X, 17);
         //actualize on no precede
         Assert.AreEqual(r2.Y, "hellowww");
 
         var s3 = new IdealizedState(a2 with { Value = "world"} );
-        await s3.Actualize(s2);
+        await s3.Actualize(s2, ActualizeOptions.Default);
         //deactualize on no succeed
         Assert.AreEqual(r1.X, -1017);
         Assert.AreEqual(r2.Y, "world");
 
-        await s3.DeactualizeOnEndState();
+        await s3.DeactualizeOnEndState(ActualizeOptions.Default);
         //unchanged
         Assert.AreEqual(r1.X, -1017);
         //deactualize on end

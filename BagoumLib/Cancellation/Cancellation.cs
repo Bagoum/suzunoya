@@ -105,7 +105,7 @@ public class Cancellable : ICancellable {
     /// <summary>
     /// Cancel a token, and then replace it with a new one.
     /// </summary>
-    public static ICancellee Replace(ref Cancellable? cT) {
+    public static Cancellable Replace(ref Cancellable? cT) {
         cT?.Cancel();
         return cT = new();
     }
@@ -215,9 +215,18 @@ public class JointCancellee : ICancellee {
 
     /// <summary>
     /// Create a cancellee from two parents. If either is null, the other will be directly returned.
+    /// If both are null, returns Cancellable.Null.
     /// </summary>
     public static ICancellee From(ICancellee? c1, ICancellee? c2) {
         if (c1 == null) return c2 ?? Cancellable.Null;
+        if (c2 == null) return c1;
+        return new JointCancellee(c1, c2);
+    }
+    /// <summary>
+    /// Create a cancellee from two parents. If either is null, the other will be directly returned.
+    /// </summary>
+    public static ICancellee? MaybeFrom(ICancellee? c1, ICancellee? c2) {
+        if (c1 == null) return c2;
         if (c2 == null) return c1;
         return new JointCancellee(c1, c2);
     }

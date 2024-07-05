@@ -39,6 +39,7 @@ public record ADVIdealizedState : IdealizedState {
     /// </summary>
     public ADVIdealizedState(IExecutingADV inst) {
         this.inst = inst;
+        //This is only run on new state and isn't reasserted afterwards
         Assert(new RunOnEntryAssertion(EntryTask) {
             Priority = (int.MaxValue, int.MaxValue)
         });
@@ -66,25 +67,25 @@ public record ADVIdealizedState : IdealizedState {
     
     //TODO: extend these with orderings for background, music, etc.
     /// <inheritdoc/>
-    public override async Task ActualizeOnNewState() {
-        await base.ActualizeOnNewState();
-        await FadeIn();
+    public override async Task ActualizeOnNewState(ActualizeOptions options) {
+        await base.ActualizeOnNewState(options);
+        await FadeIn(options);
     }
     /// <inheritdoc/>
-    public override async Task DeactualizeOnEndState() {
-        await FadeOut();
-        await base.DeactualizeOnEndState();
+    public override async Task DeactualizeOnEndState(ActualizeOptions options) {
+        await FadeOut(options);
+        await base.DeactualizeOnEndState(options);
         inst.VN.MainDialogue?.Clear();
     }
 
     /// <summary>
     /// A task that is run after <see cref="ActualizeOnNewState"/>.
     /// </summary>
-    protected virtual Task FadeIn() => Task.CompletedTask;
+    protected virtual Task FadeIn(ActualizeOptions options) => Task.CompletedTask;
     
     /// <summary>
     /// A task that is run before <see cref="DeactualizeOnEndState"/>.
     /// </summary>
-    protected virtual Task FadeOut() => Task.CompletedTask;
+    protected virtual Task FadeOut(ActualizeOptions options) => Task.CompletedTask;
 }
 }

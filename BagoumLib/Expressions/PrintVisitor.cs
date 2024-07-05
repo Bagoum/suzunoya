@@ -318,7 +318,8 @@ public class PrintVisitor : PrintVisitorAbs {
         else if (node.Kind == GotoExpressionKind.Break)
             Add("break");
         else if (node.Kind == GotoExpressionKind.Return) {
-            Returner.Visit(node.Value);
+            Add("return ");
+            Visit(node.Value);
         } else
             Add("goto ", new Label(node.Target));
         return node;

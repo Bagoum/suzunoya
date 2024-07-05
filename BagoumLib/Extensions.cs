@@ -697,6 +697,16 @@ public static class ListExtensions {
             arr[ii] = map(arr[ii]);
         return arr;
     }
+
+    /// <summary>
+    /// Returns true iff every item in `subset` is contained within `other`.
+    /// </summary>
+    public static bool IsSubsetOf<T>(this IReadOnlyList<T> subset, IReadOnlyList<T> other) {
+        for (int ii = 0; ii < subset.Count; ++ii)
+            if (!other.Contains(subset[ii]))
+                return false;
+        return true;
+    }
     
     /// <summary>
     /// Get a hash code based only on the elements of the list.
