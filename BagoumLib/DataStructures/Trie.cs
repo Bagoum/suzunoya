@@ -81,7 +81,7 @@ public class Trie {
             current = nxt;
         }
         return latestEndIndex.Try(out var end) ?
-            new string(str[..end]) :
+            new string(str.AsSpan(0, end)) :
             null;
     }
 

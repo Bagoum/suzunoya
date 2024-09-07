@@ -99,7 +99,7 @@ public record LazyAction : LazyFunc<Unit> {
 public record ParallelLazyAwaitable(params ILazyAwaitable[] tasks) : ILazyAwaitable {
     private Task? loadedTask;
     /// <inheritdoc/>
-    public Task Task => loadedTask ??= Task.WhenAll(tasks.Select(t => t.Task));
+    public Task Task => loadedTask ??= tasks.All(t => t.Task);
     //public ILazyAwaitable BoundCT(ICancellee cT) => new ParallelLazyAwaitable(tasks.Select(t => t.BoundCT(cT)).ToArray());
 }
 
@@ -349,7 +349,7 @@ public record VNOperation(IVNState VN, params Func<VNCancellee, Task>[] Subopera
     /// Create a <see cref="VNOperation"/> that runs the provided tasks in parallel.
     /// </summary>
     public static Func<T, Task> Parallel<T>(IEnumerable<Func<T, Task>> tasks) =>
-        x => System.Threading.Tasks.Task.WhenAll(tasks.Select(t => t(x)));
+        x => tasks.Select(t => t(x)).All();
 
     /// <summary>
     /// Create a <see cref="VNOperation"/> that runs the provided tasks in sequence.

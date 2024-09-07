@@ -288,12 +288,6 @@ public interface IVNState : IConfirmationReceiver {
     /// <br/>If a context is executed multiple times in different parent contexts, the local data is not shared.
     /// </summary>
     bool TryGetContextData<T>(out BoundedContextData<T> value, params string[] contextKeys);
-    
-    /// <summary>
-    /// True if it is possible to run a context twice.
-    /// <br/>This will avoid throwing a "duplicate definition" exception.
-    /// </summary>
-    bool AllowsRepeatContextExecution { get; }
 }
 
 /// <inheritdoc cref="IVNState"/>
@@ -478,9 +472,6 @@ public class VNState : IVNState {
     public IDialogueBox MainDialogueOrThrow =>
         MainDialogue ?? throw new Exception("No dialogue boxes are provisioned.");
 
-    /// <inheritdoc/>
-    public bool AllowsRepeatContextExecution => true;
-
     /// <summary>
     /// Create a <see cref="VNState"/>.
     /// </summary>
@@ -552,9 +543,9 @@ public class VNState : IVNState {
                 //If custom save data unhandled by VNState is modified, then you cannot use StrongBoundedContext.
                 if (lctx != null)
                     if (Contexts.Count > 1)
-                        Contexts[^2].Data.SaveNested(lctx, true);
+                        Contexts[^2].Data.SaveNested(lctx);
                     else
-                        InstanceData.SaveBCtxData(lctx, true);
+                        InstanceData.SaveBCtxData(lctx);
             }
             if (lctx?.Result is {Valid: true, Value: {} res}) {
                 Logs.Log($"Load-skipping section {ContextsDescriptor} with return value {res}");

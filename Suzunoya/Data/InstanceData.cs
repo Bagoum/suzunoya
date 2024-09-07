@@ -18,10 +18,16 @@ namespace Suzunoya.Data {
 [Serializable]
 public abstract record BoundedContextData(string Key, KeyValueRepository Locals,
     Dictionary<string, BoundedContextData> Nested) {
+
+    /// <summary>
+    /// Create (or use existing) BCTX local data nested within this.
+    /// </summary>
+    public BoundedContextData<T> CreateNested<T>(BoundedContext<T> bctx) => CreateNested(this, bctx);
+    
     /// <summary>
     /// Save the information of a bounded context executed while nested within this one.
     /// </summary>
-    public void SaveNested(BoundedContextData data, bool allowOverride=false) => SaveNested(this, data, allowOverride);
+    public void SaveNested(BoundedContextData data) => SaveNested(this, data);
 
     /// <summary>
     /// Check if there exists saved information for a nested bounded context with the provided key.
@@ -43,12 +49,22 @@ public abstract record BoundedContextData(string Key, KeyValueRepository Locals,
         this as BoundedContextData<T> ??
             throw new Exception($"Definition for BoundedContextData {Key} was not of type {typeof(T)}");
     
-    internal static void SaveNested(Either<BoundedContextData, Dictionary<string, BoundedContextData>> parent, BoundedContextData data, bool allowOverride) {
-        var key = data.Key;
+    internal static BoundedContextData<T> CreateNested<T>(Either<BoundedContextData, Dictionary<string, BoundedContextData>> parent, BoundedContext<T> bctx) {
+        var key = bctx.ID;
         var nested = parent.IsLeft ? parent.Left.Nested : parent.Right;
-        if (nested.ContainsKey(key) && !allowOverride && key != "")
+        BoundedContextData<T> result;
+        if (bctx.OnRepeat is RepeatContextExecution.Reset || !nested.TryGetValue(key, out var existing))
+            nested[key] = result = new(key, Maybe<T>.None, new(), new());
+        else if (bctx.OnRepeat is RepeatContextExecution.Fail)
             throw new Exception($"Duplicate definition for key {parent.LeftOrNull?.Key}->{key}");
-        nested[key] = data;
+        else
+            result = existing.CastTo<T>();
+        return result;
+    }
+    
+    internal static void SaveNested(Either<BoundedContextData, Dictionary<string, BoundedContextData>> parent, BoundedContextData data) {
+        var nested = parent.IsLeft ? parent.Left.Nested : parent.Right;
+        nested[data.Key] = data;
     }
 
     internal static bool HasNested(Either<BoundedContextData, Dictionary<string, BoundedContextData>> parent,
@@ -94,9 +110,14 @@ public interface IInstanceData {
     VNLocation? Location { get; set; }
     
     /// <summary>
+    /// Create a local data container for a top-level bounded context execution.
+    /// </summary>
+    BoundedContextData<T> CreateBCtxData<T>(BoundedContext<T> data);
+    
+    /// <summary>
     /// Save the locals and result information from a top-level bounded context execution.
     /// </summary>
-    void SaveBCtxData(BoundedContextData data, bool allowOverride=false);
+    void SaveBCtxData(BoundedContextData data);
 
     /// <summary>
     /// Check if there exists saved top-level bounded context information for the provided key.
@@ -198,8 +219,13 @@ public class InstanceData : IInstanceData {
     }
     
     /// <inheritdoc/>
-    public void SaveBCtxData(BoundedContextData data, bool allowOverride=false) => 
-        BoundedContextData.SaveNested(BCtxData, data, allowOverride);
+    public BoundedContextData<T> CreateBCtxData<T>(BoundedContext<T> bctx) => 
+        BoundedContextData.CreateNested(BCtxData, bctx);
+    
+    /// <inheritdoc/>
+    public void SaveBCtxData(BoundedContextData data) => 
+        BoundedContextData.SaveNested(BCtxData, data);
+    
     /// <inheritdoc/>
     public bool HasBCtxData(string? key) => BoundedContextData.HasNested(BCtxData, key);
     

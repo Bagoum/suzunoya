@@ -99,13 +99,13 @@ public class _1BasicVNStateFunctionalityTest {
             ListEq(er.SimpleLoggedEventStrings, new[] {
                 "<VNState>.DialogueLog ~ Reimu:hEllO wOrld foo",
                 "<TestDialogueBox>.DialogueStarted ~ Reimu:hEllO wOrld foo",
-                "<TestDialogueBox>.Dialogue ~ (Char { fragment = h }, EllO)",
+                "<TestDialogueBox>.Dialogue ~ (Char { Fragment = h }, EllO)",
                 "<Reimu>.$SPEAK ~ ",
-                "<TestDialogueBox>.Dialogue ~ (Char { fragment = E }, llO)",
-                "<TestDialogueBox>.Dialogue ~ (Char { fragment = l }, lO)",
-                "<TestDialogueBox>.Dialogue ~ (Char { fragment = l }, O)",
-                "<TestDialogueBox>.Dialogue ~ (Char { fragment = O }, )",
-                "<TestDialogueBox>.Dialogue ~ (Char { fragment =   }, )"
+                "<TestDialogueBox>.Dialogue ~ (Char { Fragment = E }, llO)",
+                "<TestDialogueBox>.Dialogue ~ (Char { Fragment = l }, lO)",
+                "<TestDialogueBox>.Dialogue ~ (Char { Fragment = l }, O)",
+                "<TestDialogueBox>.Dialogue ~ (Char { Fragment = O }, )",
+                "<TestDialogueBox>.Dialogue ~ (Char { Fragment =   }, )"
             });
             er.LoggedEvents.Clear();
             //at this point the accumulated time is 0.4 (with a 1s delay for the space)

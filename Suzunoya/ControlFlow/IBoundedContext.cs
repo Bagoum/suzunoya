@@ -13,6 +13,27 @@ using Suzunoya.Entities;
 namespace Suzunoya.ControlFlow {
 
 /// <summary>
+/// The method that the VN should use to handle a BCTX when its execution data already exists.
+/// </summary>
+[PublicAPI]
+public enum RepeatContextExecution {
+    /// <summary>
+    /// Throw an exception.
+    /// </summary>
+    Fail = 0,
+    
+    /// <summary>
+    /// Reuse the existing BCTX data.
+    /// </summary>
+    Reuse = 1,
+    
+    /// <summary>
+    /// Clear the existing BCTX data.
+    /// </summary>
+    Reset = 2,
+}
+
+/// <summary>
 /// Non-generic base class for <see cref="BoundedContext{T}"/>
 /// </summary>
 [PublicAPI]
@@ -32,6 +53,9 @@ public interface IBoundedContext {
     ///  data storage in BCTXData.
     /// </summary>
     public bool Identifiable { get; }
+    
+    /// <inheritdoc cref="RepeatContextExecution"/>
+    public RepeatContextExecution OnRepeat { get; }
 }
 
 /// <summary>
@@ -69,6 +93,9 @@ public record BoundedContext<T>(IVNState VN, string ID, Func<Task<T>> InnerTask)
     
     /// <inheritdoc/>
     public bool Identifiable => !string.IsNullOrWhiteSpace(ID);
+
+    /// <inheritdoc/>
+    public RepeatContextExecution OnRepeat { get; set; } = RepeatContextExecution.Reuse;
 
     /// <summary>
     /// True iff there are no save-data changes in the body of the bounded context.

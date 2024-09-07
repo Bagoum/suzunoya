@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BagoumLib.Tasks;
 using JetBrains.Annotations;
 
 namespace BagoumLib.Assertions;
@@ -99,7 +100,7 @@ public record IdealizedState {
             async Task DeactualizePrev() {
                 foreach (var (phase, assertions) in phaseToDeactualizers.OrderBy(p => p.Key)) {
                     Logging.Logs.Log("Deactualizing previous state for phase {0}...", phase, level: LogLevel.DEBUG2);
-                    await Task.WhenAll(assertions.Select(pa => pa.DeactualizeOnNoSucceeding()));
+                    await assertions.All(pa => pa.DeactualizeOnNoSucceeding());
                     Logging.Logs.Log("Completed deactualization of previous for phase {0}", phase, level: LogLevel.DEBUG2);
                 }
             }
@@ -116,7 +117,7 @@ public record IdealizedState {
                         tasks.Add(pa == null ? a.ActualizeOnNoPreceding() : a.Inherit(pa));
                     if (tasks.Count > 0) {
                         Logging.Logs.Log("Actualizing next state for phase {0}...", phase, level: LogLevel.DEBUG2);
-                        await Task.WhenAll(tasks);
+                        await tasks!.All();
                         Logging.Logs.Log("Completed actualization of next state for phase {0}", phase, level: LogLevel.DEBUG2);
                     }
                     pairings.Clear();
@@ -125,7 +126,7 @@ public record IdealizedState {
             }
 
             if (opts.SimultaneousActualization)
-                await Task.WhenAll(DeactualizePrev(), ActualizeNext());
+                await Utilities.TaskWhenAll([DeactualizePrev(), ActualizeNext()]);
             else {
                 await DeactualizePrev();
                 await ActualizeNext();
@@ -140,7 +141,7 @@ public record IdealizedState {
         IsActualized = true;
         foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
             Logging.Logs.Log("Actualizing new-state for phase {0}...", phase, level: LogLevel.DEBUG2);
-            await Task.WhenAll(assertions.Select(a => a.ActualizeOnNewState()));
+            await assertions.All(a => a.ActualizeOnNewState());
             Logging.Logs.Log("Completed actualization of new-state for phase {0}", phase, level: LogLevel.DEBUG2);
         }
     }
@@ -154,7 +155,7 @@ public record IdealizedState {
         IsActualized = false;
         foreach (var (phase, assertions) in AssertionsByPhase.OrderBy(p => p.Key)) {
             Logging.Logs.Log("Deactualizing end-state for phase {0}...", phase, level: LogLevel.DEBUG2);
-            await Task.WhenAll(assertions.Select(a => a.DeactualizeOnEndState()));
+            await assertions.All(a => a.DeactualizeOnEndState());
             Logging.Logs.Log("Completed deactualization of end-state for phase {0}", phase, level: LogLevel.DEBUG2);
         }
     }

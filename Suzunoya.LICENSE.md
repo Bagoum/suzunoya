@@ -31,7 +31,6 @@ With the exception of the testing subproject, this project consumes the followin
 - [System.Reactive](https://www.nuget.org/packages/System.Reactive/) ([MIT](https://github.com/dotnet/reactive/blob/85f1eb7c53e27cccdbeee3e0b044916168843fcc/LICENSE))
 - [System.Collections.Immutable](https://www.nuget.org/packages/System.Collections.Immutable/) ([MIT](https://github.com/dotnet/runtime/blob/71adfb003aa57f4c8801fc9079c9339342c58524/LICENSE.TXT))
 - [Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json) ([MIT](https://github.com/JamesNK/Newtonsoft.Json/blob/4dc9af66e07dea321ad101bfb379326127251a80/LICENSE.md))
-- [FluentIL](https://github.com/Bagoum/FluentIL) ([MIT](https://github.com/Bagoum/FluentIL/blob/master/LICENSE.md))
 
 The project incorporates code from the following projects:
 - [bezier-easing](https://github.com/gre/bezier-easing/) ([MIT](https://github.com/gre/bezier-easing/blob/fcfc40e1b945a8d3b6b2f1aff5aa57f3b56673d9/LICENSE))

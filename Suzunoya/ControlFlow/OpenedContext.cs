@@ -60,14 +60,14 @@ public class OpenedContext<T> : OpenedContext, IDisposable {
     public OpenedContext(BoundedContext<T> bCtx) {
         this.vn = bCtx.VN;
         this.BCtx = bCtx;
-        Data = new BoundedContextData<T>(bCtx.ID, Maybe<T>.None, new KeyValueRepository(), new());
         vn.ContextStarted.OnNext(this);
         if ((this as OpenedContext).DataIsSaved) {
             if (vn.Contexts.Count > 0) {
-                (Parent = vn.Contexts[^1]).Data.SaveNested(Data, vn.AllowsRepeatContextExecution);
+                Data = (Parent = vn.Contexts[^1]).Data.CreateNested(bCtx);
             } else
-                vn.InstanceData.SaveBCtxData(Data, vn.AllowsRepeatContextExecution);
-        }
+                Data = vn.InstanceData.CreateBCtxData(bCtx);
+        } else
+            Data = new(bCtx.ID, Maybe<T>.None, new(), new());
         CtxCToken = JointCancellee.MaybeFrom(Parent?.CtxCToken, bCtx.LocalCToken);
         vn.Contexts.Add(this);
     }

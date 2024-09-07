@@ -8,15 +8,27 @@ using Suzunoya.Data;
 using static Suzunoya.Dialogue.SpeechTag;
 
 namespace Suzunoya.Dialogue {
+/// <summary>
+/// Dialogue text, possibly with tags and events,
+///  that is parsed and provided as a set of instructions for playback.
+/// </summary>
 public class Speech {
     private readonly LString raw;
     private readonly SpeechSettings cfg;
     
     private List<TextUnit>? textUnits;
     internal List<TextUnit> TextUnits => textUnits ??= SpeechParser.Parse(raw);
+    
     private List<SpeechFragment>? fragments;
+    /// <summary>
+    /// The instructions for playing back the speech text.
+    /// </summary>
     public List<SpeechFragment> Fragments => fragments ??= Parse(cfg, TextUnits);
+    
     private string? readable;
+    /// <summary>
+    /// The speech text as a user-displayable readable string. (Tags are stripped.)
+    /// </summary>
     public string Readable => readable ??= ComputeReadable();
 
     public Speech(LString raw, ISettings? settings, SpeechSettings? cfg = null) {
@@ -30,23 +42,29 @@ public class Speech {
     //<b>a<color=red>a</b>a</color>a
     //is legal in TMP and should be legal here.
 
-
     private string ComputeReadable() {
-        var sb = new StringBuilder();
-        foreach (var frag in Fragments) {
-            if (frag is SpeechFragment.Char s)
-                sb.Append(s.fragment);
-        }
-        return sb.ToString();
+        var nc = 0;
+        foreach (var frag in Fragments)
+            if (frag is SpeechFragment.Char)
+                ++nc;
+        var chars = new char[nc];
+        var ii = 0;
+        foreach (var frag in Fragments)
+            if (frag is SpeechFragment.Char ch)
+                chars[ii++] = ch.Fragment;
+        return new string(chars);
     }
 
+    /// <summary>
+    /// Convert a list of text units into a set of instructions for playing speech.
+    /// </summary>
     private static List<SpeechFragment> Parse(SpeechSettings settings, IReadOnlyList<TextUnit> units) {
         var opsUntilNextRollEvent = 0f;
-        var frags = new List<SpeechFragment>();
-        var cfg_stack = new Stack<SpeechSettings>();
+        var frags = new List<SpeechFragment>(units.Count * 2);
+        var cfg_stack = new Stack<SpeechSettings>(2);
         cfg_stack.Push(settings);
-        var tag_stack = new Stack<SpeechFragment.TagOpen>();
-        var tmp_tag_pop = new Stack<SpeechFragment.TagOpen>();
+        var tag_stack = new Stack<SpeechFragment.TagOpen>(4);
+        var tmp_tag_pop = new Stack<SpeechFragment.TagOpen>(4);
 
         for (int ii = 0; ii < units.Count; ++ii) {
             var cfg = cfg_stack.Peek();
@@ -102,51 +120,34 @@ public class Speech {
 
 }
 
-public abstract class SpeechFragment {
-    public class Char : SpeechFragment {
-        public readonly char fragment;
-        public Char(char fragment) {
-            this.fragment = fragment;
-        }
+/// <summary>
+/// Instructions for playing back speech text using a specific <see cref="SpeechSettings"/>.
+/// </summary>
+public abstract record SpeechFragment {
+    /// <summary>
+    /// One character being output from speech.
+    /// </summary>
+    public record Char(char Fragment) : SpeechFragment;
 
-        public override string ToString() => $"Char {{ fragment = {fragment} }}";
-    }
+    /// <summary>
+    /// A delay between speech fragments.
+    /// </summary>
+    public record Wait(float time) : SpeechFragment;
 
-    public class Wait : SpeechFragment {
-        public readonly float time;
-        public Wait(float time) {
-            this.time = time;
-        }
-    }
+    /// <summary>
+    /// An arbitrary callback.
+    /// </summary>
+    public record RollEvent(Action ev) : SpeechFragment;
 
-    //change to internal management type
-    public class RollEvent : SpeechFragment {
-        public readonly Action ev;
-        public RollEvent(Action ev) {
-            this.ev = ev;
-        }
-    }
+    /// <summary>
+    /// A <see cref="SpeechTag"/> being opened.
+    /// </summary>
+    public record TagOpen(string name, SpeechTag tag) : SpeechFragment;
 
-    //Tags can be used to modify SpeakSettings, eg. <speed=*2>fast text!</speed>
-    public class TagOpen : SpeechFragment {
-        public readonly string name;
-        public readonly SpeechTag tag;
-        public TagOpen(string name, SpeechTag tag) {
-            this.name = name;
-            this.tag = tag;
-        }
-
-        public override string ToString() => $"TagOpen {{ name = {name}, tag = {tag} }}";
-    }
-
-    public class TagClose : SpeechFragment {
-        public readonly TagOpen opener;
-        public TagClose(TagOpen opener) {
-            this.opener = opener;
-        }
-        
-        public override string ToString() => $"TagClose {{ opener = {opener} }}";
-    }
+    /// <summary>
+    /// A <see cref="SpeechTag"/> being closed.
+    /// </summary>
+    public record TagClose(TagOpen opener) : SpeechFragment;
 }
 
 

@@ -770,6 +770,14 @@ public static class ListExtensions {
     public static void DecrLoop(this int mod, ref int idx) {
         if (--idx < 0) idx = mod - 1;
     }
+
+    /// <summary>
+    /// Add `x` to the list if it is not null.
+    /// </summary>
+    public static void AddNonNull<T>(this List<T> arr, T? x) where T : class {
+        if (x != null)
+            arr.Add(x);
+    }
 }
 
 /// <summary>
@@ -867,7 +875,7 @@ public static class DictExtensions {
 }
 
 /// <summary>
-/// Static class providing extensions for nullable struct types
+/// Static class providing extensions for nullable types
 /// </summary>
 [PublicAPI]
 public static class NullableExtensions {
@@ -881,10 +889,16 @@ public static class NullableExtensions {
     public static bool? Or(this bool? x, bool y) => x.HasValue ? (bool?) (x.Value || y) : null;
 
     /// <summary>
-    /// Functor map over nullable structs
+    /// Functor map over nullable structs.
     /// </summary>
     public static U? FMap<T, U>(this T? x, Func<T, U> f) where T : struct where U : struct
         => x.HasValue ? (U?) f(x.Value) : null;
+    
+    /// <summary>
+    /// Functor map over nullable class types.
+    /// </summary>
+    public static R? OptFMap<T, R>(this T? x, Func<T, R> map) where T : class where R : class 
+        => x is null ? null : map(x);
 
     /// <summary>
     /// Monadic bind over nullable structs
@@ -967,6 +981,67 @@ public static class EventExtensions {
         var mapEv = new Evented<T, U>(map(source.Value), map);
         source.Subscribe(mapEv);
         return mapEv;
+    }
+}
+
+/// <summary>
+/// Static class providing extensions for actions/funcs.
+/// </summary>
+[PublicAPI]
+public static class FuncExtensions {
+    /// <summary>
+    /// An Action that does nothing.
+    /// </summary>
+    public static readonly Action Noop = () => { };
+    
+    /// <summary>
+    /// Create a Func that calls the `preceding` Action and then returns `result`.
+    /// </summary>
+    public static Func<T, R> AsFunc<T, R>(this R result, Action<T> preceding) => x => {
+        preceding(x);
+        return result;
+    };
+    
+    /// <summary>
+    /// Create a Func that returns true if either argument returns true.
+    /// </summary>
+    public static Func<bool> Or(this Func<bool> x, Func<bool> y) => () => x() || y();
+
+    /// <summary>
+    /// Provide the first value as an argument to the Func.
+    /// </summary>
+    public static B Use<A, B>(this A a, Func<A, B> then) => then(a);
+    
+    /// <summary>
+    /// Return an action that execute two actions in sequence.
+    /// </summary>
+    public static Action Then(this Action? a, Action? b) {
+        if (a == null) return b ?? Noop;
+        if (b == null) return a;
+        return () => {
+            a();
+            b();
+        };
+    }
+    
+    /// <inheritdoc cref="Then"/>
+    public static Action<T> Then<T>(this Action<T>? a, Action<T>? b) {
+        if (a == null) return b ?? (_ => {});
+        if (b == null) return a;
+        return x => {
+            a(x);
+            b(x);
+        };
+    }
+    
+    /// <inheritdoc cref="Then"/>
+    public static Action<T1,T2> Then<T1,T2>(this Action<T1,T2>? a, Action<T1,T2>? b) {
+        if (a == null) return b ?? ((_,_) => {});
+        if (b == null) return a;
+        return (x,y) => {
+            a(x,y);
+            b(x,y);
+        };
     }
 }
 

@@ -18,13 +18,13 @@ public abstract record Continuation<B, U> {
     /// <summary>
     /// Get the underlying value in a base type.
     /// </summary>
-    public abstract B Extract();
+    public abstract B Obj { get; }
     
-    private record Typed<T>(T Data, Func<T, U> Cont) : Continuation<B, U> where T: B {
+    private record Typed<T>(T TObj, Func<T, U> Cont) : Continuation<B, U> where T: B {
         /// <inheritdoc/>
-        public override U Realize() => Cont(Data);
+        public override U Realize() => Cont(TObj);
 
-        public override B Extract() => Data;
+        public override B Obj => TObj;
     }
 
     /// <summary>

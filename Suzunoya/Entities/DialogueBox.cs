@@ -165,8 +165,8 @@ public class DialogueBox : Rendered, IDialogueBox, IConfirmationReceiver {
                 lookahead.Clear();
                 for (int jj = ii; jj < d.Line.Fragments.Count; ++jj) {
                     if (d.Line.Fragments[jj] is SpeechFragment.Char c) {
-                        if (LookaheadRequired(c.fragment)) {
-                            if (jj != ii) lookahead.Append(c.fragment);
+                        if (LookaheadRequired(c.Fragment)) {
+                            if (jj != ii) lookahead.Append(c.Fragment);
                         } else
                             break;
                     }
