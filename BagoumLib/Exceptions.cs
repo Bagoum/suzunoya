@@ -19,9 +19,14 @@ public class MultiException : Exception {
     public MultiException(string message, params Exception[] innerExcs) : this(message, innerExcs as IEnumerable<Exception>) { }
 }
 
+
+
+/// <summary>
+/// Helpers for exceptions.
+/// </summary>
 [PublicAPI]
 public static class Exceptions {
-    public record ExceptionMessagePrinter(StringBuilder Sb, int Indent = 0) {
+    internal record ExceptionMessagePrinter(StringBuilder Sb, int Indent = 0) {
         public void Print(ExceptionMessage error) {
             if (error is ExceptionMessage.Str s)
                 Sb.Append(s.Message);
@@ -53,7 +58,7 @@ public static class Exceptions {
         private string MakeIndent() => Indent == 0 ? "" :  new string(' ', Indent);
     }
     
-    public record InvertedExceptionMessagePrinter(StringBuilder Sb, int Indent = 0) : ExceptionMessagePrinter(Sb, Indent) {
+    internal record InvertedExceptionMessagePrinter(StringBuilder Sb, int Indent = 0) : ExceptionMessagePrinter(Sb, Indent) {
         public override void Print(List<ExceptionMessage> errors) {
             for (int ii = 1; ii <= errors.Count; ++ii) {
                 Print(errors[^ii]);
@@ -65,20 +70,24 @@ public static class Exceptions {
             }
         }
     }
-    public abstract record ExceptionMessage {
+    
+    internal abstract record ExceptionMessage {
         public record Str(string Message) : ExceptionMessage;
         public record Aggregate(string Header, List<ExceptionMessage>[] Children) : ExceptionMessage;
 
         public static implicit operator ExceptionMessage(string s) => new Str(s);
     }
 
+    /// <summary>
+    /// Combine multiple errors into one.
+    /// </summary>
     public static Exception? MaybeAggregate<T>(IList<T> errs) where T: Exception => errs.Count switch {
         0 => null,
         1 => errs[0],
         _ => new MultiException($"Found {errs.Count} errors.", errs)
     };
 
-    public static (List<ExceptionMessage> messages, string? innermostStackTrace)
+    internal static (List<ExceptionMessage> messages, string? innermostStackTrace)
         GetNestedExceptionMessages(this Exception e) {
         var msgs = new List<ExceptionMessage>();
         var lastStackTrace = e.StackTrace;
@@ -100,6 +109,12 @@ public static class Exceptions {
         }
         return (msgs, lastStackTrace);
     }
+    
+    /// <summary>
+    /// Return a string describing a nested exception, showing the outermost
+    ///  exception first and then moving inwards.
+    /// <br/>Includes a stacktrace from the innermost exception.
+    /// </summary>
     public static string PrintNestedException(Exception e, bool showStacktrace = true) {
         var sb = new StringBuilder();
         var (msgs, st) = GetNestedExceptionMessages(e);

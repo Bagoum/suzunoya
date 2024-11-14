@@ -9,6 +9,7 @@ namespace BagoumLib.Mathematics {
 /// </summary>
 [PublicAPI]
 public static class BMath {
+    public const int IntFloatMax = int.MaxValue / 2;
     /// <summary>
     /// Half of pi.
     /// </summary>
@@ -177,6 +178,17 @@ public static class BMath {
         var t = (float)Math.Floor(src / mod) * mod + Mod(mod, target);
         var t1 = t > src ? t - mod : t + mod;
         return Math.Abs(src - t) < Math.Abs(src - t1) ? t : t1;
+    }
+    
+    /// <summary>
+    /// Rotate a vector (x,y) CCW by the provided angle in degrees.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static (float x, float y) RotateVectorDeg(float x, float y, float ang_deg) {
+        float ang = ang_deg * degRad;
+        float cos_rot = (float)Math.Cos(ang);
+        float sin_rot = (float)Math.Sin(ang);
+        return (cos_rot * x - sin_rot * y, sin_rot * x + cos_rot * y);
     }
 
     /// <summary>

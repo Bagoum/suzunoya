@@ -90,6 +90,11 @@ public class ADVManager : ITokenized {
     public void DestroyCurrentInstance() {
         ExecAdv?.Inst.Cancel();
     }
+
+    internal void UnsetIfCurrent(ADVInstance inst) {
+        if (ExecAdv?.Inst == inst)
+            ExecAdv = null;
+    }
     
     /// <summary>
     /// Set the provided ADV execution as the current executing ADV.

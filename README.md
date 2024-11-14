@@ -32,17 +32,23 @@ Mizuhashi is a lightweight combinatorial parser based on FParsec. I wrote this b
 
 Consumes BagoumLib.
 
+### Scriptor
+
+Scriptor is a work-in-progress library that provides an implementation of a simple C#-ish scripting language that can be recompiled at runtime into C# lambdas. It uses type unification to automatically compute most of the program's types (though it currently is not that good with subtyping or interfaces). It is primarily used to provide the scripting language for the bullet hell engine [Danmokou](https://github.com/bagoum/danmokou). Details on the language are provided [here](https://dmk.bagoum.com/docs/articles/language/guide1.html).
+
+Consumes BagoumLib and Mizuhashi.
+
 ### Suzunoya
 
 Suzunoya is an engine-agnostic visual novel library. It also contains code for state management in ADV games. 
 
-Consumes BagoumLib and Mizuhashi.
+Consumes BagoumLib, Mizuhashi, and Scriptor.
 
 ### SuzunoyaUnity
 
 [SuzunoyaUnity](https://github.com/Bagoum/suzunoya-unity) (separate repository) is the Suzunoya adapter for the Unity game engine.
 
-Consumes BagoumLib, Mizuhashi, and Suzunoya.
+Consumes BagoumLib, Mizuhashi, Scriptor, and Suzunoya.
 
 ### BeatDetectorApp
 

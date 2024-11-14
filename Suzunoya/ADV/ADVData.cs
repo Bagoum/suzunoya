@@ -37,6 +37,7 @@ public record ADVData(InstanceData VNData) {
     [JsonIgnore] public bool IsLocked => LockedContextData != null;
     
     //Json usage
+    /// <inheritdoc/>
     [Obsolete]
     public ADVData() : this(default(InstanceData)!) {}
 

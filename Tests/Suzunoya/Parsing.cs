@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using BagoumLib.Tasks;
 using NUnit.Framework;
 using Suzunoya.Dialogue;
 using static Tests.AssertHelpers;
@@ -16,7 +17,7 @@ public class Parsing {
             opsPerChar = (s, i) => 1,
             opsPerRollEvent = 3,
             rollEventAllowed = (s, i) => char.IsUpper(s[i]),
-            rollEvent = () => { }
+            rollEvent = WaitingUtils.NoOp
         };
         ListEq(new Speech(data, null, cfg).Fragments.Select(x => x.ToString()).ToArray(), new SpeechFragment[] {
             new Char('h'),

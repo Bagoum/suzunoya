@@ -644,7 +644,7 @@ public static partial class Combinators {
                 result = f.term1;
             }
 
-            return new(result, prev.Value.Error, prev.Value.Start, prev.Value.End);
+            return new(result, prev!.Value.Error, prev.Value.Start, prev.Value.End);
         };
     }
 

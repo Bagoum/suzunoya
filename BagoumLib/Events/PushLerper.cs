@@ -12,7 +12,10 @@ namespace BagoumLib.Events {
 /// <typeparam name="T"></typeparam>
 [PublicAPI]
 public class PushLerper<T> : ICObservable<T> {
-    private readonly Func<T, T, float, T> lerper;
+    private Func<T, T, float, T>? _lerper;
+    //NB: delaying the query to GenericOps helps with allowing custom types to be registered
+    // in Unity, where class fields on MonoBehaviors are created before the scene is executed and Awake is called.
+    private Func<T, T, float, T> Lerper => _lerper ??= GenericOps.GetLerp<T>();
     /// <summary>
     /// Function that determines how much time it takes to lerp from the previous value (first argument)
     ///  to the next value (second argument).
@@ -35,17 +38,17 @@ public class PushLerper<T> : ICObservable<T> {
     /// <inheritdoc/>
     public T Value => OnChange.Value;
 
+    /// <inheritdoc/>
     public PushLerper(float lerpTime, Func<T, T, float, T>? lerper = null) : this((a, b) => lerpTime, lerper) { }
     
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="lerpTime">A pure function that returns the lerp time given the previous and next values.</param>
     /// <param name="lerper"></param>
     public PushLerper(Func<T, T, float> lerpTime, Func<T, T, float, T>? lerper = null) {
         this.LerpTime = lerpTime;
         elapsed = lerpTime(default!, default!);
-        this.lerper = lerper ?? GenericOps.GetLerp<T>();
+        this._lerper = lerper;
         this.OnChange = new(this.prevValue = nextValue = default!);
     }
 
@@ -59,10 +62,10 @@ public class PushLerper<T> : ICObservable<T> {
             prevValue = Value;
             nextValue = targetValue;
             elapsed = initTime;
-            OnChange.Value = lerper(prevValue, nextValue, LerpController01);
+            OnChange.Value = Lerper(prevValue, nextValue, LerpController01);
         } else {
-            elapsed = initTime;
             OnChange.Value = prevValue = nextValue = targetValue;
+            elapsed = LerpTime(prevValue, nextValue);
         }
         set = true;
     }
@@ -74,6 +77,16 @@ public class PushLerper<T> : ICObservable<T> {
         if (!set || !EqualityComparer<T>.Default.Equals(nextValue, targetValue))
             Push(targetValue, initTime);
     }
+    
+    /// <summary>
+    /// Force-set the current value to `targetValue` if it is not the same as the existing target value.
+    /// </summary>
+    public void ForcePushIfNotSame(T targetValue, float initTime = 0) {
+        if (!set || !EqualityComparer<T>.Default.Equals(nextValue, targetValue)) {
+            Unset();
+            Push(targetValue, initTime);
+        }
+    }
 
     /// <summary>
     /// Update the lerp process for a given delta-time.
@@ -82,7 +95,7 @@ public class PushLerper<T> : ICObservable<T> {
         var lt = LerpTime(prevValue, nextValue);
         if (elapsed < lt) {
             elapsed += dT;
-            OnChange.Value = lerper(prevValue, nextValue, ElapsedRatio(lt));
+            OnChange.Value = Lerper(prevValue, nextValue, ElapsedRatio(lt));
         }
     }
 
@@ -92,7 +105,7 @@ public class PushLerper<T> : ICObservable<T> {
     public void ChangeLerpTime(Func<T, T, float> newLerpTime) {
         this.LerpTime = newLerpTime;
         if (set)
-            OnChange.Value = lerper(prevValue, nextValue, LerpController01);
+            OnChange.Value = Lerper(prevValue, nextValue, LerpController01);
     }
 
     /// <summary>
@@ -103,7 +116,12 @@ public class PushLerper<T> : ICObservable<T> {
         set = false;
     }
 
+    /// <summary>
+    /// Get the current value of a <see cref="PushLerper{T}"/>.
+    /// </summary>
     public static implicit operator T(PushLerper<T> pl) => pl.Value;
+    
+    /// <inheritdoc/>
     public IDisposable Subscribe(IObserver<T> observer) => OnChange.Subscribe(observer);
 
 }

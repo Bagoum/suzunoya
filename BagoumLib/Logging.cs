@@ -75,6 +75,9 @@ public static class Logging {
     /// Singleton logger.
     /// </summary>
     public static readonly Logger Logs = new();
+    
+    public static string ToFileLink(string? filename, int line, string? content = null) =>
+        $"<a href=\"{filename}\" line=\"{line}\">{content ?? $"{filename}:{line}"}</a>";
 }
 
 /// <summary>

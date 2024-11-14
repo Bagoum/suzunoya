@@ -66,6 +66,10 @@ public abstract class DisturbedEvented<D, V> : IDisturbable<D>, ICSubject<V, V> 
     }
 
     private readonly Evented<V> onSet;
+    /// <summary>
+    /// Source event that is fired when this value changes.
+    /// </summary>
+    public Event<V> OnChange => onSet.OnChange;
     
     /// <summary>
     /// List of disturbance effects applied to the core value.

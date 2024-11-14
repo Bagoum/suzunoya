@@ -21,8 +21,9 @@ public record RegexTokenizer<T>([RegexPattern] string RegexPattern, Func<Positio
     /// <summary>
     /// Flags for regex construction. By default, uses RegexOptions.Compiled.
     /// </summary>
-    public RegexOptions Flags { get; init; } = RegexOptions.Compiled; //NonBacktracking would be useful, but its .NET7 only
+    public RegexOptions Flags { get; init; } = RegexOptions.Compiled; //TODO NonBacktracking would be useful, but its .NET7 only
 
+    /// <inheritdoc/>
     public RegexTokenizer(string regexPattern, Func<Position, Match, Maybe<T>> tokenizer) : this(regexPattern,
         (p, m) => {
             var token = tokenizer(p, m);
@@ -42,8 +43,6 @@ public class RegexLexer<T> {
     // In a single joined regex (ie. (option1)|(option2)|(option3)...), it is not trivial
     // to handle cases where certain regexes ought to have priority over others.
     private readonly Regex[] regexes;
-    private readonly Regex regex;
-    private readonly string[] groupNames;
 
     /// <summary>
     /// Create a regex-based lexer.
@@ -53,11 +52,11 @@ public class RegexLexer<T> {
         this.tokenizers = tokenizers;
         //\G is like ^, except it also works when you use regex.Match(str, startFromIndex).
         //See https://learn.microsoft.com/en-us/dotnet/standard/base-types/anchors-in-regular-expressions
-        //Use a timeout of 10ms since we can't use NoBacktracking
+        //Use a timeout of 10ms since we can't use NoBacktracking in standard2.1 (used by Unity)
         regexes = tokenizers.Select(t => new Regex($"\\G{t.RegexPattern}", t.Flags, TimeSpan.FromMilliseconds(10))).ToArray();
-        groupNames = new string[tokenizers.Length];
+        /*groupNames = new string[tokenizers.Length];
         regex = new Regex($"\\G({string.Join("|", tokenizers.Select((h, i) => $"(?<{groupNames[i] = $"regexLexerGroup{i}"}>{h.RegexPattern})"))})",
-            RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled);
+            RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled);*/
     }
 
     /// <summary>
@@ -69,7 +68,6 @@ public class RegexLexer<T> {
         var prevIndex = 0;
         var position = new Position(source, 0);
         for (int index = 0; index < source.Length;) {
-            //Multiple regex implementation (somewhat slower)
             for (int it = 0; it < tokenizers.Length; ++it) {
                 try {
                     var match = regexes[it].Match(source, index);
@@ -95,7 +93,7 @@ public class RegexLexer<T> {
             sb.Append(pos.PrettyPrintLocation(source));
             if (tokens.Count > 0)
                 sb.Append(
-                    $"\nThe most recently parsed token was {tokens[^1]} at {new PositionRange(new(source, prevIndex), new(source, index))}.");
+                    $"\nThe most recently parsed token was {tokens[^1]} at {new PositionRange(new(source, prevIndex), pos)}.");
             throw new Exception(sb.ToString());
             nextLoop: ;
         }

@@ -25,10 +25,12 @@ public class JointCallback<T1,T2,R> {
     /// </summary>
     public Maybe<T2> Second { get; private set; } = Maybe<T2>.None;
     
+    /// <inheritdoc cref="JointCallback{T1,T2,R}"/>
     public JointCallback(Func<T1,T2,R> callback) {
         Callback = callback;
     }
     
+    /// <inheritdoc cref="JointCallback{T1,T2,R}"/>
     public JointCallback(Action<T1,T2> callback) {
         if (typeof(R) != typeof(Unit))
             throw new Exception($"Joint callback must have a Unit return type to use Action constructor");
@@ -50,6 +52,7 @@ public class JointCallback<T1,T2,R> {
             return Callback(value, snd);
         return Maybe<R>.None;
     }
+    
     /// <summary>
     /// Provide the second value, and invoke the callback if the first value is already provided.
     /// </summary>

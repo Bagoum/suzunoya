@@ -32,5 +32,9 @@ public class NullEvent<T> : Event<T> {
     /// <inheritdoc/>
     public override IDisposable Subscribe(IObserver<T> observer) => 
         NullDisposable.Default;
+    
+    /// <inheritdoc/>
+    public override IDisposable Subscribe(IObserver<T> observer, int priority) => 
+        NullDisposable.Default;
 }
 }

@@ -3,8 +3,8 @@ using System.Collections.Generic;
 
 namespace BagoumLib.DataStructures {
 /// <summary>
-/// Generalized implementation of <see cref="DMCompactingArray{T}"/> for multiple types of <see cref="DeletionMarker{T}"/> in one array,
-///  even if the underlying value types are different.
+/// Generalized implementation of <see cref="DMCompactingArray{T}"/> parametrized by the type of deletion marker.
+/// <br/>There is no guarantee about the value type of array elements.
 /// </summary>
 /// <typeparam name="D">Subimplementation of <see cref="IDeletionMarker"/></typeparam>
 public class AnyTypeDMCompactingArray<D> where D : IDeletionMarker {

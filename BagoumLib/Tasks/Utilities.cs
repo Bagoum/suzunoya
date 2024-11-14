@@ -99,35 +99,56 @@ public static class Utilities {
     }
 
     /// <summary>
-    /// Runs a continuation after a task and logs errors from the task or the continuation.
-    /// <br/>The continuation runs even if the task is cancelled/hits an exception.
-    /// <br/>If the continuation hits an error,
-    ///  the task result will contain that error (with the original task error nested within it).
-    /// <br/>It is useful to use this on unawaited tasks with a null continuation, as it logs errors.
+    /// Return a task that is completed successfully if the original task
+    ///  is completed successfully or cancelled, and fails if the original task fails.
     /// </summary>
-    public static Task ContinueWithSync(this Task t, Action? done = null) {
+    public static async Task DontReportCancellation(this Task t) {
+        try {
+            await t;
+        } catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// Runs a continuation after a task and logs exceptions from the task or the continuation.
+    /// <br/>The continuation runs even if the task is cancelled/hits an exception.
+    /// <br/>If the continuation hits an exception,
+    ///  the task result will contain that exception (with the original task exception nested within it).
+    /// <br/>It is useful to use this on unawaited tasks with a null continuation, as it logs exceptions.
+    /// <br/>If `logOnCancelled` is true or `done` is null, then will also log cancellations.
+    /// </summary>
+    public static Task ContinueWithSync(this Task t, Action? done = null, bool? logOnCancelled = null) {
+        //By default, log cancellations if there is no continuation
+        var logCancel = logOnCancelled ?? (done is null);
         if (t.IsCompleted) {
             //don't directly throw here. store the exception in the task result
             // so an exception is only thrown if the task is awaited.
-            if (FinalizeContinueWith(t, done) is { } exc)
+            if (FinalizeContinueWith(t, done, logCancel) is { } exc)
                 return Task.FromException(exc);
             return t;
         } else
-            return _ContinueWithSync(t, done);
+            return _ContinueWithSync(t, done, logCancel);
     }
 
-    private static async Task _ContinueWithSync(this Task t, Action? done = null) {
+    /// <summary>
+    /// Logs exceptions or cancellation from the task.
+    /// <br/>Use on unawaited tasks to report errors.
+    /// </summary>
+    public static void Log(this Task t) => ContinueWithSync(t, null, true);
+
+    private static async Task _ContinueWithSync(this Task t, Action? done, bool logCancel) {
         //This implementation is faster than using ContinueWith(done, TaskContinuationOptions.ExecuteSynchronously)
         // in Unity due to Unity synchronization context overhead.
         try {
             await t;
         } finally {
-            if (FinalizeContinueWith(t, done) is { } exc)
+            if (FinalizeContinueWith(t, done, logCancel) is { } exc)
                 throw exc;
+            if (t.IsCanceled)
+                throw new OperationCanceledException();
         }
     }
 
-    private static Exception? FinalizeContinueWith(Task t, Action? done) {
+    private static Exception? FinalizeContinueWith(Task t, Action? done, bool logCancel) {
         Exception? exc = t.Exception;
         try {
             done?.Invoke();
@@ -138,6 +159,8 @@ public static class Utilities {
             Logging.Logs.Error(exc, 
                 "Exceptions occured within a task continuation. " +
                 "If this continuation is awaited by the main thread, then this error may be repeated.");
+        else if (logCancel && t.IsCanceled)
+            Logging.Logs.Warning("A task that might not be awaited was cancelled.");
         return exc;
     }
 
@@ -162,6 +185,8 @@ public static class Utilities {
                     "If this continuation is awaited by the main thread, then this error may be repeated.");
                 throw exc;
             }
+            if (t.IsCanceled)
+                throw new OperationCanceledException();
         }
     }
 

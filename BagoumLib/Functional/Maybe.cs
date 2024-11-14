@@ -57,6 +57,11 @@ public readonly struct Maybe<T> {
     /// Functor map.
     /// </summary>
     public Maybe<U> FMap<U>(Func<T, U> f) => Valid ? new(f(Value)) : Maybe<U>.None;
+
+    /// <summary>
+    /// Monadic bind.
+    /// </summary>
+    public Maybe<U> Bind<U>(Func<T, Maybe<U>> f) => Valid ? f(Value) : Maybe<U>.None;
     
     /// <summary>
     /// Get the underlying value if it exists, otherwise return dflt.

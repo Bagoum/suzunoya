@@ -12,7 +12,7 @@ public static partial class Combinators {
     /// <param name="minTimes">Minimum number of times to apply the parser (inclusive). Will error if fewer results are found.</param>
     /// <param name="maxTimes">Maximum number of times to apply the parser (inclusive).</param>
     public static Parser<T, List<R>> Repeat<T, R>(this Parser<T, R> p, int minTimes, int maxTimes) {
-        if (maxTimes == 0) return PReturn<T, List<R>>(new List<R>());
+        if (maxTimes == 0) return PReturn<T, List<R>>([]);
         return input => {
             var results = new List<R>();
             ParseResult<R> next = default;

@@ -37,8 +37,8 @@ public record Tweener<T> : TransitionBase<T> {
     /// Lerp function specific to type T (unclamped). Add handling for types via Tween.RegisterLerper.
     /// </summary>
     private Func<T, T, float, T> Lerp { get; } = GetLerp<T>();
-
-
+    
+    /// <inheritdoc cref="Tweener{T}"/>
     public Tweener(Either<T, Func<T>> start, Either<T, Func<T>> end, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
         Start = start;
         End = end;
@@ -82,6 +82,7 @@ public record Tweener<T> : TransitionBase<T> {
 /// A tweener that does nothing for the provided amount of time.
 /// </summary>
 public record NoopTweener : TransitionBase<Unit> {
+    /// <inheritdoc cref="NoopTweener{T}"/>
     public NoopTweener(float time, ICancellee? cT = null) {
         Time = time;
         CToken = cT;
@@ -113,6 +114,7 @@ public record ScaleInTweener<T> : TransitionBase<T> {
     /// </summary>
     private Func<T, float, T> Scaler { get; } = GetMulOp<T>();
 
+    /// <inheritdoc cref="ScaleInTweener{T}"/>
     public ScaleInTweener(T target, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
         Target = target;
         Time = time;
@@ -159,6 +161,7 @@ public record DeltaTweener<T> : TransitionBase<T> {
     private static readonly Func<T, T, float, T> Lerp = GetLerp<T>();
     private static readonly Func<T, T, T> Add = GetAddOp<T>().add;
     
+    /// <inheritdoc cref="DeltaTweener{T}"/>
     public DeltaTweener(Either<T, Func<T>> start, T delta, float time, Action<T> apply, Easer? ease = null, ICancellee? cT = null) {
         Start = start;
         Delta = delta;

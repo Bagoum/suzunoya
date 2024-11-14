@@ -37,7 +37,6 @@ public static class LocalizationRendering {
     
     /// <inheritdoc cref="Render(string?,string[],object[])"/>
     public static string Render(string? locale, string fmtString, params object[] fmtArgs) {
-        FormatArgs(locale, fmtArgs);
         if (fmtArgs.Length == 0)
             return fmtString;
         FormatArgs(locale, fmtArgs);

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reactive;
 using System.Reactive.Subjects;
 using BagoumLib.DataStructures;
 
@@ -23,13 +24,22 @@ public class ReplayEvent<T> : Event<T> {
         buffer = new(History = history);
     }
 
-    /// <inheritdoc/>
-    public override IDisposable Subscribe(IObserver<T> observer) {
-        var dsp = base.Subscribe(observer);
+    private void ReplayFor(IObserver<T> observer) {
         for (int ii = buffer.Count; ii > 0; --ii) {
             observer.OnNext(buffer.SafeIndexFromBack(ii));
         }
-        return dsp;
+    }
+
+    /// <inheritdoc/>
+    public override IDisposable Subscribe(IObserver<T> observer) {
+        ReplayFor(observer);
+        return base.Subscribe(observer);
+    }
+    
+    /// <inheritdoc/>
+    public override IDisposable Subscribe(IObserver<T> observer, int priority) {
+        ReplayFor(observer);
+        return base.Subscribe(observer, priority);
     }
 
     /// <inheritdoc/>

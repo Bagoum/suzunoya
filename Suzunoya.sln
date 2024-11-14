@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mizuhashi", "Mizuhashi\Mizu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BeatDetectorApp", "BeatDetectorApp\BeatDetectorApp.csproj", "{BB1823E8-7FBB-4B70-A122-83AD110F52E4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scriptor", "Scriptor\Scriptor.csproj", "{12A8C1CC-6F2D-4012-AAED-88F501FC1DF7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB1823E8-7FBB-4B70-A122-83AD110F52E4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{12A8C1CC-6F2D-4012-AAED-88F501FC1DF7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12A8C1CC-6F2D-4012-AAED-88F501FC1DF7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12A8C1CC-6F2D-4012-AAED-88F501FC1DF7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12A8C1CC-6F2D-4012-AAED-88F501FC1DF7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

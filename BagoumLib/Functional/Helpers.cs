@@ -104,6 +104,20 @@ public static class Helpers {
             l ?? new() :
             r;
     }
+
+    /// <summary>
+    /// Alias for <see cref="Maybe{T}.FMap{R}"/> for LINQ compatibility.
+    /// </summary>
+    public static Maybe<B> Select<A, B>(this Maybe<A> x, Func<A, B> f) => x.FMap(f);
+
+    /// <summary>
+    /// LINQ implementation for SelectMany.
+    /// </summary>
+    public static Maybe<R> SelectMany<A, B, R>(this Maybe<A> x, Func<A, Maybe<B>> f, Func<A, B, R> project) {
+        if (x.Valid && f(x.Value).Try(out var y))
+            return project(x.Value, y);
+        return Maybe<R>.None;
+    }
     
 
     public static Either<List<T>, string> ReplaceEntries<T>(bool allowFewer, List<T> replaceIn, List<T> replaceFrom, Func<T, bool> replaceFilter) {

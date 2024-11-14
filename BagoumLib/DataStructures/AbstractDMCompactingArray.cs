@@ -5,8 +5,8 @@ using BagoumLib.Functional;
 
 namespace BagoumLib.DataStructures {
 /// <summary>
-/// Alternate implementation of <see cref="DMCompactingArray{T}"/> which allows multiple concrete implementations of
-/// <see cref="IDeletionMarker{T}"/> in one array.
+/// Alternate implementation of <see cref="DMCompactingArray{T}"/> which allows any concrete implementation of
+/// <see cref="IDeletionMarker{T}"/>.
 /// </summary>
 /// <typeparam name="T">Value type of array elements</typeparam>
 public class AbstractDMCompactingArray<T> : AnyTypeDMCompactingArray<IDeletionMarker<T>>, IReadOnlyDMCompactingArray<T> {

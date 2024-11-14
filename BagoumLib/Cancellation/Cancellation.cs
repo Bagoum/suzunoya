@@ -296,7 +296,6 @@ public class GCancellable<T> : ICancellee<T> {
             obj = Maybe<T>.Of(value);
         }
     }
-
     /// <summary>
     /// Cancel the token with the provided value, setting the cancel level to <see cref="ICancellee.HardCancelLevel"/>.
     /// </summary>

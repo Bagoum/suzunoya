@@ -9,6 +9,7 @@ namespace Suzunoya.Data {
 /// Container for data relevant to VN execution that is shared by all instances.
 /// </summary>
 public interface IGlobalData {
+    /// <inheritdoc cref="ISettings"/>
     ISettings Settings { get; }
     
     /// <summary>
@@ -20,10 +21,6 @@ public interface IGlobalData {
     /// Check whether a line has been read.
     /// </summary>
     bool IsLineRead(string line);
-
-    void GalleryCGViewed(string key);
-
-    IReadOnlyCollection<string> Gallery { get; }
 }
 
 /// <summary>
@@ -31,26 +28,31 @@ public interface IGlobalData {
 /// </summary>
 [Serializable]
 public class GlobalData : IGlobalData {
+    /// <inheritdoc cref="IGlobalData.Settings"/>
     public Settings Settings { get; init; } = new();
+    /// <summary>
+    /// The IDs of all executed VN lines.
+    /// </summary>
     public HashSet<string> ReadLines { get; init; } = new();
-
-    public HashSet<string> Gallery { get; init; } = new();
     
     [JsonIgnore] ISettings IGlobalData.Settings => Settings;
-    [JsonIgnore] IReadOnlyCollection<string> IGlobalData.Gallery => Gallery;
 
+    /// <inheritdoc/>
     public void LineRead(string line) {
         ReadLines.Add(line);
     }
 
+    /// <inheritdoc/>
     public bool IsLineRead(string line) => ReadLines.Contains(line);
-
-    public void GalleryCGViewed(string key) {
-        Gallery.Add(key);
-    }
 }
 
+/// <summary>
+/// A service providing an instance of <see cref="GlobalVNData"/> for VN initialization.
+/// </summary>
 public interface IGlobalVNDataProvider {
+    /// <summary>
+    /// Global instance of <see cref="GlobalVNData"/>.
+    /// </summary>
     public GlobalData GlobalVNData { get; }
 }
 

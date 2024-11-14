@@ -50,6 +50,12 @@ public class Evented<T, U> : ISubject<T, U>, ICObservable<U> {
         observer.OnNext(_value);
         return OnChange.Subscribe(observer);
     }
+    
+    /// <inheritdoc cref="Subscribe(System.IObserver{U})" />
+    public IDisposable Subscribe(IObserver<U> observer, int priority) {
+        observer.OnNext(_value);
+        return OnChange.Subscribe(observer, priority);
+    }
 
     /// <inheritdoc />
     public void OnNext(T value) {

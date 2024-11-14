@@ -29,7 +29,7 @@ public interface ILazyAwaitable {
     /// <summary>
     /// Awaitable that does nothing.
     /// </summary>
-    public static readonly ILazyAwaitable Null = new LazyAction(() => { });
+    public static readonly ILazyAwaitable Null = new LazyAction(WaitingUtils.NoOp);
 }
 
 /// <summary>

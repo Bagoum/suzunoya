@@ -20,12 +20,17 @@ public abstract record Markdown {
     /// A top-level Markdown block that includes a tailing newline or EOF.
     /// </summary>
     public abstract record Block : Markdown {
+        /// <summary>
+        /// Flatten a nested block.
+        /// </summary>
         public virtual IEnumerable<Block> Flatten() => new[]{this};
+        
         /// <summary>
         /// Convenience structure that contains two sequential blocks. This is used by internal
         ///  parsing handling, but will not be present in the results if you call Document or Parse.
         /// </summary>
         public record Paired(Block First, Block Second) : Block {
+            /// <inheritdoc/>
             public override IEnumerable<Block> Flatten() => First.Flatten().Concat(Second.Flatten());
         }
 

@@ -183,14 +183,14 @@ public interface IVNState : IConfirmationReceiver {
     /// Wrap an external task (that does not respect skip/cancel semantics) in a cancellable VNOperation.
     /// <br/>Note that this cannot be skipped. It will loop. (It can be cancelled.)
     /// </summary>
-    Task<T> WrapExternal<T>(Task<T> task);
+    Task<T> WrapExternal<T>(Func<ICancellee, Task<T>> task);
     
     /// <summary>
     /// Wrap an external task (that does not respect skip/cancel semantics) in a <see cref="StrongBoundedContext{T}"/>.
     /// <br/>Note that this cannot be skipped. It will loop. (It can be cancelled.)
     /// </summary>
-    StrongBoundedContext<T> WrapExternal<T>(string key, Func<Task<T>> task) =>
-        new(this, key, () => WrapExternal(task()));
+    StrongBoundedContext<T> WrapExternal<T>(string key, Func<ICancellee, Task<T>> task) =>
+        new(this, key, () => WrapExternal(task));
 
     /// <summary>
     /// Create a lazy task that completes when a Confirm is sent to the VNState (see <see cref="UserConfirm"/>).
@@ -224,11 +224,6 @@ public interface IVNState : IConfirmationReceiver {
     /// Executes the bounded context, saves the output value in instance save data, and returns the output value.
     /// </summary>
     Task<T> ExecuteContext<T>(BoundedContext<T> ctx);
-    
-    /// <summary>
-    /// Record a gallery object as having been viewed ingame. (WIP)
-    /// </summary>
-    void RecordCG(IGalleryable cg);
 
     /// <summary>
     /// Event that is published whenever the instance data changes,
@@ -786,12 +781,13 @@ public class VNState : IVNState {
 
     //TODO make this take cT -> Task<T>
     /// <inheritdoc/>
-    public async Task<T> WrapExternal<T>(Task<T> task) {
+    public async Task<T> WrapExternal<T>(Func<ICancellee, Task<T>> task) {
         while (true) {
-            var vnop = Wait(() => task.IsCompleted);
-            var completion = await vnop;
+            using var token = GetOperationCanceller(out var op, false);
+            var t = task(op);
+            var completion = await Wait(() => t.IsCompleted);
             if (completion == Completion.Standard)
-                return task.Result;
+                return t.Result;
             if (completion == Completion.Cancelled)
                 throw new OperationCanceledException();
             if (SkippingMode != null)
@@ -935,11 +931,6 @@ public class VNState : IVNState {
             return true;
         } else
             return false;
-    }
-
-    /// <inheritdoc/>
-    public void RecordCG(IGalleryable cg) {
-        InstanceData.GlobalData.GalleryCGViewed(cg.Key);
     }
 
     /// <summary>

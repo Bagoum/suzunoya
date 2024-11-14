@@ -30,6 +30,7 @@ public record ADVInstance(IADVInstanceRequest Request, IVNState VN, Cancellable 
     public void Cancel() {
         Tracker.Cancel();
         VN.DeleteAll(); //this cascades into destroying executingVN
+        Manager.UnsetIfCurrent(this);
     }
 
     /// <inheritdoc/>

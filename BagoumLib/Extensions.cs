@@ -11,6 +11,7 @@ using BagoumLib.DataStructures;
 using BagoumLib.Events;
 using BagoumLib.Functional;
 using BagoumLib.Mathematics;
+using BagoumLib.Tasks;
 using JetBrains.Annotations;
 
 namespace BagoumLib {
@@ -485,6 +486,15 @@ public static class IEnumExtensions {
     }
 
     /// <summary>
+    /// Filter to include only the elements of `arr` that are of type `U`.
+    /// </summary>
+    public static IEnumerable<U> CastFilter<T, U>(this IEnumerable<T> arr) {
+        foreach (var x in arr)
+            if (x is U xu)
+                yield return xu;
+    }
+
+    /// <summary>
     /// Filter out null elements.
     /// </summary>
     public static IEnumerable<T> FilterNone<T>(this IEnumerable<T?> arr) where T : struct {
@@ -681,6 +691,22 @@ public static class IEnumExtensions {
 [PublicAPI]
 public static class ListExtensions {
     /// <summary>
+    /// Clear the list and return it.
+    /// </summary>
+    public static List<T> Cleared<T>(this List<T> arr) {
+        arr.Clear();
+        return arr;
+    }
+    
+    /// <summary>
+    /// Add an element to a list and return it.
+    /// </summary>
+    public static List<T> Added<T>(this List<T> arr, T ele) {
+        arr.Add(ele);
+        return arr;
+    }
+    
+    /// <summary>
     /// Remove and return the last element of a list.
     /// </summary>
     public static T Pop<T>(this List<T> arr) {
@@ -772,11 +798,12 @@ public static class ListExtensions {
     }
 
     /// <summary>
-    /// Add `x` to the list if it is not null.
+    /// Add `x` to the list if it is not null, and return the list.
     /// </summary>
-    public static void AddNonNull<T>(this List<T> arr, T? x) where T : class {
+    public static List<T> AddNonNull<T>(this List<T> arr, T? x) where T : class {
         if (x != null)
             arr.Add(x);
+        return arr;
     }
 }
 
@@ -785,6 +812,13 @@ public static class ListExtensions {
 /// </summary>
 [PublicAPI]
 public static class DictExtensions {
+    /// <summary>
+    /// Copy all key/value pairs from `src` into `target`.
+    /// </summary>
+    public static void CopyInto<K, V>(this Dictionary<K, V> src, Dictionary<K, V> target) {
+        foreach (var kv in src) target[kv.Key] = kv.Value;
+    }
+    
     /// <summary>
     /// Get the element at the given key, or throw an exception explicitly mentioning the key.
     /// </summary>
@@ -814,9 +848,8 @@ public static class DictExtensions {
     ///  or create a new list if none are yet associated.
     /// </summary>
     public static void AddToList<K, V>(this Dictionary<K, List<V>> dict, K key, V value) where K : notnull {
-        if (!dict.TryGetValue(key, out var l)) {
-            dict[key] = l = new List<V>();
-        }
+        if (!dict.TryGetValue(key, out var l))
+            dict[key] = l = ListCache<V>.Get();
         l.Add(value);
     }
 
@@ -871,6 +904,55 @@ public static class DictExtensions {
             data = dict[key] = deflt;
         }
         return data;
+    }
+    
+    /// <summary>
+    /// Get the value associated with a key, or return null.
+    /// </summary>
+    public static V? GetOrNull<K, V>(this Dictionary<K, V> dict, K key) where V : struct {
+        if (dict.TryGetValue(key, out var res)) return res;
+        return default(V?);
+    }
+    
+    /// <summary>
+    /// Push a value onto the stack mapped to the provided key.
+    /// </summary>
+    public static void Push<K, V>(this Dictionary<K, Stack<V>> dict, K key, V value) {
+        if (!dict.TryGetValue(key, out var s)) s = dict[key] = new Stack<V>();
+        s.Push(value);
+    }
+
+    /// <summary>
+    /// Pop a value from the stack mapped to the provided key. Clear the key if the stack becomes empty.
+    /// </summary>
+    public static void Pop<K, V>(this Dictionary<K, Stack<V>> dict, K key) {
+        var s = dict[key];
+        s.Pop();
+        if (s.Count == 0) dict.Remove(key);
+    }
+
+    /// <summary>
+    /// Get the value `V` associated with the type that most accurately defines `obj`, in the order:
+    /// <br/>- obj.GetType()
+    /// <br/>- interfaces
+    /// <br/>- base types
+    /// </summary>
+    public static V SearchByType<V>(this Dictionary<Type, V> src, object obj, bool searchInterfaces) {
+        var t = obj.GetType();
+        if (src.TryGetValue(t, out var v) && v != null)
+            return v;
+        //Search interfaces first so UINodeLR<T> matches interface before matching UINode
+        if (searchInterfaces) {
+            foreach (var it in obj.GetType().GetInterfaces()) {
+                if (src.TryGetValue(it, out v) && v != null)
+                    return v;
+            }
+        }
+        while ((t = t.BaseType) != null) {
+            if (src.TryGetValue(t, out v) && v != null)
+                return v;
+        }
+        throw new Exception($"Couldn't find type {obj.GetType()} in dictionary");
     }
 }
 
@@ -990,11 +1072,6 @@ public static class EventExtensions {
 [PublicAPI]
 public static class FuncExtensions {
     /// <summary>
-    /// An Action that does nothing.
-    /// </summary>
-    public static readonly Action Noop = () => { };
-    
-    /// <summary>
     /// Create a Func that calls the `preceding` Action and then returns `result`.
     /// </summary>
     public static Func<T, R> AsFunc<T, R>(this R result, Action<T> preceding) => x => {
@@ -1016,7 +1093,7 @@ public static class FuncExtensions {
     /// Return an action that execute two actions in sequence.
     /// </summary>
     public static Action Then(this Action? a, Action? b) {
-        if (a == null) return b ?? Noop;
+        if (a == null) return b ?? WaitingUtils.NoOp;
         if (b == null) return a;
         return () => {
             a();

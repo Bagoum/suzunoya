@@ -14,7 +14,7 @@ namespace BagoumLib.Events {
 [PublicAPI]
 public interface IBObservable<out T> : IObservable<T> {
     /// <summary>
-    /// Whether or not this observable has ever published a vlaue.
+    /// Whether or not this observable has ever published a value.
     /// </summary>
     bool HasValue { get; }
     
@@ -103,6 +103,10 @@ public class Event<T, U> : IBSubject<T, U> {
 
     /// <inheritdoc/>
     public virtual IDisposable Subscribe(IObserver<U> observer) => callbacks.Add(observer);
+
+    /// <inheritdoc cref="Subscribe(System.IObserver{U})"/>
+    public virtual IDisposable Subscribe(IObserver<U> observer, int priority) => 
+        callbacks.AddPriority(observer, priority);
 
     /// <inheritdoc/>
     public virtual void OnNext(T value) {

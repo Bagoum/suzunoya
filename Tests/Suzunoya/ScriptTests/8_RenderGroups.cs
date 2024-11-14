@@ -25,15 +25,15 @@ public class _8RenderGroupTest {
             var reimu = vn.Add(new Reimu());
             await vn.Wait(0);
             
-            var rg2 = vn.Add(new RenderGroup("rg2", 2));
-            var rg3 = vn.Add(new RenderGroup("rg3", 3));
+            var rg2 = vn.Add(new RenderGroup(2));
+            var rg3 = vn.Add(new RenderGroup(3));
             //Multiple render groups cannot have the same priority (at least not on initialization)
-            Assert.Throws<Exception>(() => vn.Add(new RenderGroup("rg4", 2)));
+            Assert.Throws<Exception>(() => vn.Add(new RenderGroup(2)));
             
             reimu.AddToRenderGroup(rg2);
             ListEq(rg2.Contents.ToArray(), new[] { reimu });
             reimu.AddToRenderGroup(rg3);
-            ListEq(rg2.Contents.ToArray(), new IRendered[] { });
+            ListEq(rg2.Contents.ToArray(), Array.Empty<IRendered>());
             ListEq(rg3.Contents.ToArray(), new[] { reimu });
             reimu.LocalLocation.Value = Vector3.One;
             rg3.ZoomTarget.Value = reimu.ComputedLocalLocation;

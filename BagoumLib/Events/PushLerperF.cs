@@ -12,7 +12,8 @@ namespace BagoumLib.Events {
 /// <typeparam name="T"></typeparam>
 [PublicAPI]
 public class PushLerperF<T> : ICObservable<T> {
-    private readonly Func<T, T, float, T> lerper;
+    private Func<T, T, float, T>? _lerper;
+    private Func<T, T, float, T> Lerper => _lerper ??= GenericOps.GetLerp<T>();
     private readonly float lerpTime;
 
     private bool set = false;
@@ -25,22 +26,26 @@ public class PushLerperF<T> : ICObservable<T> {
     private float ElapsedRatio => BMath.Clamp(0, 1, lerpTime <= 0 ? 1 : (elapsedNext / lerpTime));
 
     private Evented<T> OnChange { get; }
+    
+    /// <inheritdoc/>
     public T Value => OnChange.Value;
     
-    public PushLerperF(float lerpTime, Func<T, T, float, T> lerper) {
+    /// <inheritdoc cref="PushLerperF{T}"/>
+    public PushLerperF(float lerpTime, Func<T, T, float, T>? lerper = null) {
         this.lerpTime = lerpTime;
-        this.lerper = lerper;
+        this._lerper = lerper;
         this.prevFunc = this.nextFunc = t => default!;
         this.OnChange = new(default!);
     }
 
+    /// <inheritdoc cref="PushLerper{T}.Push"/>
     public void Push(Func<float, T> targetValue, float initTime = 0) {
         if (set) {
             prevFunc = (elapsedNext < lerpTime && prevFunc != nextFunc) ? _ => Value : nextFunc;
             nextFunc = targetValue;
             elapsedPrev = elapsedNext;
             elapsedNext = initTime;
-            OnChange.Value = lerper(PrevValue, NextValue, ElapsedRatio);
+            OnChange.Value = Lerper(PrevValue, NextValue, ElapsedRatio);
         } else {
             prevFunc = nextFunc = targetValue;
             elapsedPrev = elapsedNext = initTime;
@@ -56,13 +61,19 @@ public class PushLerperF<T> : ICObservable<T> {
         set = false;
     }
 
+    /// <inheritdoc cref="PushLerper{T}.Update"/>
     public void Update(float dT) {
         elapsedPrev += dT;
         elapsedNext += dT;
-        OnChange.Value = lerper(PrevValue, NextValue, ElapsedRatio);
+        OnChange.Value = Lerper(PrevValue, NextValue, ElapsedRatio);
     }
 
+    /// <summary>
+    /// Get the current value of a <see cref="PushLerper{T}"/>.
+    /// </summary>
     public static implicit operator T(PushLerperF<T> pl) => pl.Value;
+    
+    /// <inheritdoc/>
     public IDisposable Subscribe(IObserver<T> observer) => OnChange.Subscribe(observer);
 
 }

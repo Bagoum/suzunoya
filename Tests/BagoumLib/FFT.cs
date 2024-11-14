@@ -89,7 +89,6 @@ public class FFT {
         //In blue dots: the provided data's real components.
         //In red line: the frequency spectrum of the provided data.
         //In green line: the inverse FFT of the frequency spectrum. This should overlap the blue dots.
-        var fft = new OouraFFT();
         Plot spec = new();
         GraphRealSignals(spec, sr, data, actualSamples);
         fft.FFTToFreq(data, true);
@@ -106,7 +105,6 @@ public class FFT {
     public void FFTonFFT() {
         var N = 512;
         var plt = new Plot();
-        var fft = new OouraFFT();
         var data1 = DataForFn(i => Filters.Tukey(i - 200, 240, 0.2) + 0.4 * Filters.Hann(i - 140, 70), N).NormalizeReals();
         var l1 = GraphRealSignals(plt, 1, data1, color: Colors.ForestGreen);
         l1.Label = "Rectangle";
@@ -133,7 +131,6 @@ public class FFT {
         var l2 = GraphRealSignals(plt, 1, data2, color: Colors.Chocolate);
         l2.LineStyle.Pattern = LinePattern.Dashed;
         l2.Label = "Triangle";
-        var fft = new OouraFFT();
         var conv = fft.Convolve(data2.ToArray(), data1.ToArray());
         var l3 = GraphRealSignals(plt, 1, conv, color: Colors.Black);
         l3.LineStyle.Pattern = LinePattern.DenselyDashed;
@@ -275,7 +272,6 @@ public class FFT {
         var times = 5;
         var plt = new Plot();
         var gauss = DataForFilter(i => Filters.DGaussian(i, 161, 10), 256);
-        var rng = new Random();
         var data = Enumerable.Range(0, times).Select(i => 
                 DataForFn(x => 1 - 2 * Cos(Tau * 16 * (x + i * N) / sr) + rng.NextDouble() * 0.4, N))
             .Select((data, ii) => {
@@ -324,8 +320,6 @@ public class FFT {
         var sr = 5120.0;
         var times = 5;
         var plt = new Plot();
-        var rng = new Random();
-        var fft = new OouraFFT();
         var data = Enumerable.Range(0, times).Select(i =>
                 DataForFn(x => 1 - Cos(Tau * 16 * (x + i * N) / sr) + rng.NextDouble() * 0.3, N))
             .Select((data, ii) => {
@@ -352,7 +346,6 @@ public class FFT {
         var plt = new Plot();
         GraphRealSignals(plt, sr, data.ToArray());
         var hannSmear = DataForFn(i => Filters.HalfHann(i, 73), N).NormalizeReals();
-        var fft = new OouraFFT();
         fft.Convolve(data, hannSmear);
         plt.Add.Signal(data.Select(x => x.Real).ToArray(), 1/sr, Colors.Red);
         plt.SavePng("../../../../../pollution.png", 1600, 500);
@@ -438,7 +431,6 @@ public class FFT {
         var file = new AudioFileReader(fn);
         var wf = file.WaveFormat;
         var sr = file.WaveFormat.SampleRate;
-        var fft = new OouraFFT();
         var mp1 = new Plot();
         var mp2 = new Plot();
         var N = NextPowerOfTwo((int)(file.Length / (wf.BitsPerSample * wf.Channels / 8)));
@@ -470,7 +462,6 @@ public class FFT {
         var mp2 = new Plot();
         var N = 4096;
         double sr = file.WaveFormat.SampleRate;
-        var fft = new OouraFFT();
         var allData = new List<Complex>();
         var cdata = ChunkAudio(file, N)
             .Select((cv, ii) => {
@@ -540,7 +531,6 @@ public class FFT {
         var fn = "../../../../../short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
         double sr = file.WaveFormat.SampleRate;
-        var fft = new OouraFFT();
         var mp3 = new Plot();
         var N = 1024;
         var pN = 64;
@@ -609,7 +599,6 @@ public class FFT {
         var fn = "../../../../../short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
         double sr = file.WaveFormat.SampleRate;
-        var fft = new OouraFFT();
         var mp1 = new Plot();
         var N = 262144;
         var data = ChunkAudio(file, N).First();
@@ -633,13 +622,13 @@ public class FFT {
         TestFourierForFn(providers[1], ExF1, 2, 8, true);
         //TestFourierForFn(providers[2], ExF1, 3, 8, true);
         
-        foreach (var fft in providers) {
-            TestFourierForFn(fft, ExF1, 2, 8);
-            TestFourierForFn(fft, ExF1, 3, 16);
-            TestFourierForFn(fft, ExF1, 4, 32);
-            TestFourierForFn(fft, ExF2, 2, 8);
-            TestFourierForFn(fft, ExF2, 3, 16);
-            TestFourierForFn(fft, ExF2, 4, 32);
+        foreach (var f in providers) {
+            TestFourierForFn(f, ExF1, 2, 8);
+            TestFourierForFn(f, ExF1, 3, 16);
+            TestFourierForFn(f, ExF1, 4, 32);
+            TestFourierForFn(f, ExF2, 2, 8);
+            TestFourierForFn(f, ExF2, 3, 16);
+            TestFourierForFn(f, ExF2, 4, 32);
         }
     }
 
@@ -649,7 +638,6 @@ public class FFT {
             var periodSamples = new[]{
                 (2.4, 4), (3.6, 16), (6.1, 64), (11.3, 256), (17.9, 1024), (25.8, 4096), (47.2, 16384)//, (81.0, 65536)
             };
-            var rng = new Random();
             var sw = new Stopwatch();
             var rpt = 400;
             var s = periodSamples[^1].Item2;
@@ -669,15 +657,15 @@ public class FFT {
                     Console.WriteLine($"{N.ToString(),5}: {(sw.Elapsed.TotalMicroseconds/rpt):000.00,8} us");
             }
             
-            foreach (var fft in providers) {
+            foreach (var f in providers) {
                 if(log)
-                    Console.WriteLine($"\nPerformance for {fft.ToString()}:");
+                    Console.WriteLine($"\nPerformance for {f.ToString()}:");
                 foreach (var (p, N) in periodSamples) {
                     sw.Reset();
                     for (int ii = 0; ii < rpt; ++ii) {
                         var data = DataForFnOverPeriod(_ => rng.NextDouble() * 10, p, N);
                         sw.Start();
-                        fft.FFTToFreq(data);
+                        f.FFTToFreq(data);
                         sw.Stop();
                     }
                     if(log)
@@ -702,12 +690,12 @@ public class FFT {
         Assert.AreEqual(a.Real, b.Real, err);
         Assert.AreEqual(a.Imaginary, b.Imaginary, err);
     }
-    private static void TestFourierForFn(IFFT fft, Func<double, Complex> fn, double period, int samples, bool print=false) {
+    private static void TestFourierForFn(IFFT f, Func<double, Complex> fn, double period, int samples, bool print=false) {
         var data = DataForFnOverPeriod(fn, period, samples);
         if (print)
             PrintArr(data, x => $"{x.Real:F2}");
         var fdata = data.ToArray();
-        fft.FFTToFreq(fdata);
+        f.FFTToFreq(fdata);
         var frdata = fdata.ToArray();
         if (print)
             PrintArr(frdata);
@@ -719,7 +707,7 @@ public class FFT {
             AssertEq(data[ii], freqSum);
         }
 
-        fft.FFTFromFreq(fdata);
+        f.FFTFromFreq(fdata);
         for (int ii = 0; ii < samples; ++ii) {
             Assert.AreEqual(0, fdata[ii].Imaginary, err);
             AssertEq(fdata[ii], data[ii]);

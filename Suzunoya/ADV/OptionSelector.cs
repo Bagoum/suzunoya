@@ -35,7 +35,7 @@ public record OptionSelector<C>(IVNState VN) {
     /// <param name="key">Key used to identify this BCTX.</param>
     /// <param name="options">Non-empty array of options. Do not modify the array after passing it to this function.</param>
     public StrongBoundedContext<(int index, C value)> WaitForSelection(string key, params C[] options) =>
-        VN.WrapExternal(key, async () => {
+        VN.WrapExternal(key, async _ => {
             if (CanSelect)
                 throw new Exception("Cannot request a selection when one already exists");
             if (options.Length == 0)

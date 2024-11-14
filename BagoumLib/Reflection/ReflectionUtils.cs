@@ -100,6 +100,12 @@ public static class ReflectionUtils {
     /// C# description as possible without namespaces.
     /// </summary>
     public static string RName(this Type t) => CSharpTypePrinter.Default.Print(t);
+    
+    /// <summary>
+    /// Alias for CSharpTypePrinter.Default.Print(t), which simplifies the type according to runtime rules
+    ///  and then prints it type as close to the native C# description as possible without namespaces.
+    /// </summary>
+    public static string SimpRName(this Type t) => SimplifiedExprPrinter.Default.Print(t);
 
     /// <summary>
     /// Returns true iff either t is equal to parent, or t is a strict subclass of parent.

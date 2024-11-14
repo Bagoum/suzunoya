@@ -20,9 +20,10 @@ namespace Suzunoya.Display {
 /// A render group is also a rendered object and this has similar fields to IRendered.
 /// </summary>
 public class RenderGroup : Transform, ITinted {
-    public static int DefaultSortingIDStep { get; set; } = 10;
-    public const string DEFAULT_KEY = "$default";
-    public string Key { get; }
+    /// <summary>
+    /// The default difference to use between each assigned sorting ID.
+    /// </summary>
+    public static int DefaultSortingIDStep { get; set; } = 4;
 
     /// <summary>
     /// A render group may render to another render group. Roughly equivalent to IRendered.RenderGroup,
@@ -48,6 +49,9 @@ public class RenderGroup : Transform, ITinted {
     /// <inheritdoc/>
     public DisturbedProduct<FColor> ComputedTint { get; }
     
+    /// <summary>
+    /// The alpha of the render group's tint.
+    /// </summary>
     public float Alpha {
         get => ComputedTint.Value.a;
         set => Tint.Value = Tint.Value.WithA(value);
@@ -60,6 +64,8 @@ public class RenderGroup : Transform, ITinted {
     
     /// <summary>
     /// The target that should be zoomed in on or away from when <see cref="Zoom"/> != 1.
+    /// <br/>Note: if the camera only supports zooming upon the center, then use
+    /// <see cref="ZoomTransformOffset"/> instead.
     /// </summary>
     public Evented<Vector3> ZoomTarget { get; } = new(Vector3.Zero);
     
@@ -78,10 +84,10 @@ public class RenderGroup : Transform, ITinted {
     /// </summary>
     public Event<IRendered> RendererAdded { get; } = new();
 
-    public RenderGroup(string key = DEFAULT_KEY, int priority = 0, bool visible = false) {
+    /// <inheritdoc cref="RenderGroup"/>
+    public RenderGroup(int priority = 0, bool visible = false) {
         ZoomTransformOffset = new(() => (Zoom - 1) / Zoom * (ZoomTarget.Value - ComputedLocalLocation), 
             Zoom.Erase(), ZoomTarget.Erase());
-        Key = key;
         Priority = new(priority);
         Visible = new(visible);
         ComputedTint = new(Tint);
@@ -106,6 +112,9 @@ public class RenderGroup : Transform, ITinted {
         Contents.Sort(SortingIDCompare);
     }
 
+    /// <summary>
+    /// Get a sorting ID to assign to a new entity.
+    /// </summary>
     public int NextSortingID() {
         var m = -1 * DefaultSortingIDStep;
         for (int ii = 0; ii < Contents.Count; ++ii) {
@@ -113,14 +122,6 @@ public class RenderGroup : Transform, ITinted {
                 m = Math.Max(m, r.SortingID.BaseValue);
         }
         return m + DefaultSortingIDStep;
-    }
-
-    private Cancellable? transitionToken;
-
-    public ICancellee GetTransitionToken() {
-        transitionToken?.Cancel(ICancellee.HardCancelLevel);
-        transitionToken = new Cancellable();
-        return new JointCancellee(LifetimeToken, transitionToken);
     }
 
     /// <inheritdoc/>

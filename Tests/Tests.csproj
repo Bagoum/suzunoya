@@ -6,6 +6,7 @@
 
         <Nullable>enable</Nullable>
         <LangVersion>12</LangVersion>
+        <OutputType>Library</OutputType>
         <TargetFramework>net8.0</TargetFramework>
     </PropertyGroup>
 
@@ -31,6 +32,7 @@
     <ItemGroup>
       <ProjectReference Include="..\BagoumLib\BagoumLib.csproj" />
       <ProjectReference Include="..\Mizuhashi\Mizuhashi.csproj" />
+      <ProjectReference Include="..\Scriptor\Scriptor.csproj" />
       <ProjectReference Include="..\Suzunoya\Suzunoya.csproj" />
     </ItemGroup>
 

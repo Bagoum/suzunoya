@@ -21,54 +21,56 @@ public class CombMergeSorter<T> : ISorter<T> {
         for (var comb = 1; comb < len; comb *= 2) {
             //Comb backwards so the first half of the merge (A) is always the shorter half
             //This allows efficient buffer usage
-            var minA = start + comb;
             for (var b = end - comb; b > start; b -= comb * 2) {
                 //Optimization for mostly-sorted case
                 if (comp(in array[b - 1], in array[b]))
                     continue;
-                var a = (minA > b ? minA : b) - comb;
+                var a = b - comb;
+                if (a < start) a = start;
                 var bi = b;
-                var e = b + comb;
+                var bend = b + comb;
                 var a1i = 0;
                 var a2i = 0;
-                var a3i = a;
-                //Merge [a, b) and [b, e)
-                //array[bi, e) are remaining elements from B
-                //buffer[a1i, a2i) are elements from A, succeeded by array[a3i, b)
-                //array[start, a3i) are merged elements
+                var nxt = a;
+                //Merge [a, b) and [b, bend)
+                //array[bi, bend) are remaining elements from B
+                //buffer[a1i, a2i) are elements from A, succeeded by array[nxt, b)
+                //array[start, nxt) are merged elements
+                //nxt is the next index to be merged
                 
-                //a3i == e means that we have merged everything
-                while (a3i < e) {
+                //nxt == bend means that we have merged everything
+                while (nxt < bend) {
                     //If there are no B elements remaining,
                     // then copy A elements to the end of the merged elements and we are done
                     //Since comb=len(B)>=len(A), all A elements must be in the buffer
-                    // a3i-start = len(B)+k, where k is the number of merged elements from A
-                    if (bi == e) {
-                        Array.Copy(buffer, a1i, array, a3i, a2i - a1i);
+                    // nxt-start = len(B)+k, where k is the number of merged elements from A
+                    if (bi == bend) {
+                        Array.Copy(buffer, a1i, array, nxt, a2i - a1i);
                         break;
                     }
                     if (a2i > a1i) {
                         //Use A from buffer
-                        if (b > a3i)
+                        if (b > nxt)
                             //If the element at the index-to-merge is A (as opposed to freed space from B),
                             // move it to the buffer
-                            buffer[a2i++] = array[a3i];
-                        array[a3i++] = 
+                            buffer[a2i++] = array[nxt];
+                        array[nxt++] = 
                             comp(in buffer[a1i], in array[bi]) ?
                                 buffer[a1i++] :
                                 array[bi++];
-                    } else if (b > a3i) {
+                    } else if (b > nxt) {
                         //A-buffer is empty, use A in array
-                        if (comp(in array[a3i], in array[bi])) {
+                        if (comp(in array[nxt], in array[bi])) {
                             //A is smaller, no swap required
-                            a3i++;
+                            nxt++;
                         } else {
                             //Move A to buffer and use element from B
-                            buffer[a2i++] = array[a3i];
-                            array[a3i++] = array[bi++];
+                            buffer[a2i++] = array[nxt];
+                            array[nxt++] = array[bi++];
                         }
                     } else
-                        //If there are no A elements remaining, then the B elements are already sorted, we are done
+                        //If there are no A elements remaining,
+                        // then since the B elements are already sorted, we are done
                         break;
                 }
 

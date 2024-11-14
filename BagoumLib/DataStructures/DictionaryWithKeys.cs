@@ -30,6 +30,18 @@ public class DictionaryWithKeys<K, V> where K : notnull {
         }
     }
 
+    /// <summary>
+    /// Clear all data in this dictionary.
+    /// </summary>
+    public void Clear() {
+        for (int ii = 0; ii < Keys.Count; ++ii)
+            if (Keys.GetMarkerIfExistsAt(ii, out var dm))
+                dm.MarkForDeletion();
+        Keys.Compact();
+        Keys.Empty();
+        data.Clear();
+    }
+    
     private class DWKDeletionMarker : IDeletionMarker<K> {
         private static readonly Stack<DWKDeletionMarker> cache = new();
         private DictionaryWithKeys<K, V> container;

@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Nullable>enable</Nullable>
+        <LangVersion>12</LangVersion>
+        <TargetFrameworks>net8.0;netstandard2.1</TargetFrameworks>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DocumentationFile>bin\Release\Scriptor.xml</DocumentationFile>
+        <DebugSymbols>true</DebugSymbols>
+    </PropertyGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\BagoumLib\BagoumLib.csproj" />
+      <ProjectReference Include="..\Mizuhashi\Mizuhashi.csproj" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <Reference Include="LanguageServer.Contracts">
+        <HintPath>..\..\LanguageServer.NET\LanguageServer.Contracts\bin\Release\netstandard2.1\LanguageServer.Contracts.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

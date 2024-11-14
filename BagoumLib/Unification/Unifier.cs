@@ -321,6 +321,7 @@ public interface IRealizedImplicitCast {
 public record ImplicitTypeConverter : IImplicitTypeConverter {
     //don't use this for unification, it will cross-pollute
     private TypeDesignation.Dummy SharedMethodType { get; }
+    /// <inheritdoc/>
     public IImplicitTypeConverterInstance NextInstance { get; private set; }
 
     /// <inheritdoc cref="ImplicitTypeConverter"/>
@@ -342,10 +343,12 @@ public record ImplicitTypeConverter : IImplicitTypeConverter {
         /// <inheritdoc cref="IImplicitTypeConverterInstance.Converter"/>
         public ImplicitTypeConverter Converter { get; }
         IImplicitTypeConverter IImplicitTypeConverterInstance.Converter => Converter;
+        /// <inheritdoc/>
         public TypeDesignation.Dummy MethodType { get; }
         /// <inheritdoc/>
         public TypeDesignation.Variable[] Generic { get; }
-
+        
+        /// <inheritdoc cref="Instance"/>
         public Instance(ImplicitTypeConverter conv) {
             Converter = conv;
             MethodType = conv.SharedMethodType.RecreateVariablesD();

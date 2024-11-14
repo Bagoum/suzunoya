@@ -10,7 +10,7 @@ public abstract record TypeTree {
     /// <summary>
     /// Degenerate interface inheriting <see cref="ITypeTree"/>.
     /// </summary>
-    public interface ITree : ITypeTree { }
+    public interface ITree : ITypeTree;
 
     public interface IMethodTree : ITree {
         ITree[] Arguments { get; }

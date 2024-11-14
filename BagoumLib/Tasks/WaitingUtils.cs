@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Reactive;
 using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using JetBrains.Annotations;
@@ -7,6 +8,10 @@ using JetBrains.Annotations;
 namespace BagoumLib.Tasks {
 [PublicAPI]
 public static class WaitingUtils {
+    /// <summary>
+    /// An Action that does nothing.
+    /// </summary>
+    public static readonly Action NoOp = () => { };
     
     /// <summary>
     /// Get an action that completes a task.
@@ -15,6 +20,28 @@ public static class WaitingUtils {
         var tcs = new TaskCompletionSource<bool>();
         t = tcs.Task;
         return () => tcs.SetResult(true);
+    }
+    
+    /// <summary>
+    /// Get an action that completes a task.
+    /// </summary>
+    public static Action GetUnitAwaiter(out Task<Unit> t) {
+        var tcs = new TaskCompletionSource<Unit>();
+        t = tcs.Task;
+        return () => tcs.SetResult(default);
+    }
+
+    /// <summary>
+    /// Get an action that must be called `ct` times to complete a task.
+    /// </summary>
+    public static Action GetManyAwaiter(int ct, out Task t) {
+        var tcs = new TaskCompletionSource<bool>();
+        t = tcs.Task;
+        var acc = 0;
+        return () => {
+            if (++acc == ct)
+                tcs.SetResult(true);
+        };
     }
 
     /// <summary>
@@ -31,29 +58,27 @@ public static class WaitingUtils {
         };
     }
     
-    public static Action GetAwaiter(out Func<bool> t) {
-        bool done = false;
-        t = () => done;
-        return () => done = true;
-    }
-    
-    public static Action GetCondition(out Func<bool> t) {
+    /// <summary>
+    /// Get an action that sets a boolean value (returned by `cond`) to true.
+    /// </summary>
+    public static Action GetCondition(out Func<bool> cond) {
         bool completed = false;
-        t = () => completed;
+        cond = () => completed;
         return () => completed = true;
     }
-    public static Action GetManyCondition(int ct, out Func<bool> t) {
-        int acc = 0;
-        t = () => acc == ct;
-        return () => ++acc;
-    }
+
+    /// <summary>
+    /// Get a callback that must be called `ct` times in order to invoke `whenAll`.
+    /// </summary>
     public static Action GetManyCallback(int ct, Action whenAll) {
         if (ct == 1) return whenAll;
         int acc = 0;
         return () => {
-            if (++acc == ct) whenAll();
+            if (++acc == ct) 
+                whenAll();
         };
     }
+    
 
     /// <summary>
     /// Waits for the given amount of time, but can be cancelled early by the cT.

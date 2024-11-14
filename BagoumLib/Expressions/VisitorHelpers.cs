@@ -118,8 +118,8 @@ public static class VisitorHelpers {
         ExpressionType.ArrayLength => Right(".Length"),
         ExpressionType.Decrement => Right(" - 1"),
         ExpressionType.Increment => Right(" + 1"),
-        ExpressionType.IsFalse => Right(" is false"), //TODO??
-        ExpressionType.IsTrue => Right(" is true"), //TODO??
+        ExpressionType.IsFalse => Right(" is false"),
+        ExpressionType.IsTrue => Right(" is true"),
         ExpressionType.Negate => Left("-"),
         ExpressionType.NegateChecked => Left("-"),
         ExpressionType.Not => Left(operand == typeof(bool) ? "!" : "~"),
@@ -130,7 +130,6 @@ public static class VisitorHelpers {
         ExpressionType.PreIncrementAssign => Left("++"),
         ExpressionType.Throw => Left("throw "),
         ExpressionType.UnaryPlus => Left("+"),
-        
         _ => throw new Exception($"{e} is not a handled unary operator")
     };
     //Not handled: Block, Call, Conditional, Constant, DebugInfo, Default, Dynamic, Extension (?),

@@ -97,7 +97,7 @@ public record EvidenceRequest<E>(IVNState VN, ADVManager? ADV = null) {
     /// <param name="key">Key used to identify this BCTX.</param>
     public StrongBoundedContext<E> WaitForEvidence(string key) => 
         //waitexternal allows cancellation to work properly
-        VN.WrapExternal(key, () => {
+        VN.WrapExternal(key, _ => {
             var tcs = new TaskCompletionSource<E>();
             requests.Push(new Token.TCS(tcs));
             RequestsChanged.OnNext(default);
