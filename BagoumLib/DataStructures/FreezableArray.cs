@@ -1,24 +1,40 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace BagoumLib.DataStructures;
 
-public readonly struct FreezableArray<T> {
-    public readonly T[] Data;
+/// <summary>
+/// An array of data that cannot be modified and has element-based equality/hashing.
+/// </summary>
+public readonly struct FreezableArray<T> : IEquatable<FreezableArray<T>> {
+    /// <summary>
+    /// The underlying data.
+    /// </summary>
+    public IReadOnlyList<T> Data => data;
+    private readonly T[] data;
+    
+    /// <inheritdoc cref="FreezableArray{T}"/>
     public FreezableArray(T[] data) {
-        this.Data = data;
+        this.data = data;
     }
 
-    //Call this when using as a persistent key so elements don't get modified later
-    public FreezableArray<T> Freeze() => 
-        new(Data.ToArray());
+    /// <summary>
+    /// An empty array.
+    /// </summary>
+    public static FreezableArray<T> Empty { get; } = new([]);
 
-    public override bool Equals(object obj) =>
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) =>
         obj is FreezableArray<T> td && Data.AreSame(td.Data);
+    
+    /// <inheritdoc/>
+    public bool Equals(FreezableArray<T> other) => Data.AreSame(other.Data);
 
+    /// <inheritdoc/>
     public override int GetHashCode() => Data.ElementWiseHashCode();
 
-    public static readonly FreezableArray<T> Empty = new(Array.Empty<T>());
-
+    /// <inheritdoc/>
     public override string ToString() => $"Frozen[{string.Join(", ", Data.Select(d => d?.ToString() ?? "<null>"))}]";
+
 }

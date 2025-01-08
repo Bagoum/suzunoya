@@ -78,7 +78,7 @@ public static class Utilities {
         return tasks.Count switch {
             0 => Task.CompletedTask,
             1 => tasks[0]!,
-            _ => Task.WhenAll(tasks)
+            _ => Task.WhenAll(tasks!)
         };
     }
 
@@ -93,7 +93,7 @@ public static class Utilities {
         }
         return lis.Count switch {
             0 => Task.CompletedTask,
-            1 => lis[0]!,
+            1 => lis[0],
             _ => Task.WhenAll(lis)
         };
     }

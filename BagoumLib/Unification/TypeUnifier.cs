@@ -64,8 +64,8 @@ public record TypeUnifyErr {
     public record NoPossibleOverload(IMethodTypeTree Tree, IList<List<(TypeDesignation, Unifier)>> ArgSets) : TypeUnifyErr;
     
     /// <summary>
-    /// During the <see cref="ITypeTree.ResolveUnifiers"/> stage, no overload could be found that unified
-    ///  correctly with the parameters and return type.
+    /// During the <see cref="ITypeTree.ResolveUnifiers(TypeDesignation,TypeResolver,Unifier)"/> stage,
+    ///  no overload could be found that unified correctly with the parameters and return type.
     /// </summary>
     public record NoResolvableOverload(ITypeTree Tree, TypeDesignation Required, IReadOnlyList<(TypeDesignation, TypeUnifyErr)> Overloads) : TypeUnifyErr;
 
@@ -80,7 +80,7 @@ public record TypeUnifyErr {
     public record MultipleImplicits(ITypeTree Tree, TypeDesignation Required, TypeDesignation First, TypeDesignation Second) : TypeUnifyErr;
 
     /// <summary>
-    /// <see cref="ITypeTree.PossibleUnifiers(TypeResolver,Unifier)"/> returned more or less than 1 possible top-level type.
+    /// AST type-checking returned more than 1 possible top-level type.
     /// </summary>
     public record TooManyPossibleTypes(ITypeTree Tree, List<TypeDesignation> PossibleTypes) : TypeUnifyErr;
 
@@ -211,7 +211,10 @@ public abstract class TypeDesignation {
         return false;
     }
 
-    protected TypeDesignation[]? SimplifyArgs(Unifier u, TypeDesignation[] args) {
+    /// <summary>
+    /// Simplify an array of types using the unifier.
+    /// </summary>
+    protected static TypeDesignation[]? SimplifyArgs(Unifier u, TypeDesignation[] args) {
         int diff = 0;
         for (; diff < args.Length; ++diff) {
             if (args[diff].Simplify(u) != args[diff])
@@ -236,7 +239,7 @@ public abstract class TypeDesignation {
     /// </summary>
     public TypeDesignation RecreateVariables() => RecreateVariables(new());
 
-    /// <inheritdoc cref="RecreateVariables"/>
+    /// <inheritdoc cref="RecreateVariables()"/>
     protected abstract TypeDesignation RecreateVariables(Dictionary<Variable, Variable> rebind);
     
     /// <summary>
@@ -244,12 +247,18 @@ public abstract class TypeDesignation {
     /// </summary>
     public Known MakeArrayType() => new Known(Known.ArrayGenericType, this);
 
+    /// <summary>
+    /// Equality operator.
+    /// </summary>
     public static bool operator ==(TypeDesignation? a, TypeDesignation? b) {
         if (a is null)
             return b is null;
         return a.Equals(b);
     }
 
+    /// <summary>
+    /// Inequality operator.
+    /// </summary>
     public static bool operator !=(TypeDesignation? a, TypeDesignation? b) => !(a == b);
 
     // --- subclasses ---
@@ -319,8 +328,8 @@ public abstract class TypeDesignation {
             var ctypes = new Type[Arguments.Length];
             for (int ii = 0; ii < Arguments.Length; ++ii) {
                 var rtyp = Arguments[ii].Resolve(unifier);
-                if (!rtyp.TryL(out var typ))
-                    return rtyp.Right;
+                if (rtyp.TryR(out var err))
+                    return err;
                 ctypes[ii] = rtyp.Left;
             }
             if (Typ == typeof(_ArrayGenericTypeHelperDoNotUse<>))

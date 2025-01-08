@@ -22,6 +22,9 @@ using Position = Mizuhashi.Position;
 
 namespace Scriptor.Compile {
 
+/// <summary>
+/// Record containing state information for annotating an ST into an AST.
+/// </summary>
 public record STAnnotater(LexicalScope Scope, Dictionary<string, ST>? VarReplace = null);
 
 /// <summary>
@@ -30,7 +33,10 @@ public record STAnnotater(LexicalScope Scope, Dictionary<string, ST>? VarReplace
 /// but it can be transformed into an <see cref="IAST"/> that does.
 /// </summary>
 public abstract record ST(PositionRange Position) : IDebugPrint {
-    public ReflectDiagnostic[] Diagnostics { get; init; } = System.Array.Empty<ReflectDiagnostic>();
+    /// <summary>
+    /// Diagnostics that should be applied to the resultant AST.
+    /// </summary>
+    public ReflectDiagnostic[] Diagnostics { get; init; } = [];
 
     private static SemanticToken? Token(PositionRange? pos, string type) => 
         pos.Try(out var p) ? new(p, type) : null;
@@ -72,7 +78,12 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
     /// <param name="Name">Name of the identifier.</param>
     /// <param name="Generic">Whether this identifier is generic, ie. contains &lt;&gt; or array markings []. A generic identifier cannot be a variable.</param>
     public record Ident(PositionRange Position, string Name, bool Generic) : ST(Position) {
+        /// <summary>
+        /// The token representing the explicitly-declared type of this identifier.
+        /// </summary>
         public Lexer.Token? KnownType { get; }
+        
+        /// <inheritdoc cref="ST.Ident"/>
         public Ident(Lexer.Token token, Lexer.Token? type = null) : this(token.Position, token.Content,
             token.Type == Lexer.TokenType.TypeIdentifier) {
             this.KnownType = type;
@@ -108,7 +119,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                 if (scope.IsConstScope)
                     return new AST.Failure(new(Position, "Cannot use dynamic lookup within a constant scope."), scope);
                 var ast = new AST.WeakReference(Position, scope, key, typ);
-                ast.AddTokens(new[]{Type(KnownType?.Position)});
+                ast.AddTokens([Type(KnownType?.Position)]);
                 return ast;
             }
             if (typ != null)
@@ -171,6 +182,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
 
+    /// <summary>
+    /// An `import` statement that brings some other script into the namespace.
+    /// </summary>
     public record Import(PositionRange KwPos, Lexer.Token File, (PositionRange At, Lexer.Token Filename)? Location, (PositionRange As, Lexer.Token Desc)? Name) :
         ST(KwPos.Merge(Name?.Desc.Position ?? File.Position)) {
         
@@ -190,8 +204,10 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                     Description = () => $"Import {File.Content}" + (Name is { } n ? $" as {n.Desc.Content}" : null)
                 };
             }
-            ast.AddTokens(new[] { Keyword(KwPos), Keyword(Location?.At), 
-                Token(Location?.Filename.Position, SemanticTokenTypes.String), Keyword(Name?.As) });
+            ast.AddTokens([
+                Keyword(KwPos), Keyword(Location?.At), 
+                Token(Location?.Filename.Position, SemanticTokenTypes.String), Keyword(Name?.As)
+            ]);
             return (IAST)ast;
         }
 
@@ -211,7 +227,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                 return new AST.Failure(
                     new(Position, "This return statement is not contained within a function definition."), ann.Scope);
             var ast = new AST.Return(Position, ann.Scope, Value?.Annotate(ann));
-            ast.AddTokens(new[] { Keyword(KwPos) });
+            ast.AddTokens([Keyword(KwPos)]);
             return ast;
         }
 
@@ -268,6 +284,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         public static readonly MethodSignature VarInitialize =
             LangParser.Meth(typeof(ExMAssign), nameof(ExMAssign.VariableInitialize));
         
+        /// <summary>
+        /// Location of the `const` keyword before the declaration.
+        /// </summary>
         public PositionRange? ConstKwPos { get; set; }
         
         /*private readonly FunctionCall Assignment =
@@ -293,11 +312,12 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                 assignScope.IsConstScope = true;
                 assignScope.Type = LexicalScopeType.ExpressionBlock;
             }
-            var ret = new AST.MethodCall(decl.Position.Merge(AssignValue.Position), EqPos, ann.Scope, new[] { VarInitialize.Call(null) }, new[] {
+            var ret = new AST.MethodCall(decl.Position.Merge(AssignValue.Position), EqPos, ann.Scope, [VarInitialize.Call(null)
+            ], new[] {
                 new Ident(decl.Position, decl.Name, false).Annotate(ann),
                 AssignValue.Annotate(ann with { Scope = assignScope })
             });
-            ret.AddTokens(new[]{ Keyword(ConstKwPos), Keyword(VarKw.Position), Type(Typ?.Position)});
+            ret.AddTokens([Keyword(ConstKwPos), Keyword(VarKw.Position), Type(Typ?.Position)]);
             return ret;
         }
 
@@ -309,7 +329,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
 
-    public ReflectionException emptyMemberErr => new(Position, "An identifier is required after this period.");
+    private ReflectionException emptyMemberErr => new(Position, "An identifier is required after this period.");
 
     /// <summary>
     /// A member access `x.y`.
@@ -323,7 +343,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (Object is Ident id) {
                 if (ann.Scope.ImportDecls.TryGetValue(id.Name, out var imp)) {
                     if (Ident.TryFindVariable(Position, Member, imp, ann.Scope) is { } tree) {
-                        tree.AddTokens(new[] { Keyword(Object.Position) });
+                        tree.AddTokens([Keyword(Object.Position)]);
                         return tree;
                     } else {
                         return new AST.Failure(Member.Name.Length > 0 ?
@@ -344,7 +364,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                             { Completions = (typ, Member.Name) };
                     var ast = AST.MethodCall.Make(Position, Member.Position, ann,
                         methods.Select(m => MethodSignature.Get(m).Call(Member.Name)).ToArray(), System.Array.Empty<ST>());
-                    ast.AddTokens(new[] { Type(id.Position) });
+                    ast.AddTokens([Type(id.Position)]);
                     return ast;
                 }
             }
@@ -378,11 +398,11 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (Object is Ident id) {
                 if (ann.Scope.ImportDecls.TryGetValue(id.Name, out var imp)) {
                     if (FunctionCall.LoadScriptFnDecl(Position, Member, imp, ann, Args) is { } sfn) {
-                        (sfn as AST)?.AddTokens(new[] { Keyword(Object.Position) });
+                        (sfn as AST)?.AddTokens([Keyword(Object.Position)]);
                         return sfn;
                     } else if (imp.Ef.Scope.MacroDecls.TryGetValue(Member.Name, out var macro)) {
                         var ast = MacroDef.AnnotateAtCallsite(Position, Member.Position, macro, ann, Args);
-                        (ast as AST)?.AddTokens(new[] { Keyword(Object.Position) });
+                        (ast as AST)?.AddTokens([Keyword(Object.Position)]);
                         return ast;
                     } else {
                         return new AST.Failure(Member.Name.Length > 0 ?
@@ -413,7 +433,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                     }
                     var ast = AST.MethodCall.Make(Position, Member.Position, ann,
                         methods.Select(m => MethodSignature.Get(m).Call(Member.Name)).ToArray(), Args);
-                    ast.AddTokens(new[] { Type(id.Position) });
+                    ast.AddTokens([Type(id.Position)]);
                     return ast;
                 }
             }
@@ -436,12 +456,13 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
 
+    /// <inheritdoc cref="AST.Indexer"/>
     public record Indexer(ST Object, PositionRange OpenBrace, ST Index, PositionRange CloseBrace)
         : ST(Object.Position.Merge(CloseBrace)) {
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) {
             var ast = new AST.Indexer(Position, ann.Scope, Object.Annotate(ann), Index.Annotate(ann));
-            ast.AddTokens(new[] { Op(OpenBrace), Op(CloseBrace) });
+            ast.AddTokens([Op(OpenBrace), Op(CloseBrace)]);
             return ast;
         }
 
@@ -490,6 +511,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             } else return null;
         }
 
+        /// <summary>
+        /// Create an error string for the method by the given name not being found.
+        /// </summary>
         public static string NoMethodFoundErr(string name, LexicalScope scope) {
             var err = $"Couldn't find any method by the name `{name}`.";
             var unreachable = scope.ScriptRoot.AllFnsInDescendantScopes.Where(x => x.Name == name).ToList();
@@ -531,11 +555,11 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                         var prms = Args.Select(a => a.Annotate(ann)).ToArray();
                         if (prms.Length == 0) {
                             var nextPos = new PositionRange(id.Position.End, Position.End);
-                            prms = new IAST[] {
+                            prms = [
                                 new AST.Failure(new(nextPos, "At least one argument is required here."), ann.Scope) {
                                     PossibleTypes = decls.Select(x => x.SharedType.Arguments[0]).Distinct().ToArray()
                                 }
-                            };
+                            ];
                         }
                         return new AST.Failure(new(Position, id.Position,
                             $"There is no method by name `{id.Name}` that takes {Args.Length} arguments." +
@@ -571,6 +595,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
 
+    /// <summary>
+    /// A `new Type(args)` method call.
+    /// </summary>
     public record Constructor(PositionRange Position, PositionRange NewKw, Lexer.Token Typ, params ST[] Args) : ST(Position) {
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) {
@@ -582,7 +609,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (argFilter.Count > 0) {
                 var ast = AST.MethodCall.Make(Position, Typ.Position, ann, argFilter.Select(d => d.Call(null)).ToArray(), Args);
                 ast.AddMethodSemanticToken = false;
-                ast.AddTokens(new[] { Keyword(NewKw), Type(Typ.Position) });
+                ast.AddTokens([Keyword(NewKw), Type(Typ.Position)]);
                 return ast;
             } else {
                 var prms = Args.Select(a => a.Annotate(ann)).ToArray();
@@ -694,17 +721,15 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                 if (ArgCounts(item) is not { } counts)
                     //This is not a function, so we consume zero args, but increment the index
                     // since this object itself takes up a space
-                    return new[]{ (preceding.Add((index, 0)), index + 1)};
+                    return [(preceding.Add((index, 0)), index + 1)];
                 else 
                     //Note that we may want to prepend `preceding.Add((index, 0)), index + 1)` to this,
                     // which is the case of using a function name as a lambda
                     return counts.Item2
                         .Where(consumed => index + 1 + consumed.reqArgs <= args.Length)
                         .SelectMany(consumed => {
-                            IEnumerable<(ImmutableList<(int, int)>, int)> cac = new[]
-                                //This function eventually consumes `consumed` args, but the index we start at
-                                // is just index+1, since only the function at `index` has been consumed so far
-                                { (preceding.Add((index, consumed.reqArgs)), index + 1) };
+                            IEnumerable<(ImmutableList<(int, int)>, int)> cac = [(preceding.Add((index, consumed.reqArgs)), index + 1)
+                            ];
                             for (int ii = 0; ii < consumed.reqArgs; ++ii) {
                                 cac = cac.SelectMany(ca => PossibleArgCounts(ca.Item2, ca.Item1));
                             }
@@ -827,6 +852,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
 
+    /// <inheritdoc cref="AST.TypeAs"/>
     public record TypeAs(ST Object, PositionRange AsKw, ST TypeDef) : ST(Object.Position.Merge(TypeDef.Position)) {
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) {
@@ -836,7 +862,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (!ptyp.TryL(out var typ))
                 return new AST.Failure(new(TypeDef.Position, ptyp.Right), ann.Scope) { IsTypeCompletion = true };
             var ast = new AST.TypeAs(Position, ann.Scope, typ, Object.Annotate(ann));
-            ast.AddTokens(new[] { Keyword(AsKw), Type(TypeDef.Position) });
+            ast.AddTokens([Keyword(AsKw), Type(TypeDef.Position)]);
             return ast;
         }
 
@@ -850,6 +876,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
 
+    /// <summary>
+    /// Definition of a macro.
+    /// </summary>
     public record MacroDef(Lexer.Token Kw, Lexer.Token Name, List<(Lexer.Token name, (Lexer.Token eqKw, ST defltVal)? deflt)> Args, Block Body) : ST(Kw.Position.Merge(Body.Position)) {
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) {
@@ -872,6 +901,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             return ast;
         }
 
+        /// <summary>
+        /// Expand a macro at a target location in the source code.
+        /// </summary>
         public static IAST AnnotateAtCallsite(PositionRange pos, PositionRange meth, MacroDecl decl, STAnnotater ann, IReadOnlyList<ST> args) {
             if (args.Count > decl.Args.Length)
                 return new AST.Failure(new(pos, $"Too many arguments provided to macro {decl.Name}"),
@@ -913,6 +945,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
     }
     
+    /// <inheritdoc cref="AST.ScriptFunctionDef"/>
     public record FunctionDef(Lexer.Token Kw, Lexer.Token Name, List<((Lexer.Token name, Lexer.Token? typ), (Lexer.Token eqKw, ST defltVal)? deflt)> Args,
         Lexer.Token? ReturnType, Block Body) : ST(Kw.Position.Merge(Body.Position)) {
         /// <summary>
@@ -962,12 +995,12 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             decl.Tree = ast;
             ast.AddTokens(Args.Select(a => Type(a.Item1.typ?.Position))
                 .Concat(Args.Select(a => Op(a.deflt?.eqKw.Position)))
-                .Concat(new[] {
+                .Concat([
                     Keyword(ConstKwPos),
                     Keyword(Kw.Position),
                     new SemanticToken(Name.Position, SemanticTokenTypes.Function).WithConst(decl.IsConstant),
                     Type(ReturnType?.Position)
-                }));
+                ]));
             return ast;
         }
 
@@ -993,6 +1026,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
     /// A block of statements.
     /// </summary>
     public record Block(PositionRange Position, IReadOnlyList<ST> Args) : ST(Position) {
+        /// <inheritdoc cref="AST.Block"/>
         public Block(IReadOnlyList<ST> args) : this(args.Count > 0 ? 
             args[0].Position.Merge(args[^1].Position) : 
             new Position(0, 1, 0).CreateEmptyRange(), args) { }
@@ -1000,7 +1034,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         private IAST[] AnnotateStmts(STAnnotater ann) {
             var args = Args.Select(a => a.Annotate(ann)).ToArray();
             if (args.Length == 0)
-                args = new IAST[] { new AST.DefaultValue(Position, ann.Scope, typeof(void)) };
+                args = [new AST.DefaultValue(Position, ann.Scope, typeof(void))];
             return args;
         }
         
@@ -1011,6 +1045,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         }
 
         //note: these functions requires localScope to be passed in instead of enclosingScope
+        /// <summary>
+        /// Annotate this block as a top-level block with script arguments.
+        /// </summary>
         public Either<AST.Block, AST.Failure> AnnotateWithParameters(STAnnotater ann, IDelegateArg[] arguments) {
             var decls = new ImplicitArgDecl[arguments.Length];
             for (int ii = 0; ii < arguments.Length; ++ii) {
@@ -1019,6 +1056,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             return AnnotateWithParameters(ann, decls);
         }
         
+        /// <summary>
+        /// Annotate this block as a top-level or function body block with implicit arguments.
+        /// </summary>
         public Either<AST.Block, AST.Failure> AnnotateWithParameters(STAnnotater ann, ImplicitArgDecl[] arguments) {
             var localScope = ann.Scope;
             var decls = new (VarDecl, ImplicitArgDecl)[arguments.Length];
@@ -1085,7 +1125,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         protected override IAST _AnnotateInner(STAnnotater ann) {
             var ast = new AST.Conditional(Position, ann.Scope, false, Condition.Annotate(ann), TrueBody.Annotate(ann),
                 FalseBody?.Annotate(ann));
-            ast.AddTokens(new[] { Keyword(ifKw), elseKw is { } ekp ? Keyword(ekp) : null });
+            ast.AddTokens([Keyword(ifKw), elseKw is { } ekp ? Keyword(ekp) : null]);
             return ast;
         }
 
@@ -1133,7 +1173,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             var body = (AST.Block)Body.Annotate(localAnn);
             body.EndWithLabel = localScope.ContinueBreak.Value.c;
             var ast = new AST.Loop(Position, ann.Scope, localScope, init, cond, Finalizer?.Annotate(localAnn), body);
-            ast.AddTokens(new[] { Keyword(KwPos) });
+            ast.AddTokens([Keyword(KwPos)]);
             return ast;
         }
 
@@ -1178,7 +1218,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                 typ = typ.GetElementType();
             }
             var ast = new AST.Array(Position, ann.Scope, typ, Args.Select(a => a.Annotate(ann)).ToArray());
-            ast.AddTokens(new[] { Type(Typ?.Position) });
+            ast.AddTokens([Type(Typ?.Position)]);
             return ast;
         }
 
@@ -1216,7 +1256,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (!kt.TryL(out var typ))
                 return kt.Right;
             var ast = new AST.DefaultValue(Position, ann.Scope, typ, asFunctionArg);
-            ast.AddTokens(new[] { Type(Typ?.Position) });
+            ast.AddTokens([Type(Typ?.Position)]);
             return ast;
         }
 
@@ -1230,6 +1270,9 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
     /// A fixed value of a type not subject to type auto-determination, such as strings, but not numbers.
     /// </summary>
     public record TypedValue<T>(PositionRange Position, T Value) : ST(Position) {
+        /// <summary>
+        /// The symbol type of this value.
+        /// </summary>
         public SymbolKind Kind { get; init; } = SymbolKind.Constant;
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) => 

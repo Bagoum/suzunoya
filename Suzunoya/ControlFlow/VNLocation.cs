@@ -35,6 +35,7 @@ public class VNLocation {
     private VNLocation(string lastOperation, IEnumerable<IBoundedContext> ctxs) : 
         this(lastOperation, ctxs.Select(c => c.ID).ToList()) { }
     
+    /// <inheritdoc cref="VNLocation"/>
     public VNLocation(string lastOperation, List<string> ctxs) {
         this.LastOperationID = lastOperation;
         this.Contexts = ctxs;

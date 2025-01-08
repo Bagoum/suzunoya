@@ -31,6 +31,7 @@ public class Speech {
     /// </summary>
     public string Readable => readable ??= ComputeReadable();
 
+    /// <inheritdoc cref="Speech"/>
     public Speech(LString raw, ISettings? settings, SpeechSettings? cfg = null) {
         this.raw = raw;
         this.cfg = (cfg ??= SpeechSettings.Default) with {

@@ -11,12 +11,33 @@ namespace BagoumLib {
 /// </summary>
 [PublicAPI]
 public enum LogLevel {
+    /// <summary>
+    /// Lowest-priority debug level
+    /// </summary>
     DEBUG1 = 1,
+    /// <summary>
+    /// Second-lowest-priority debug level
+    /// </summary>
     DEBUG2 = 2,
+    /// <summary>
+    /// Second-highest-priority debug level
+    /// </summary>
     DEBUG3 = 3,
+    /// <summary>
+    /// Highest-priority debug level
+    /// </summary>
     DEBUG4 = 4,
+    /// <summary>
+    /// Informational logs (default level)
+    /// </summary>
     INFO = 5,
+    /// <summary>
+    /// Warnings
+    /// </summary>
     WARNING = 6,
+    /// <summary>
+    /// Errors/exceptions
+    /// </summary>
     ERROR = 7
 }
 /// <summary>
@@ -44,6 +65,7 @@ public readonly struct LogMessage {
     /// </summary>
     public Exception? Exception { get; }
 
+    /// <inheritdoc cref="LogMessage"/>
     public LogMessage(string message, LogLevel level, Exception? exception = null, bool? showStackTrace = null) {
         Message = message;
         ShowStackTrace = showStackTrace;
@@ -51,18 +73,35 @@ public readonly struct LogMessage {
         Exception = exception;
     }
 
+    /// <summary>
+    /// Create a <see cref="LogMessage"/> with a default level of <see cref="LogLevel.INFO"/>.
+    /// </summary>
     public static LogMessage Info(string message, LogLevel level = LogLevel.INFO) => 
         new(message, level);
     
+    /// <summary>
+    /// Create a warning log.
+    /// </summary>
     public static LogMessage Warning(string message) => 
         new(message, LogLevel.WARNING);
     
+    /// <summary>
+    /// Create an error log.
+    /// </summary>
     public static LogMessage Error(Exception? exception, string message = "") => 
         new(message, LogLevel.ERROR, exception, true);
 
+    /// <summary>
+    /// Convert a string to an info log.
+    /// </summary>
     public static implicit operator LogMessage(string message) => LogMessage.Info(message);
+    
+    /// <summary>
+    /// Convert an exception to an error log.
+    /// </summary>
     public static implicit operator LogMessage(Exception e) => LogMessage.Error(e);
 
+    /// <inheritdoc/>
     public override string ToString() => $"{Level}:{Message}";
 }
 
@@ -76,6 +115,13 @@ public static class Logging {
     /// </summary>
     public static readonly Logger Logs = new();
     
+    /// <summary>
+    /// Create a file link (clickable in some IDEs) linking to a line in a specific file
+    /// </summary>
+    /// <param name="filename">Path to file</param>
+    /// <param name="line">Line in file</param>
+    /// <param name="content">Message to put in the link text (defaults to filename:line)</param>
+    /// <returns></returns>
     public static string ToFileLink(string? filename, int line, string? content = null) =>
         $"<a href=\"{filename}\" line=\"{line}\">{content ?? $"{filename}:{line}"}</a>";
 }

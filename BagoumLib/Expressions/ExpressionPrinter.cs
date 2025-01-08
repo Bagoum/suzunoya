@@ -39,7 +39,7 @@ public class ExpressionPrinter {
     /// </summary>
     public Expression Linearize(Expression e) => new LinearizeVisitor() {
         SafeExecution = SafeLinearize
-    }.Visit(e)!;
+    }.Visit(e);
     
     /// <summary>
     /// Linearizes an expression and then converts it into C# source code.

@@ -48,7 +48,7 @@ public sealed class FastFourierTransform {
         fixed (Complex* a = samples)
         fixed (int* ip = bitReversal)
         fixed (double* w = trigTable) {
-            fftsg.cdft(2 * Length, -1, (double*)a, ip, w);
+            FFTsg.cdft(2 * Length, -1, (double*)a, ip, w);
         }
     }
 
@@ -74,7 +74,7 @@ public sealed class FastFourierTransform {
         fixed (Complex* a = spectrum)
         fixed (int* ip = bitReversal)
         fixed (double* w = trigTable) {
-            fftsg.cdft(2 * Length, 1, (double*)a, ip, w);
+            FFTsg.cdft(2 * Length, 1, (double*)a, ip, w);
         }
     }
 }

@@ -9,7 +9,7 @@ namespace BagoumLib.DataStructures {
 /// A list with a fixed capacity that wraps around and overwrites the oldest items.
 /// </summary>
 [PublicAPI]
-public class CircularList<T> : IEnumerable<T>, IReadOnlyList<T> {
+public class CircularList<T> : IReadOnlyList<T> {
     /// <summary>
     /// Number of elements in the list. Note that this is bounded by the initialized size.
     /// </summary>

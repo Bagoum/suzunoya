@@ -5,14 +5,22 @@ using JetBrains.Annotations;
 
 namespace Scriptor;
 
+/// <summary>
+/// An AST that can be printed in a readable manner.
+/// </summary>
 [PublicAPI]
 public interface IDebugPrint {
     /// <summary>
     /// Print a readable description of the entire AST.
     /// </summary>
     public IEnumerable<PrintToken> DebugPrint();
+    
+    /// <inheritdoc cref="DebugPrint"/>
     string DebugPrintStringify() => new ExpressionPrinter().Stringify(DebugPrint().ToArray());
     
+    /// <summary>
+    /// Helper function for printing arguments with a separator.
+    /// </summary>
     public static IEnumerable<PrintToken> PrintArgs(IReadOnlyList<IDebugPrint> args, string sep = ",") {
         if (args.Count > 1) {
             yield return PrintToken.indent;

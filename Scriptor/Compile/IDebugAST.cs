@@ -9,6 +9,10 @@ using Scriptor.Expressions;
 
 namespace Scriptor.Compile;
 
+/// <summary>
+/// An AST providing debug information.
+/// </summary>
+[PublicAPI]
 public interface IDebugAST : IDebugPrint {
     /// <summary>
     /// Position of the code that will generate this object.
@@ -16,6 +20,7 @@ public interface IDebugAST : IDebugPrint {
     /// </summary>
     PositionRange Position { get; }
     
+    /// <inheritdoc cref="IAST.Params"/>
     IEnumerable<IDebugAST> Children { get; }
     
     /// <summary>
@@ -53,6 +58,7 @@ public interface IDebugAST : IDebugPrint {
 /// <param name="Position">Position of the token in the source code</param>
 /// <param name="TokenType">Token type</param>
 /// <param name="TokenMods">Token modifiers</param>
+[PublicAPI]
 public record SemanticToken(PositionRange Position, string TokenType, IList<string>? TokenMods = null) {
     /// <summary>
     /// Create a semantic token that is the same as this, but is marked as constant.

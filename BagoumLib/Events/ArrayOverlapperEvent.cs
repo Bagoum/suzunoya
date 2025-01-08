@@ -27,8 +27,8 @@ public class ArrayOverlapperEvent<T> : ISubject<T[]> {
     private bool hasFirst = false;
     private readonly T[] prevData;
     private bool startWithZeroes = false;
-
-
+    
+    /// <inheritdoc cref="ArrayOverlapperEvent{T}"/>
     public ArrayOverlapperEvent(int blockSize, double evictionRate, bool startWithZeroes = false) {
         if (evictionRate <= 0)
             throw new Exception($"Eviction rate must be greater than zero");

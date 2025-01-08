@@ -93,6 +93,7 @@ public static class Extensions {
     }
 
     private static readonly Dictionary<Type, (Type, ConstructorInfo)> texTypeCache = new();
+    
     /// <summary>
     /// For a type T, get the type TEx&lt;T&gt; and its constructor.
     /// </summary>
@@ -108,7 +109,7 @@ public static class Extensions {
     /// </summary>
     public static TEx MakeTypedTEx(this Type t, Ex ex) {
         if (t == typeof(void)) return ex;
-        var (v, cons) = t.GetTExType();
+        var (_, cons) = t.GetTExType();
         return (cons.Invoke([ex]) as TEx)!;
     }
 

@@ -3,12 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
 using BagoumLib.Functional;
 
-namespace BagoumLib.Expressions {
+namespace BagoumLib.Expressions;
 
+/// <summary>
+/// Helpers for expression visitors.
+/// </summary>
 public static class VisitorHelpers {
+    /// <summary>
+    /// Return true if this expression does not have a value in C# source code
+    /// (block expressions, void-typed conditional expressions, try expressions, switch expressions).
+    /// </summary>
     public static bool IsBlockishExpression(this Expression e) => e switch {
         BlockExpression => true,
         ConditionalExpression cond => cond.Type == typeof(void),
@@ -17,10 +23,14 @@ public static class VisitorHelpers {
         _ => false
     };
 
+    /// <summary>
+    /// Return the in/out/ref prefix for a by-ref parameter.
+    /// </summary>
     public static string? ParameterByRefPrefix(ParameterInfo p) => p.ParameterType.IsByRef ?
         p.IsIn ? "in" :
         p.IsOut ? "out" : "ref" :
         null;
+    
     private static string FirstUpper(string s) {
         if (s.Length == 0 || char.IsUpper(s[0])) return s;
         return char.ToUpper(s[0]) + s.Substring(1);
@@ -54,6 +64,9 @@ public static class VisitorHelpers {
         ExpressionType.MultiplyChecked, ExpressionType.MultiplyAssignChecked, ExpressionType.NegateChecked,
         ExpressionType.SubtractChecked, ExpressionType.SubtractAssignChecked
     };
+    /// <summary>
+    /// Return true if this operator is a checked arithmetic operator.
+    /// </summary>
     public static bool IsChecked(this ExpressionType e) => CheckedTypes.Contains(e);
     
     private static readonly HashSet<ExpressionType> AssignTypes = new() {
@@ -68,11 +81,18 @@ public static class VisitorHelpers {
         ExpressionType.PostIncrementAssign, ExpressionType.PostDecrementAssign, 
         ExpressionType.PreIncrementAssign, ExpressionType.PreDecrementAssign, 
     };
+    
+    /// <summary>
+    /// Return true if this operator is an assignment-type operator.
+    /// </summary>
     public static bool IsAssign(this ExpressionType e) => AssignTypes.Contains(e);
 
     private static Either<string, string> Left(string s) => new(true, s, null!);
     private static Either<string, string> Right(string s) => new(false, null!, s);
     
+    /// <summary>
+    /// Convert a binary operator into its infix source code representation.
+    /// </summary>
     public static string BinaryOperatorString(ExpressionType e) => e switch {
         ExpressionType.Add => "+",
         ExpressionType.AddAssign => "+=",
@@ -114,6 +134,10 @@ public static class VisitorHelpers {
         _ => throw new Exception($"{e} is not a handled binary operator")
     };
 
+    /// <summary>
+    /// Convert a unary operator into its source code representation.
+    ///  Return Either.Left if the operator is on the left side, or Either.Right if the operator is on the right side.
+    /// </summary>
     public static Either<string, string> UnaryOperatorString(ExpressionType e, Type operand) => e switch {
         ExpressionType.ArrayLength => Right(".Length"),
         ExpressionType.Decrement => Right(" - 1"),
@@ -138,5 +162,4 @@ public static class VisitorHelpers {
     //Explicitly handled: ArrayIndex, Convert/Checked, Not, TypeAs, TypeIs
     //Quote is technically unary but idk what it does
     //Not in C#: Power, PowerAssign, Unbox?
-}
 }

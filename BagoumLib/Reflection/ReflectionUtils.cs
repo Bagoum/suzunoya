@@ -12,6 +12,9 @@ namespace BagoumLib.Reflection {
 /// </summary>
 [PublicAPI]
 public static class ReflectionUtils {
+    /// <summary>
+    /// The types Func{}, Func{,}, Func{,,}, etc.
+    /// </summary>
     public static readonly Type[] FuncTypesByArity = {
         typeof(Func<>),
         typeof(Func<,>),
@@ -45,6 +48,9 @@ public static class ReflectionUtils {
         typeof(Action<,,,,,,,,,,,,>),
         typeof(Action<,,,,,,,,,,,,,>),
     };
+    /// <summary>
+    /// The types (), (,), (,,), etc.
+    /// </summary>
     public static readonly Type[] TupleTypesByArity = {
         typeof(ValueTuple<>),
         typeof(ValueTuple<,>),
@@ -186,19 +192,30 @@ public static class ReflectionUtils {
                             | BindingFlags.NonPublic | BindingFlags.Public) ??
         throw new Exception($"Field {t.Name}.{field} not found");
     
+    /// <summary>
+    /// Get the value of a property by name.
+    /// </summary>
     public static T _Property<T>(this object obj, string prop) => (T) (obj.GetType()
         .GetProperty(prop, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(obj)
     ?? throw new Exception($"{prop}<{typeof(T)}> not found"));
     
-    
+    /// <summary>
+    /// Get the value of a static property by name.
+    /// </summary>
     public static T _StaticProperty<T>(this Type t, string prop) => (T) (t
         .GetProperty(prop, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(null)
     ?? throw new Exception($"static {prop}<{typeof(T)}> not found"));
     
+    /// <summary>
+    /// Get the value of a field by name.
+    /// </summary>
     public static T _Field<T>(this object obj, string prop) => (T) (obj.GetType()
         .GetField(prop, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(obj)
     ?? throw new Exception($"{prop}<{typeof(T)}> not found"));
     
+    /// <summary>
+    /// Get the value of a static field by name.
+    /// </summary>
     public static T _StaticField<T>(this Type t, string prop) => (T) (t
         .GetField(prop, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(null)
     ?? throw new Exception($"static {prop}<{typeof(T)}> not found"));

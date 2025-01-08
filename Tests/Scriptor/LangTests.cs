@@ -4,9 +4,9 @@ using Scriptor.Analysis;
 using Scriptor.Compile;
 using static NUnit.Framework.Assert;
 using static Tests.AssertHelpers;
-using static Tests.Scriptor.TestHelpers;
+using static Tests.TScriptor.TestHelpers;
 
-namespace Tests.Scriptor {
+namespace Tests.TScriptor {
 public class LangTests {
     
     [OneTimeSetUp]

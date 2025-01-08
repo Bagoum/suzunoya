@@ -24,6 +24,7 @@ using static System.Math;
 using Color = ScottPlot.Color;
 using Colors = ScottPlot.Colors;
 using FastFourierTransform = NAudio.Dsp.FastFourierTransform;
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 
 namespace BeatDetectorApp.ViewModels;
 
@@ -111,7 +112,7 @@ public class MainWindowViewModel : ViewModelBase {
             hist.Clear();
             hist.Axes.AutoScaler = new ScNoAutoScaler();
             hist.Axes.Bottom.TickLabelStyle.Rotation = -90;
-            var vline = hist.Add.VerticalLine(0, 2f, Colors.Black);
+            _ = hist.Add.VerticalLine(0, 2f, Colors.Black);
             void AddBands(IReadOnlyList<IBand> bands, int streamCache, double streamDelta) {
                 var nBands = bands.Count;
                 for (int ei = 0; ei < nBands; ++ei) {
@@ -157,8 +158,8 @@ public class MainWindowViewModel : ViewModelBase {
     private int strmDecimate = 4;
     private int histShowTime = 3;
     private int barAvgBy = 4096;
-    private double[] powerFreqs;
-    private double[] powerVals;
+    private double[] powerFreqs = null!;
+    private double[] powerVals = null!;
     private static readonly int heatmapHistory = 800;
     private HeatMapRecord[] heatMap = new HeatMapRecord[heatmapHistory];
     private int nextHeatmapGraphIndex = 0;
@@ -190,7 +191,7 @@ public class MainWindowViewModel : ViewModelBase {
     }
     
     private async Task Replot(AudioInstance audio, long sampleIdx) {
-        bool didUpdatePower = false;
+        bool didUpdatePower;
         lock (audio.Audio.SampleBuffer) {
             (_, didUpdatePower) = beats.Update(audio.Audio.SampleBuffer, (int)sampleIdx, powerVals);
         }
@@ -232,7 +233,7 @@ public class MainWindowViewModel : ViewModelBase {
             //Console.WriteLine($"{lastDrawnSampleIndex}->{drawSampleIndex}");
             var spec = _spec.Plot;
             var hist = _hist.Plot;
-            double VisualOnlyScalingFactor(int ei) => Math.Pow(24, ei * 1.0 / beats.NSignalBands);
+            //double VisualOnlyScalingFactor(int ei) => Math.Pow(24, ei * 1.0 / beats.NSignalBands);
             if (spec.GetPlottables<BarPlot>().FirstOrDefault()?.Bars is Bar[] bars) {
                 for (var ei = 0; ei < beats.NSignalBands; ++ei) {
                     var band = beats.SigBands[ei];
@@ -313,7 +314,7 @@ public class MainWindowViewModel : ViewModelBase {
             }
             for (int ib = 0; ib < strms.Count - 1; ++ib) {
                 var strm = (DataStreamer)strms[ib + 1];
-                strm!.AddRange(ndata[ib]);
+                strm.AddRange(ndata[ib]);
             }
             vl.X = (ds0.Data.NextIndex % ds0.Data.Length) * ds0.Period;
             

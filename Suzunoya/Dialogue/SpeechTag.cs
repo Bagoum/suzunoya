@@ -1,10 +1,17 @@
-﻿namespace Suzunoya.Dialogue {
+﻿using JetBrains.Annotations;
 
+namespace Suzunoya.Dialogue {
+
+/// <summary>
+/// Tags in dialogue text affecting the rendering or playback of dialogue.
+/// </summary>
+[PublicAPI]
 public abstract record SpeechTag {
     /// <summary>
     /// Apply modifications to the text unrolling settings.
     /// </summary>
     public virtual SpeechSettings ModifySettings(SpeechSettings src) => src;
+    
     /// <summary>
     /// If FALSE, the tag is used internally for data management and does not need to be handled by rendering plugins.
     /// </summary>
@@ -19,9 +26,11 @@ public abstract record SpeechTag {
     /// Changes the speed of text unrolling.
     /// </summary>
     public record Speed(float multiplier) : SpeechTag {
+        /// <inheritdoc/>
         public override SpeechSettings ModifySettings(SpeechSettings src) =>
             src with {opsPerSecond = src.opsPerSecond * multiplier};
 
+        /// <inheritdoc/>
         public override bool RequiresRender => false;
     }
 
@@ -29,11 +38,14 @@ public abstract record SpeechTag {
     /// Disables rolling events.
     /// </summary>
     public record Silent : SpeechTag {
+        /// <inheritdoc/>
         public override SpeechSettings ModifySettings(SpeechSettings src) =>
             src with {rollEventAllowed = (_, __) => false};
 
+        /// <inheritdoc/>
         public override bool RequiresRender => false;
 
+        /// <inheritdoc/>
         public override string ToString() => "Silent";
     }
 
@@ -41,6 +53,7 @@ public abstract record SpeechTag {
     /// Changes text color.
     /// </summary>
     public record Color(string color) : SpeechTag {
+        /// <inheritdoc/>
         public override string ToString() => $"Color {{ color = {color} }}";
     }
 

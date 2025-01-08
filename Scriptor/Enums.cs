@@ -1,4 +1,5 @@
 ﻿using System;
+using Scriptor.Expressions;
 using Scriptor.Reflection;
 
 namespace Scriptor;
@@ -24,8 +25,17 @@ public enum AOTMode {
     
 }
 
+/// <summary>
+/// The mode by which a <see cref="TEx{T}"/> parameter is passed.
+/// </summary>
 public enum ExMode {
+    /// <summary>
+    /// By value (default).
+    /// </summary>
     Parameter,
+    /// <summary>
+    /// By reference (in/out/ref).
+    /// </summary>
     RefParameter
 }
 

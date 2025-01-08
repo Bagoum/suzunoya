@@ -1,5 +1,7 @@
-﻿using Scriptor;
+﻿using System.Runtime.CompilerServices;
+using Scriptor;
 
+[assembly: InternalsVisibleTo("Tests")]
 [assembly: Reflect]
 namespace Scriptor {
 /// <summary></summary>

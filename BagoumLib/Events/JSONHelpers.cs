@@ -21,7 +21,7 @@ public static class JSONHelpers {
     /// </summary>
     public static readonly JsonGetTypeName GetTypeName = (JsonGetTypeName)
         Delegate.CreateDelegate(typeof(JsonGetTypeName), ExFunction.WrapAny(typeof(JsonConverter)
-            .Assembly.GetType("Newtonsoft.Json.Utilities.ReflectionUtils"), "GetTypeName").Mi);
+            .Assembly.GetType("Newtonsoft.Json.Utilities.ReflectionUtils")!, "GetTypeName").Mi);
 
 }
 

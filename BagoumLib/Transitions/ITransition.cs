@@ -102,30 +102,65 @@ public abstract record TransitionBase<T> : ITransition {
     public ITransition With(ICancellee cT, Func<float> dTProvider) => this with {CToken = cT, DeltaTimeProvider = dTProvider};
 }
 
-
+/// <summary>
+/// Helpers for creating transitions.
+/// </summary>
 [PublicAPI]
 public static class TransitionHelpers {
+    /// <summary>
+    /// Default provider for transition deltaTime. Should be provided by consuming libraries.
+    /// </summary>
     public static Func<float>? DefaultDeltaTimeProvider { get; set; }
 
+    /// <summary>
+    /// Create a transition that applies a value provided by `eval` at every time step.
+    /// </summary>
     public static StatusApplier<T> Apply<T>(Func<float, T> eval, float time, Action<T> apply, Func<T>? initVal = null, 
         ICancellee? cT = null) =>
         new(eval, time, apply, cT) { InitialValue = initVal };
+    
+    /// <summary>
+    /// Create a transition that lerps from `start` to `end`.
+    /// </summary>
     public static Tweener<T> TweenTo<T>(T start, T end, float time, Action<T> apply, Easer? ease = null, 
         ICancellee? cT = null) =>
         new(start, end, time, apply, ease, cT);
     
+    /// <summary>
+    /// Create a transition that lerps from `start` to `start+delta`.
+    /// </summary>
     public static DeltaTweener<T> TweenDelta<T>(T start, T delta, float time, Action<T> apply, Easer? ease = null, 
         ICancellee? cT = null) =>
         new(start, delta, time, apply, ease, cT);
 
+    /// <summary>
+    /// Create a transition that lerps from `start` to `start*by`.
+    /// </summary>
     public static Tweener<T> TweenBy<T>(T start, float by, float time, Action<T> apply, Easer? ease = null, 
         ICancellee? cT = null) =>
         TweenTo(start, GetMulOp<T>()(start, by), time, apply, ease, cT);
 
+    /// <summary>
+    /// Run two transitions in sequence.
+    /// </summary>
     public static ITransition Then(this ITransition tw, ITransition next) => new SequentialTransition(new(tw), new(next));
+    
+    /// <inheritdoc cref="Then(ITransition,ITransition)"/>
     public static ITransition Then(this ITransition tw, Func<ITransition> next) => new SequentialTransition(new(tw), next);
+    
+    /// <summary>
+    /// Run multiple transitions in parallel.
+    /// </summary>
     public static ITransition Parallel(params ITransition[] tws) => new ParallelTransition(tws);
+    
+    /// <summary>
+    /// Run multiple transitions in parallel.
+    /// </summary>
     public static ITransition Parallel(this ITransition tw, params ITransition[] tws) => new ParallelTransition(tws.Prepend(tw).ToArray());
+    
+    /// <summary>
+    /// Loop a transition.
+    /// </summary>
     public static ITransition Loop(this ITransition tw, int? times = null) => new LoopTransition(tw, times);
 }
 }

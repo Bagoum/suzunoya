@@ -5,7 +5,11 @@ using System.Threading.Tasks;
 using BagoumLib.Cancellation;
 using JetBrains.Annotations;
 
-namespace BagoumLib.Tasks {
+namespace BagoumLib.Tasks;
+
+/// <summary>
+/// Helpers for awaiting tasks.
+/// </summary>
 [PublicAPI]
 public static class WaitingUtils {
     /// <summary>
@@ -113,5 +117,4 @@ public static class WaitingUtils {
         }
         done(cT.ToCompletion());
     }
-}
 }

@@ -375,12 +375,6 @@ public static class FFTHelpers {
         }
         return res;
     }
-
-    public static async Task Push<T>(this IAsyncEnumerable<T> src, IObserver<T> into) {
-        await foreach (var x in src)
-            into.OnNext(x);
-        into.OnCompleted();
-    }
     
     /// <summary>
     /// Do a pointwise multiplication of two arrays, storing the output in-place in the first array.

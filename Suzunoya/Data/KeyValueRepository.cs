@@ -4,6 +4,9 @@ using Newtonsoft.Json;
 
 namespace Suzunoya.Data {
 
+/// <summary>
+/// Interface for a basic key-value repository for save data.
+/// </summary>
 public interface IKeyValueRepository {
     /// <summary>
     /// Saves a key-value pair in the repository. Overwrites if existing. Noop if key is null.
@@ -23,18 +26,27 @@ public interface IKeyValueRepository {
     IEnumerable<string> Keys { get; }
 }
 //You can't proto-compress object, so json it is!
+/// <summary>
+/// Basic implementation of <see cref="IKeyValueRepository"/>.
+/// </summary>
 [Serializable]
 public class KeyValueRepository : IKeyValueRepository {
+    /// <summary>
+    /// Underlying data store.
+    /// </summary>
     public Dictionary<string, object> Data { get; init; } = new();
+    /// <inheritdoc/>
     [JsonIgnore]
     public IEnumerable<string> Keys => Data.Keys;
 
+    /// <inheritdoc/>
     public void SaveData<T>(string? key, T value) {
         if (key == null) return;
         if (value == null) throw new Exception("Cannot save null values. Use Maybe<T> instead");
         Data[key] = value;
     }
 
+    /// <inheritdoc/>
     public T GetData<T>(string? key) {
         if (key == null)
             throw new Exception("Null keys are not permitted in the KVR.");
@@ -45,6 +57,7 @@ public class KeyValueRepository : IKeyValueRepository {
         return cast;
     }
 
+    /// <inheritdoc/>
     public bool HasData(string? key) => key != null && Data.ContainsKey(key);
 }
 }

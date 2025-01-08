@@ -11,7 +11,7 @@ namespace BagoumLib.Expressions {
 /// </summary>
 [PublicAPI]
 public static class ExExtensions {
-    public static readonly ExFunction StringAdd = 
+    private static readonly ExFunction StringAdd = 
         ExFunction.Wrap<string>(nameof(string.Concat), typeof(string), typeof(string));
     
     /// <summary>

@@ -33,6 +33,7 @@ public class MapStateTransition<I, D> where I: ADVIdealizedState where D: ADVDat
     //Note: you'll have to do some plumbing to ensure that this enqueue mechanism doesn't get clogged
     // when teleporting using the world map while an update is occuring.
     //Pushing a vn skip operation or two should work.
+    /// <inheritdoc cref="MapStateTransition{I,D}"/>
     public MapStateTransition(MapStateManager<I, D> mapStates) {
         this.MapStates = mapStates;
     }

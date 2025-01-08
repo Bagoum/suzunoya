@@ -7,7 +7,7 @@ using Scriptor;
 using static NUnit.Framework.Assert;
 using static Scriptor.Math.SimpleParser;
 
-namespace Tests.Scriptor {
+namespace Tests.TScriptor {
 public class SimpleParserTests {
     [Test]
     public static void TestFloat() {

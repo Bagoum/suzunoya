@@ -8,6 +8,9 @@ using BagoumLib.Mathematics;
 
 namespace BagoumLib.SignalProcessing;
 
+/// <summary>
+/// A frequency band in a beat detector.
+/// </summary>
 public interface IBand {
     /// <summary>
     /// Beat detector containing this band.
@@ -34,6 +37,9 @@ public record PowerBand : IObserver<double>, IBand {
     /// </summary>
     public CircularList<double> LogPowerHistory { get; } = new(512);
     
+    /// <summary>
+    /// History of log-power signals passed through a Hann filter.
+    /// </summary>
     public CircularList<double> SmoothLogPowerHistory { get; } = new(512);
     
     /// <summary>
@@ -57,7 +63,8 @@ public record PowerBand : IObserver<double>, IBand {
     private ChunkConvolver DGauss { get; }
     
     private readonly Event<Complex> ev = new();
-    private readonly ChunkerEvent<Complex> chunker;
+
+    /// <inheritdoc cref="PowerBand"/>
     public PowerBand(BeatDetector Src, double LowLimit, double HighLimit) {
         this.Src = Src;
         this.LowLimit = LowLimit;
@@ -65,7 +72,7 @@ public record PowerBand : IObserver<double>, IBand {
         ev.Subscribe(x => {
             LogPowerHistory.Add(x.Real);
         });
-        chunker = new(PowerN);
+        ChunkerEvent<Complex> chunker = new(PowerN);
         ev.Subscribe(chunker);
         var sr = Src.PowerSampleRate;
         var hann = FFTHelpers.DataForFilter(i => Filters.HalfHann(i, Math.Clamp((int)(sr * 0.08), 3, PowerN - 1)), PowerN)
@@ -128,6 +135,8 @@ public record SignalBand : IObserver<Complex[]>, IBand {
     public double LowLimit { get; }
     /// <inheritdoc/>
     public double HighLimit { get;  }
+    
+    /// <inheritdoc cref="SignalBand"/>
     public SignalBand(BeatDetector Src, double LowLimit, double HighLimit) {
         this.Src = Src;
         this.LowLimit = LowLimit;
@@ -249,7 +258,13 @@ public class BeatDetector {
     private readonly Complex[] sigSamples;
     private readonly Complex[] sigScratch;
     private readonly Complex[] powSamples;
+    /// <summary>
+    /// Maximum parsed frequency.
+    /// </summary>
     public static readonly double MaxHz = 20480;
+    /// <summary>
+    /// Minimum parsed frequency.
+    /// </summary>
     public static readonly double MinHz = 40;
 
     public BeatDetector(int audioSampleRate, int nSignal = 4096, int nSignalBands = 40, int nHistory = 65536) {

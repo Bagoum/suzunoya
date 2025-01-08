@@ -7,7 +7,13 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 
 namespace BagoumLib.Expressions {
+/// <summary>
+/// Interface for converting objects into string representations.
+/// </summary>
 public interface IObjectPrinter {
+    /// <summary>
+    /// Convert an object into a string representation.
+    /// </summary>
     public string Print(object? o); 
 }
 
@@ -16,7 +22,10 @@ public interface IObjectPrinter {
 /// <br/>Note that this is not possible for all types.
 /// </summary>
 public class CSharpObjectPrinter : IObjectPrinter {
-    public CSharpTypePrinter TypePrinter { get; set; } = new CSharpTypePrinter();
+    /// <summary>
+    /// Type-to-string printer.
+    /// </summary>
+    public CSharpTypePrinter TypePrinter { get; set; } = new();
 
     /// <summary>
     /// Set this to true to use .ToString() if the value cannot be printed.
@@ -41,6 +50,8 @@ public class CSharpObjectPrinter : IObjectPrinter {
         '\'' => "\\\'",
         _ => $"{c}",
     };
+    
+    /// <inheritdoc/>
     public virtual string Print(object? o) {
         if (o == null)
             return "null";
@@ -59,7 +70,7 @@ public class CSharpObjectPrinter : IObjectPrinter {
             return $"({string.Join(", ", Enumerable.Range(0, tup.Length).Select(i => Print(tup[i])))})";
         }
         if (typ.IsEnum)
-            return $"{TypePrinter.Print(typ)}.{o.ToString()}";
+            return $"{TypePrinter.Print(typ)}.{o}";
         if (CastTypes.Contains(typ))
             return $"(({TypePrinter.Print(typ)}){o})";
         return FormattableString.Invariant(o switch {

@@ -14,14 +14,14 @@ namespace Suzunoya.Assertions {
 /// (specifically anything deriving <see cref="IRendered"/>).
 /// </summary>
 public abstract record EntityAssertion {
-    /// <inheritdoc cref="IAssertion{T}.ID"/>
+    /// <inheritdoc cref="IAssertion.ID"/>
     public string? ID { get; init; }
-    /// <inheritdoc cref="IAssertion{T}.Priority"/>
+    /// <inheritdoc cref="IAssertion.Priority"/>
     public (int Phase, int Ordering) Priority { get; set; }
     /// <summary>
     /// The entity assertion for the <see cref="ITransform"/>
     ///  that is a parent for this assertion's bound object.
-    /// See <see cref="EntityAssertion{T}.TakeParent"/>
+    /// See <see cref="EntityAssertion.TakeParent"/>
     /// </summary>
     protected EntityAssertion? Parent;
     /// <summary>
@@ -43,7 +43,7 @@ public abstract record EntityAssertion {
     /// </summary>
     public Vector3 Scale { get; init; } = Vector3.One;
     /// <summary>
-    /// Bound to <see cref="IRendered.Tint"/>
+    /// Bound to <see cref="ITinted.Tint"/>
     /// </summary>
     public FColor Tint { get; init; } = FColor.White;
 

@@ -304,6 +304,7 @@ public interface IInputStream {
 /// A lightweight description of a parseable stream.
 /// <br/>A single mutable instance of this is threaded through the parsing process.
 /// </summary>
+/// <typeparam name="Token">Type of the stream tokens ('char' for a string parser)</typeparam>
 public class InputStream<Token> : IInputStream {
     /// <inheritdoc/>
     public ITokenWitness TokenWitness { get; }
@@ -533,7 +534,7 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
     public ParseResult(LocatedParserError? err, int start, int? end = null) : this(Maybe<R>.None, err ?? throw new Exception("Missing error"), start, end ?? start) {
     }
 
-    /// <inheritdoc cref="ParseResult{R}"/>
+    // <inheritdoc cref="ParseResult{R}"/>
     /*public ParseResult(Maybe<R> result, ParserError error, int start, int end) : 
         this(result, new LocatedParserError(start, end, error), start, end) {
     }*/
@@ -617,6 +618,8 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
 /// passes it through parsing code,
 /// and returns a parse result (which, loosely speaking, contains either a result value or an error).
 /// </summary>
+/// <typeparam name="T">Type of stream token ('char' for string parsers)</typeparam>
+/// <typeparam name="R">Type of parsing result (eg. 'SyntaxTree' for a language parser)</typeparam>
 public delegate ParseResult<R> Parser<T, R>(InputStream<T> input);
 
 
@@ -729,7 +732,7 @@ public record CharTokenWitness(InputStream<char> Stream, string? Source = null) 
 
     /// <inheritdoc/>
     public string ShowConsumed(int start, int end) {
-        return new string(Source[start..end]);
+        return Source[start..end];
     }
 }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using BagoumLib;
@@ -8,13 +9,14 @@ using BagoumLib.Reflection;
 using BagoumLib.Unification;
 using NUnit.Framework;
 using static BagoumLib.Unification.TypeDesignation;
-using static BagoumLib.Unification.TypeTree;
+using static Scriptor.Analysis.TypeTree;
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedParameter.Global
 // ReSharper disable NotAccessedVariable
 // ReSharper disable UnusedVariable
 
 namespace Tests.BagoumLib {
+[SuppressMessage("ReSharper", "RedundantAssignment")]
 public static class TypeUnifyTests {
     private static Either<List<(TypeDesignation, Unifier)>, TypeUnifyErr> PossibleUnifiers(this ITree t) =>
         t.PossibleUnifiers(new TypeResolver(), Unifier.Empty);

@@ -10,11 +10,14 @@ namespace Scriptor.Reflection;
 //this doesn't implement IMethodDesignation because we don't want it to report TypeDesignation at this level,
 // as that would result in all invocations of the same method sharing the same type variables
 //instead, TypeDesignation is copied at the InvokedMethod level, preventing cross-contamination
+/// <summary>
+/// An annotated type member signature.
+/// </summary>
 public interface IMethodSignature {
     /// <summary>
     /// Get a representation of this method's type. This should not directly be used for unification, as
     ///  its variable types should not be shared between all invocations.
-    ///  Call <see cref="TypeDesignation.RecreateVariables"/> before using for unification.
+    ///  Call <see cref="TypeDesignation.RecreateVariables()"/> before using for unification.
     /// <br/>Note that lifted methods do NOT return a lifted type here. The types here are *unlifted*
     ///  over the TExArgCtx->TEx&lt;&gt; functor.
     /// <br/>Note that instance methods should prepend the instance type at the beginning of the argument array.
@@ -68,6 +71,9 @@ public interface IMethodSignature {
     /// </summary>
     string AsSignatureWithRestrictions { get; }
 
+    /// <summary>
+    /// Print the signature of this method with custom rendering for each parameter.
+    /// </summary>
     [PublicAPI]
     public string AsSignatureWithParamMod(Func<NamedParam, int, string> paramMod);
     
@@ -76,6 +82,9 @@ public interface IMethodSignature {
     /// </summary>
     string TypeOnlySignature { get; }
 
+    /// <summary>
+    /// Create an <see cref="InvokedMethod"/> representing calling this method with a given alias.
+    /// </summary>
     InvokedMethod Call(string? calledAs);
 
     /// <summary>
@@ -83,7 +92,9 @@ public interface IMethodSignature {
     /// </summary>
     T? GetAttribute<T>() where T : Attribute;
     
-
+    /// <summary>
+    /// The kind of conversion this method creates if used as a type converter.
+    /// </summary>
     public ScopedConversionKind ImplicitTypeConvKind =>
         GetAttribute<ExpressionBoundaryAttribute>() != null ?
             ScopedConversionKind.BlockScopedExpression :
@@ -107,7 +118,7 @@ public interface IMethodSignature {
         for (int ii = 0; ii < args.Length; ++ii)
             if (args[ii] is not ConstantExpression)
                 return InvokeEx(args);
-        var cargs = new object[args.Length];
+        var cargs = new object?[args.Length];
         for (int ii = 0; ii < args.Length; ++ii)
             cargs[ii] = ((ConstantExpression)args[ii]).Value;
         return Ex.Constant(Invoke(cargs));
@@ -126,7 +137,6 @@ public interface IMethodSignature {
     /// <summary>
     /// (Informational) The name of this method.
     /// </summary>
-    /// <returns></returns>
     string Name { get; }
 }
 

@@ -37,7 +37,7 @@ public interface IDeletionMarker : IDisposable {
 }
 
 /// <summary>
-/// An <see cref="IDeletionMarker"/> for an underlying value of type <see cref="T"/>.
+/// An <see cref="IDeletionMarker"/> for an underlying value of type T.
 /// </summary>
 public interface IDeletionMarker<T> : IDeletionMarker {
     /// <summary>

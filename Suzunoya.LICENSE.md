@@ -36,7 +36,6 @@ With the exception of the testing subproject, this project consumes the followin
 The project incorporates code from the following projects:
 - [bezier-easing](https://github.com/gre/bezier-easing/) ([MIT](https://github.com/gre/bezier-easing/blob/fcfc40e1b945a8d3b6b2f1aff5aa57f3b56673d9/LICENSE))
 - [FParsec](http://www.quanttec.com/fparsec/about/) ([Simplified BSD License](http://www.quanttec.com/fparsec/license.html))
-- [WikiSort](https://github.com/BonzaiThePenguin/WikiSort/) ([Public Domain](https://github.com/BonzaiThePenguin/WikiSort/blob/df036bd85af713f5012ccc4d329f05eb6a553128/LICENSE))
 - [FFTFlat](https://github.com/sinshu/fftflat/tree/main) ([MIT](https://github.com/sinshu/fftflat/blob/main/LICENSE.md))
 
 Furthermore, the BeatDetectorApp subproject consumes the following packages:

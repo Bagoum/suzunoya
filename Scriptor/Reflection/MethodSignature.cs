@@ -31,8 +31,9 @@ public record MethodSignature : IMethodSignature {
     /// </summary>
     public Dictionary<Type, TypeDesignation.Variable> GenericTypeMap { get; private set; }
     /// <inheritdoc cref="IGenericMethodSignature.SharedGenericTypes"/>
-    public TypeDesignation.Variable[] SharedGenericTypes { get; init; } = Array.Empty<TypeDesignation.Variable>();
+    public TypeDesignation.Variable[] SharedGenericTypes { get; init; } = [];
 
+    /// <inheritdoc cref="MethodSignature"/>
     protected MethodSignature(TypeMember Member, NamedParam[] Params) {
         this.Member = Member;
         this.Params = Params;
@@ -61,6 +62,7 @@ public record MethodSignature : IMethodSignature {
             return TypeDesignation.FromType(t, GenericTypeMap);
         }
         
+        // ReSharper disable once VirtualMemberCallInConstructor
         SharedType = TypeDesignation.Dummy.Method(DesignationForWrappedType(CheckHiddenReturnType(ReturnType)), 
                 Params.Select(p => DesignationForWrappedType(p.Type)).ToArray());
     }
@@ -157,7 +159,7 @@ public record MethodSignature : IMethodSignature {
             tac.Ctx.CompileToField = compileAsField;
             return AST.MethodCall.RealizeMethod(null, this, tac, (i, tac) => tac.GetByName(fTypes[i], $"$parg{i}"));
         };
-        var result = serv.CompileDelegate(fnType, body, args)!;
+        var result = serv.CompileDelegate(fnType, body, args);
         //AOT requires ordering consistency; this may be out-of-order if multiple scripts use the same method
         if (ServiceLocator.Find<ILangCustomizer>().AOTMode is AOTMode.None)
             _asFunc = result;
@@ -165,14 +167,12 @@ public record MethodSignature : IMethodSignature {
     }
     private object? _asFunc;
 
-    /// <summary>
-    /// Returns a <see cref="MethodSignature"/> or <see cref="GenericMethodSignature"/> for this method.
-    /// </summary>
+    /// <inheritdoc cref="MaybeGet"/>
     public static MethodSignature Get(MemberInfo mi) => 
         MaybeGet(mi) ?? throw new Exception($"Member {mi} cannot be handled by reflection.");
     
     /// <summary>
-    /// Returns a <see cref="MethodSignature"/> or <see cref="GenericMethodSignature"/> for this method.
+    /// Returns a <see cref="MethodSignature"/> or <see cref="GenericMethodSignature"/> for the method.
     /// </summary>
     public static MethodSignature? MaybeGet(MemberInfo mi) {
         if (globals.TryGetValue(mi, out var sig))
@@ -183,6 +183,7 @@ public record MethodSignature : IMethodSignature {
         return Get(member);
     }
 
+    /// <inheritdoc cref="MaybeGet"/>
     public static MethodSignature Get(TypeMember member) {
         var mi = member.BaseMi;
         var fallthrough = mi.GetCustomAttribute<FallthroughAttribute>() != null;
@@ -224,6 +225,10 @@ public record GenericMethodSignature(TypeMember.Method Minf, NamedParam[] Params
     /// Number of generic parameters.
     /// </summary>
     public int TypeParams { get; } = Minf.Mi.GetGenericArguments().Length;
+    
+    /// <summary>
+    /// Mapping from generic method + concrete type map to specialized methods.
+    /// </summary>
     public static readonly Dictionary<(FreezableArray<Type>, MethodSignature), MethodSignature> specializeCache = new();
     
     /// <inheritdoc/>
@@ -267,14 +272,14 @@ public record GenericMethodSignature(TypeMember.Method Minf, NamedParam[] Params
 /// <param name="BaseParams">The parameter list [A, B, C].</param>
 public abstract record LiftedMethodSignature(MethodSignature Original, NamedParam[] FuncedParams, NamedParam[] BaseParams) 
     : MethodSignature(Original.Member, FuncedParams) {
-    protected static readonly Dictionary<(Type, Type), (Type lmsTR, ConstructorInfo constr)> typeSpecCache = new();
-    protected static readonly Type[] consTypes = { typeof(MethodSignature), typeof(NamedParam[]), typeof(NamedParam[]) };
+    private protected static readonly Dictionary<(Type, Type), (Type lmsTR, ConstructorInfo constr)> typeSpecCache = new();
+    private protected static readonly Type[] consTypes = [typeof(MethodSignature), typeof(NamedParam[]), typeof(NamedParam[])];
 
     /// <inheritdoc/>
     public override InvokedMethod Call(string? calledAs) => new LiftedInvokedMethod(this, calledAs);
     
     /// <inheritdoc/>
-    public override object? Invoke(params object?[] prms) {
+    public override object Invoke(params object?[] prms) {
         throw new Exception(
             "This lifted method signature does not have a specified return type and therefore cannot be invoked");
     }
@@ -289,6 +294,9 @@ public abstract record LiftedMethodSignature(MethodSignature Original, NamedPara
     /// </summary>
     public static NamedParam[] LiftParams<T>(MethodSignature method) => LiftParams(typeof(T), method);
     
+    /// <summary>
+    /// Lift a set of parameters over the reader functor T->.
+    /// </summary>
     public static NamedParam[] LiftParams(Type t, MethodSignature method) {
         var baseTypes = method.Params;
         var fTypes = new NamedParam[baseTypes.Length];
@@ -324,10 +332,10 @@ public abstract record LiftedMethodSignature<T>(MethodSignature Original, NamedP
         var t = typeof(T);
         if (!typeSpecCache.TryGetValue((t, r), out var info)) {
             var type = typeof(LiftedMethodSignature<,>).MakeGenericType(t, r);
-            var cons = type.GetConstructor(consTypes);
+            var cons = type.GetConstructor(consTypes)!;
             typeSpecCache[(t, r)] = info = (type, cons);
         }
-        return liftCache[method.Member.BaseMi] = info.constr!.Invoke(new object[] { method, LiftParams(t, method), method.Params })
+        return liftCache[method.Member.BaseMi] = info.constr.Invoke([method, LiftParams(t, method), method.Params])
             as LiftedMethodSignature<T> ?? throw new StaticException(
             $"Dynamic instantiation of LiftedMethodSignature<{t.SimpRName()},{r.SimpRName()}> failed");
     }
@@ -384,6 +392,10 @@ public record LiftedMethodSignature<T, R>(MethodSignature Original, NamedParam[]
         throw new Exception("Lifted methods cannot be invoked as expressions");
     }
 
+    /// <summary>
+    /// Provided arguments in the form [T->A1,T->A2,T->A3...],
+    /// invoke this function lifted over the reader functor T->.
+    /// </summary>
     public Func<T,R> InvokeMiFunced(object?[] fprms) => 
         //Note: this lambda capture generally prevents using ArrayCache
         bpi => {

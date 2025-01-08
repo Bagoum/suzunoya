@@ -1,11 +1,10 @@
-﻿using System;
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using BagoumLib.Expressions;
-using Scriptor;
 using Scriptor.Expressions;
 using Ex = System.Linq.Expressions.Expression;
 using static Scriptor.Expressions.ExHelpers;
 using static Scriptor.Expressions.ExMHelpers;
+#pragma warning disable CS8981
 using tfloat = Scriptor.Expressions.TEx<float>;
 using tbool = Scriptor.Expressions.TEx<bool>;
 

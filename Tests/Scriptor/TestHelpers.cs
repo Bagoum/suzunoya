@@ -5,7 +5,7 @@ using Scriptor.Analysis;
 using Scriptor.Compile;
 using Scriptor.Reflection;
 
-namespace Tests.Scriptor;
+namespace Tests.TScriptor;
 
 public static class TestHelpers {
     public static DelegateArg<T> D<T>(string name) => new(name);

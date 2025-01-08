@@ -119,7 +119,11 @@ public static class Helpers {
         return Maybe<R>.None;
     }
     
-
+    /// <summary>
+    /// Replace entries in `replaceIn` when they pass `replaceFilter` with entries in `replaceFrom`.
+    /// If `allowFewer` is true, then won't replace arguments if there are no more entries in `replaceFrom`.
+    /// All replacements must be consumed.
+    /// </summary>
     public static Either<List<T>, string> ReplaceEntries<T>(bool allowFewer, List<T> replaceIn, List<T> replaceFrom, Func<T, bool> replaceFilter) {
         replaceIn = replaceIn.ToList(); //nondestructive
         int jj = 0;

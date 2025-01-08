@@ -25,7 +25,7 @@ namespace Scriptor.Definition {
 /// </summary>
 public static class LangParser {
     /// <summary>
-    /// If true, LStrings not found via <see crefILangCustomizerce.TryFindLocalizedStringReference"/>
+    /// If true, LStrings not found via <see cref="ILangCustomizer.TryFindLocalizedStringReference"/>
     ///  will be treated as unknown strings rather than parse errors.
     /// </summary>
     public static bool SoftFailOnUnmatchedLString { get; set; } = false;

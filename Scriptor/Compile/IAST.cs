@@ -8,14 +8,15 @@ using BagoumLib.Functional;
 using BagoumLib.Reflection;
 using BagoumLib.Unification;
 using Mizuhashi;
-using Scriptor;
 using Scriptor.Analysis;
-using Scriptor.Compile;
 using Scriptor.Expressions;
 using Scriptor.Reflection;
 
-namespace Scriptor.Compile {
+namespace Scriptor.Compile;
 
+/// <summary>
+/// Base interface for annotated syntax trees.
+/// </summary>
 public interface IAST : ITypeTree, IDebugAST {
     /// <summary>
     /// All ASTs that are direct children of this.
@@ -86,12 +87,10 @@ public interface IAST : ITypeTree, IDebugAST {
             u1s.SelectNotNull(u1 => {
                 var finalTypeDesig = u1.Item1;
                 Either<IImplicitTypeConverter, bool> finalCast = false;
-                var u = u1.Item2;
                 if (finalType != null && finalType != typeof(void)) {
                     if (finalTypeDesig.Resolve().LeftOrNull?.IsWeakSubclassOf(finalType) is not true) {
                         finalTypeDesig = TypeDesignation.FromType(finalType);
-                        if (finalTypeDesig.Unify(u1.Item1, u).TryL(out var sameU)) {
-                            u = sameU;
+                        if (finalTypeDesig.Unify(u1.Item1, u1.Item2).IsLeft) {
                             finalCast = false;
                         } else if (lookup(finalTypeDesig, u1.Item1) is { } conv)
                             finalCast = new(conv);
@@ -113,7 +112,7 @@ public interface IAST : ITypeTree, IDebugAST {
         
         if (cu1s.Count != 1) {
             //Prefer to get a TooManyOverloads or TooManyTypes from the methods proper if possible
-            /*foreach (var u in cu1s) 
+            /*foreach (var u in cu1s)
                 if (root.ResolveUnifiers(u.Item2, resolver, Unifier.Empty).TryR(out var err))
                     return err;*/
             foreach (var u in cu1s)
@@ -143,6 +142,9 @@ public interface IAST : ITypeTree, IDebugAST {
         return tDes.Left.Item1.Resolve(tDes.Left.Item2);
     }
 
+    /// <summary>
+    /// Provide a human-readable message about a <see cref="TypeUnifyErr"/>.
+    /// </summary>
     public static (string, PositionRange?) _EnrichError(TypeUnifyErr e, PositionRange? pos = null) {
         var sb = new StringBuilder();
         void UntypedRef(VarDecl decl) {
@@ -168,7 +170,7 @@ public interface IAST : ITypeTree, IDebugAST {
                           $"implicitly cast to an underdetermined type {rt.SimpRName()}.");
             } else if (unbound.Tree is AST.Reference r && r.Value.TryL(out var decl)) {
                 UntypedRef(decl);
-            } else if (unbound.Tree is AST.Number n) {
+            } else if (unbound.Tree is AST.Number) {
                 sb.Append($"It's not clear whether this number is an int or a float.");
             } else
                 sb.Append("The result type of this expression could not be determined.");
@@ -188,7 +190,7 @@ public interface IAST : ITypeTree, IDebugAST {
                     prams.Select((p, pi) => 
                         $"Parameter #{pi + 1}: " + (p == null ? "<N/A>" : 
                             (string.Join(" or ", npo.ArgSets[ai++].Select(s => s.Item1.SimpRName()).Distinct()) +
-                            $" (at {p.Position})"))
+                             $" (at {p.Position})"))
                     ));
             }
             if (npo.Tree is AST.MethodCall m) {
@@ -297,6 +299,7 @@ public interface IAST : ITypeTree, IDebugAST {
         return (sb.ToString(), pos);
     }
 
+    /// <inheritdoc cref="_EnrichError"/>
     public static Exception EnrichError(TypeUnifyErr e, PositionRange? pos = null) {
         var (s, _pos) = _EnrichError(e, pos);
         return _pos is { } p ? new ReflectionException(p, s) : new Exception(s);
@@ -307,6 +310,9 @@ public interface IAST : ITypeTree, IDebugAST {
     /// </summary>
     public IEnumerable<ReflectionException> Verify() => VerifyChildren(this);
 
+    /// <summary>
+    /// Execute <see cref="Verify"/> over child ASTs.
+    /// </summary>
     public static IEnumerable<ReflectionException> VerifyChildren(IAST ast) => 
         ast.Params.Length > 0 ? ast.Params.SelectMany(p => p.Verify()) : Array.Empty<ReflectionException>();
 
@@ -317,15 +323,15 @@ public interface IAST : ITypeTree, IDebugAST {
     
     /// <summary>
     /// (Stage 4) Create an executable script out of this AST. Specifically, if the return type provided to
-    ///  <see cref="ITypeTree.ResolveUnifiers"/> is T, then this function returns a TEx&lt;T&gt;,
-    ///  which the caller can be compile into a delegate with any top-level arguments.
+    ///  <see cref="ITypeTree.ResolveUnifiers(TypeDesignation,TypeResolver,Unifier)"/> is T,
+    ///  then this function returns a TEx&lt;T&gt;, which the caller can be compile into a delegate with any top-level arguments.
     /// </summary>
     TEx Realize(TExArgCtx tac);
     
-    IEnumerable<PrintToken> IDebugPrint.DebugPrint() => new PrintToken[] { Explain() };
+    IEnumerable<PrintToken> IDebugPrint.DebugPrint() => [Explain()];
 }
 
-public interface IMethodAST<T> : IAST, IMethodTypeTree<T> where T : IMethodDesignation {
-}
-
-}
+/// <summary>
+/// Interfaces for method ASTs.
+/// </summary>
+public interface IMethodAST<T> : IAST, IMethodTypeTree<T> where T : IMethodDesignation;

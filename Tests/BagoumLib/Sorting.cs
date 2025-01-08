@@ -9,6 +9,7 @@ using BagoumLib.Mathematics;
 using BagoumLib.Reflection;
 using BagoumLib.Sorting;
 using NUnit.Framework;
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
 
 namespace Tests.BagoumLib {
 
@@ -139,7 +140,7 @@ public class SortingTests {
     [Test]
     public void SortTestBenchmark() {
 		int testSize = 16;
-		var sizes = new int[]{ 10000, 49999, 262145, 500000 };
+		var sizes = new[]{ 10000, 49999, 262145, 500000 };
 		TestComparator comp = new TestComparator();
 		
 		Testing[] correctnessCases = {

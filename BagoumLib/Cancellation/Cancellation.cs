@@ -184,6 +184,7 @@ public class PassthroughCancellee : ICancellee {
     /// <inheritdoc/>
     public ICancellee Root => root.Root;
 
+    /// <inheritdoc cref="PassthroughCancellee"/>
     public PassthroughCancellee(ICancellee? root, ICancellee? local) {
         this.root = root ?? Cancellable.Null;
         this.local = local ?? Cancellable.Null;
@@ -203,11 +204,13 @@ public class JointCancellee : ICancellee {
     /// <inheritdoc/>
     public bool Cancelled => CancelLevel > 0;
 
+    /// <inheritdoc cref="JointCancellee"/>
     public JointCancellee(ICancellee? c1, ICancellee? c2) {
         this.c1 = c1 ?? Cancellable.Null;
         this.c2 = c2 ?? Cancellable.Null;
     }
 
+    /// <inheritdoc cref="JointCancellee"/>
     public JointCancellee(ICancellee? c1, out Cancellable token) {
         this.c1 = c1 ?? Cancellable.Null;
         this.c2 = token = new Cancellable();

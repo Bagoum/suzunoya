@@ -16,7 +16,7 @@ public class AbstractDMCompactingArray<T> : AnyTypeDMCompactingArray<IDeletionMa
     /// <param name="capacity"></param>
     public AbstractDMCompactingArray(int capacity = 8) : base(capacity) { }
 
-    /// <inheritdoc cref="DMCompactingArray{T}.Item"/>
+    /// <inheritdoc cref="DMCompactingArray{T}.this"/>
     public T this[int index] => Data[index].Value;
 
     /// <inheritdoc cref="IReadOnlyDMCompactingArray{T}.GetIfExistsAt"/>

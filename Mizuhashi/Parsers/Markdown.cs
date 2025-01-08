@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reactive;
 using System.Text;
@@ -8,6 +9,8 @@ using BagoumLib.Functional;
 using static Mizuhashi.Combinators;
 using static Mizuhashi.Parsers.Markdown;
 using BagoumLib.DataStructures;
+using JetBrains.Annotations;
+
 #pragma warning disable 8851
 
 
@@ -15,6 +18,7 @@ namespace Mizuhashi.Parsers {
 /// <summary>
 /// A representation of a Markdown element.
 /// </summary>
+[SuppressMessage("ReSharper", "NotAccessedPositionalProperty.Global")]
 public abstract record Markdown {
     /// <summary>
     /// A top-level Markdown block that includes a tailing newline or EOF.
@@ -23,7 +27,7 @@ public abstract record Markdown {
         /// <summary>
         /// Flatten a nested block.
         /// </summary>
-        public virtual IEnumerable<Block> Flatten() => new[]{this};
+        public virtual IEnumerable<Block> Flatten() => [this];
         
         /// <summary>
         /// Convenience structure that contains two sequential blocks. This is used by internal
@@ -43,12 +47,20 @@ public abstract record Markdown {
         /// A paragraph is a sequence of lines separated by single newlines. It cannot be empty.
         /// </summary>
         public record Paragraph(List<TextRun> Lines) : Block {
+            /// <inheritdoc cref="Markdown.Block.Paragraph"/>
             public Paragraph(TextRun line) : this(new List<TextRun>() { line }) { }
+            /// <inheritdoc cref="Markdown.Block.Paragraph"/>
             public Paragraph(TextRun line, Paragraph postceding) : this(postceding.Lines.Prepend(line).ToList()) { }
             
+            /// <summary>
+            /// Create a paragraph from an array of lines.
+            /// </summary>
             public static Paragraph FromArray(params TextRun[] pieces) => new(pieces.ToList());
+            
+            /// <inheritdoc/>
             public override string ToString() => $"<Paragraph {{ {string.Join(", ", Lines)} }}>";
 
+            /// <inheritdoc/>
             public virtual bool Equals(Paragraph? other) {
                 if (other is null) return false;
                 if (other.Lines.Count != this.Lines.Count) return false;
@@ -64,12 +76,14 @@ public abstract record Markdown {
         /// An ordered or unordered sequence of paragraphs displayed with bullets.
         /// </summary>
         public record List(bool Ordered, List<List<Block>> Lines) : Block {
+            /// <inheritdoc/>
             public override string ToString() {
                 var orderPrefix = Ordered ? "O" : "Uno";
                 var linesStr = string.Join("\n", Lines.Select(l => "- " + string.Join("\n", l)));
                 return $"<{orderPrefix}rderedList{{\n\t{linesStr.Replace("\n", "\n\t")}\n}}>";
             }
 
+            /// <inheritdoc/>
             public virtual bool Equals(List? other) {
                 if (other is null) return false;
                 if (other.Lines.Count != this.Lines.Count) return false;
@@ -79,11 +93,12 @@ public abstract record Markdown {
                 return true;
             }
 
-            public override IEnumerable<Block> Flatten() => new Block[] {
+            /// <inheritdoc/>
+            public override IEnumerable<Block> Flatten() => [
                 new List(Ordered, Lines.Select(option =>
                         option.SelectMany(b => b.Flatten()).ToList())
                     .ToList())
-            };
+            ];
         }
 
         /// <summary>
@@ -109,10 +124,17 @@ public abstract record Markdown {
     /// A sequence of Markdown text that contains at least one non-whitespace character.
     /// </summary>
     public abstract record TextRun {
+        /// <summary>
+        /// A nested list of <see cref="TextRun"/>.
+        /// </summary>
         public record Sequence(List<TextRun> Pieces) : TextRun, IUnrollable<TextRun> {
+            /// <inheritdoc cref="Markdown.TextRun.Sequence"/>
             public static Sequence FromArray(params TextRun[] pieces) => new(pieces.ToList());
+            
+            /// <inheritdoc/>
             public override string ToString() => $"<Sequence {{ {string.Join(", ", Pieces)} }}>";
 
+            /// <inheritdoc/>
             public virtual bool Equals(Sequence? other) {
                 if (other is null) return false;
                 if (other.Pieces.Count != this.Pieces.Count) return false;
@@ -122,29 +144,44 @@ public abstract record Markdown {
                 return true;
             }
 
+            /// <inheritdoc cref="Pieces"/>
             public IEnumerable<TextRun> Values => Pieces;
         }
 
-        public record Atom : TextRun {
-            public Atom(string Text) {
-                this.Text = Text;
-            }
+        /// <summary>
+        /// A basic unit of unformatted text.
+        /// </summary>
+        public record Atom(string Text) : TextRun {
+            /// <inheritdoc/>
             public override string ToString() => $"\"{Text}\"";
-            public string Text { get; init; }
-            public void Deconstruct(out string Text) {
-                Text = this.Text;
-            }
         }
 
+        /// <summary>
+        /// Bolded text.
+        /// </summary>
         public record Bold(TextRun Bolded) : TextRun;
 
+        /// <summary>
+        /// Italicized text.
+        /// </summary>
         public record Italic(TextRun Italicized) : TextRun;
 
+        /// <summary>
+        /// Text formatted as inline code.
+        /// </summary>
         public record InlineCode(string Text) : TextRun;
 
+        /// <summary>
+        /// A hyperlink.
+        /// </summary>
         public record Link(TextRun Title, string URL) : TextRun;
 
-        public Sequence AsSeq() => new(new() { this });
+        /// <summary>
+        /// Nest this within a <see cref="Sequence"/>.
+        /// </summary>
+        public Sequence AsSeq() => new([this]);
+        
+        /// <inheritdoc cref="Atom"/>
         public static implicit operator TextRun(string s) => new Atom(s);
     }
     
@@ -158,14 +195,27 @@ public abstract record Markdown {
 /// are not yet supported
 /// </summary>
 public static class MarkdownParser {
+    /// <summary>
+    /// Indentation settings.
+    /// </summary>
     public record Settings(int Indent = 0, int IndentBy = 2) {
+        /// <summary>
+        /// Increment the indent.
+        /// </summary>
         public Settings AddIndent => this with { Indent = Indent + 1 };
         private readonly ParserError.Expected err = new($"{Indent} indents");
+        
+        /// <summary>
+        /// Parse indentation.
+        /// </summary>
         public Parser<char, Unit> ParseIndent => inp => 
             TrySkipIndent(inp.Source, inp.Index).Try(out var end) ?
                 new(Unit.Default, null, inp.Index, inp.Step(end - inp.Index)) :
                 new(err, inp.Index);
 
+        /// <summary>
+        /// Return true iff the current location of the stream is aligned to the current indentation.
+        /// </summary>
         public bool IsAligned(InputStream<char> inp) {
             for (int ii = inp.Index - 1; ii >= 0; --ii) {
                 if (inp.Source[ii] == '\n')
@@ -174,7 +224,7 @@ public static class MarkdownParser {
             return TrySkipIndent(inp.Source, 0) == inp.Index;
         }
 
-        public int? TrySkipIndent(char[] source, int fromIndex) {
+        private int? TrySkipIndent(char[] source, int fromIndex) {
             var oddSpaces = 0;
             var indentsRead = 0;
             int ii = fromIndex;
@@ -189,6 +239,10 @@ public static class MarkdownParser {
             return (Indent == indentsRead && oddSpaces == 0) ? ii : null;
         }
         
+        /// <summary>
+        /// Try to skip <see cref="Indent"/> levels of indentation starting from `fromIndex`,
+        /// and return the resulting index.
+        /// </summary>
         public int? TrySkipIndent(string source, int fromIndex) {
             var oddSpaces = 0;
             var indentsRead = 0;
@@ -263,12 +317,16 @@ public static class MarkdownParser {
             public TextRun Resolve(string linkURL) => new TextRun.Link(CompilePieces(Parts), linkURL);
         }
     }
+    
+    /// <summary>
+    /// Parse a line of text.
+    /// </summary>
     public static readonly Parser<char, TextRun> ParseTextRun = inp => {
         var start = inp.Index;
         List<Either<char, TextRun>>? topLevelParts = null;
         StackList<TextContext>? contexts = null;
         void AddPiece(Either<char, TextRun> tr) {
-            if (contexts?.MaybePeek() != null)
+            if (contexts?.MaybePeek().Valid is true)
                 contexts.Peek().Parts.Add(tr);
             else
                 (topLevelParts ??= new()).Add(tr);
@@ -353,12 +411,12 @@ public static class MarkdownParser {
                     while (contexts.Peek() is not TextContext.Asterisk)
                         AddPiece(new(contexts.Pop().FailedResolve()));
                     var ast1 = (contexts.Pop() as TextContext.Asterisk)!;
-                    if (contexts.MaybePeek() is TextContext.Asterisk a) {
+                    if (contexts.MaybePeek().Try(out var tc) && tc is TextContext.Asterisk a) {
                         if (canCloseBold && a.Parts.Count == 0) {
                             inp.Step();
                             contexts.Pop();
                             AddPiece(new(a.ResolveBold(ast1)));
-                        } else if (contexts.Count > 1 && contexts.Peek(2) is TextContext.Asterisk aOuter && aOuter.Parts.Count == 0) {
+                        } else if (contexts.Count > 1 && contexts.Peek(2) is TextContext.Asterisk { Parts.Count: 0 }) {
                             //***text* -> match 2(ast1) and 3(this)
                             AddPiece(new(ast1.ResolveItalic()));
                         } else {
@@ -376,7 +434,7 @@ public static class MarkdownParser {
         }
         if (allWhitespace)
             return new ParseResult<TextRun>(TextRunEmpty, start, inp.Index);
-        while (contexts?.MaybePeek() != null)
+        while (contexts?.MaybePeek().Valid is true)
             AddPiece(new(contexts.Pop().FailedResolve()));
         if (topLevelParts is { Count: > 0 })
             return new ParseResult<TextRun>(TextContext.CompilePieces(topLevelParts), null, start, inp.Index);
@@ -594,6 +652,10 @@ public static class MarkdownParser {
         if (prev != null)
             yield return prev;
     }
+    
+    /// <summary>
+    /// Parser for an entire Markdown document.
+    /// </summary>
     public static Parser<char, List<Block>> ParseDocument(Settings s) =>
         ParseManyBlocks(s).ThenEOF().FMap(bs => Reformat(bs).ToList());
 

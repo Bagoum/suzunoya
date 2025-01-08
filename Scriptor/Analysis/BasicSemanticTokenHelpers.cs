@@ -6,7 +6,7 @@ namespace Scriptor.Analysis;
 /// <summary>
 /// Helpers for semantic token types.
 /// </summary>
-public class SemanticTokenTypes {
+public static class SemanticTokenTypes {
     /// <summary>
     /// A type, eg. `int.`
     /// </summary>
@@ -68,7 +68,16 @@ public class SemanticTokenTypes {
     }
 }
 
-public class BasicSemanticTokenModifiers { 
+/// <summary>
+/// Basic universal semantic token modifiers.
+/// </summary>
+public static class BasicSemanticTokenModifiers { 
+    /// <summary>
+    /// A constant variable.
+    /// </summary>
     public const string Const = "const";
+    /// <summary>
+    /// A dynamic-lookup variable.
+    /// </summary>
     public const string DynamicVar = "dmkdynamicvar";
 }

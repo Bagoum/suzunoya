@@ -10,8 +10,15 @@ namespace Scriptor.Reflection;
 /// <summary>
 /// Helper methods for lifting types and creating func types.
 /// </summary>
+[PublicAPI]
 public static class TypeLifter {
+    /// <summary>
+    /// Types which can be lifted, eg. TEx{float}.
+    /// </summary>
     public static HashSet<Type> FuncifiableReturnTypes { get; } = new();
+    /// <summary>
+    /// Generic types which can be lifted, eg. TEx{T}.
+    /// </summary>
     public static HashSet<Type> FuncifiableReturnTypeGenerics { get; } = new();
     
     private static readonly Dictionary<(Type toType, Type fromFuncType), Func<object, object, object>> funcConversions =
@@ -60,7 +67,7 @@ public static class TypeLifter {
                 var oa = x as Array ?? throw new StaticException("Couldn't arrayify");
                 var fa = Array.CreateInstance(arg.GetElementType()!, oa.Length);
                 for (int oi = 0; oi < oa.Length; ++oi) {
-                    fa.SetValue(Defuncify(arg.GetElementType()!, ftele, oa.GetValue(oi), bpi), oi);
+                    fa.SetValue(Defuncify(arg.GetElementType()!, ftele, oa.GetValue(oi)!, bpi), oi);
                 }
                 return fa;
             });
@@ -82,7 +89,7 @@ public static class TypeLifter {
                              throw new StaticException("Couldn't decompose tuple to array");
                 for (int ii = 0; ii < funced_gts.Length; ++ii)
                     argarr[ii] = Defuncify(base_gts[ii], funced_gts[ii], argarr[ii], bpi);
-                return Activator.CreateInstance(arg, argarr);
+                return Activator.CreateInstance(arg, argarr)!;
             });
         } else {
             res = arg;
@@ -123,7 +130,9 @@ public static class TypeLifter {
         return mi.Invoke(func, [arg])!;
     }
 
-
+    /// <summary>
+    /// Convert a tuple into an array.
+    /// </summary>
     [UsedImplicitly]
     public static object[] TupleToArr2<T1, T2>((T1, T2) tup) => [tup.Item1!, tup.Item2!];
 }

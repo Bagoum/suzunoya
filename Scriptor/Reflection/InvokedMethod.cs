@@ -1,4 +1,5 @@
-﻿using BagoumLib.Reflection;
+﻿using System;
+using BagoumLib.Reflection;
 using BagoumLib.Unification;
 
 namespace Scriptor.Reflection;
@@ -20,25 +21,41 @@ public record InvokedMethod(IMethodSignature Mi, string? CalledAs) : IMethodDesi
     /// The name by which the user called the method (which may be an alias).
     /// </summary>
     public string? CalledAs { get; } = CalledAs;
+    
+    /// <inheritdoc cref="IMethodSignature.Params"/>
     public NamedParam[] Params => Mi.Params;
+    
+    /// <summary>
+    /// The simple name of this method (`T` for constructors) and <see cref="CalledAs"/>.
+    /// </summary>
     public string SimpleName {
         get {
             var prefix = Mi.IsCtor ? Mi.TypeName : Mi.Name;
-            return (CalledAs == null || CalledAs.ToLower() == Mi.Name.ToLower()) ?
+            return (CalledAs == null || CalledAs.Equals(Mi.Name, StringComparison.InvariantCultureIgnoreCase)) ?
                 prefix : $"{prefix}/{CalledAs}";
         }
     }
+    /// <summary>
+    /// The name of this method (`new T` for constructors) and <see cref="CalledAs"/>.
+    /// </summary>
     public string Name => 
         Mi.IsCtor ? 
             $"new {Mi.TypeName}" :
-            (CalledAs == null || CalledAs.ToLower() == Mi.Name.ToLower()) ? 
+            (CalledAs == null || CalledAs.Equals(Mi.Name, StringComparison.InvariantCultureIgnoreCase)) ? 
                 Mi.Name : 
                 $"{Mi.Name}/{CalledAs}";
+    
+    /// <summary>
+    /// <see cref="Name"/> prefixed with the enclosing type name (if not a constructor).
+    /// </summary>
     public string TypeEnclosedName => 
         Mi.IsCtor ?
             Name :
             $"{Mi.TypeName}.{Name}";
 
+    /// <summary>
+    /// A file link to the method.
+    /// </summary>
     public string FileLink =>
         Mi.MakeFileLink(TypeEnclosedName) ?? TypeEnclosedName;
 

@@ -6,7 +6,7 @@ namespace BagoumLib.DataStructures;
 /// <summary>
 /// Cache for dictionaries.
 /// </summary>
-public static class DictCache<K, V> {
+public static class DictCache<K, V> where K: notnull {
     private static readonly Stack<Dictionary<K, V>> cached = new();
 
     /// <summary>
@@ -52,12 +52,13 @@ public static class CacheExtensions {
     public static void Consign<T>(this List<T> cacheMe) => ListCache<T>.Consign(cacheMe);
     
     /// <inheritdoc cref="DictCache{K,V}.Consign"/>
-    public static void Consign<K,V>(this Dictionary<K,V> cacheMe) => DictCache<K,V>.Consign(cacheMe);
+    public static void Consign<K,V>(this Dictionary<K,V> cacheMe) where K:notnull => DictCache<K,V>.Consign(cacheMe);
     
     /// <summary>
     /// Set a value in a nested dictionary.
     /// </summary>
-    public static void SetDefaultSet<K, K2, V>(this Dictionary<K, Dictionary<K2, V>> dict, K key, K2 key2, V value) {
+    public static void SetDefaultSet<K, K2, V>(this Dictionary<K, Dictionary<K2, V>> dict, K key, K2 key2, V value)
+            where K:notnull where K2:notnull {
         if (!dict.TryGetValue(key, out var data))
             data = dict[key] = DictCache<K2, V>.Get();
         data[key2] = value;
@@ -66,7 +67,7 @@ public static class CacheExtensions {
     /// <summary>
     /// Consign all lists within this dictionary, and then the dictionary itself.
     /// </summary>
-    public static void ConsignRecursive<K, V>(this Dictionary<K, List<V>> dict) {
+    public static void ConsignRecursive<K, V>(this Dictionary<K, List<V>> dict) where K:notnull {
         foreach (var v in dict.Values)
             ListCache<V>.Consign(v);
         DictCache<K, List<V>>.Consign(dict);

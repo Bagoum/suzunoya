@@ -16,7 +16,7 @@ public readonly record struct NamedParam(Type Type, string Name) {
     /// Implicit conversion of ParameterInfo to <see cref="NamedParam"/>.
     /// </summary>
     public static implicit operator NamedParam(ParameterInfo pi) => 
-        new(pi.ParameterType, pi.Name);
+        new(pi.ParameterType, pi.Name ?? "<Unnamed parameter>");
 
     /// <summary>
     /// Description of this type in the format "TYPE NAME", where TYPE is simplified.

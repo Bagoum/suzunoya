@@ -3,7 +3,8 @@ using System.Reactive;
 
 namespace Mizuhashi {
 public static partial class Combinators {
-    
+    private static readonly ParserError manyNoConsumeErr =
+        new ParserError.Failure("`Many`/`Repeat` parser parsed an object without consuming text.");
 
     /// <summary>
     /// Applies a parser as many times as possible up to maxTimes, and returns the list of all results.
@@ -29,8 +30,7 @@ public static partial class Combinators {
                             next.Error?.Error! :
                             new ParserError.IncorrectNumber(minTimes, results.Count, null, next.Error), next.Start);
                 else if (!next.Consumed)
-                    return new(
-                        new ParserError.Failure("`Many` parser parsed an object without consuming text."), next.Start);
+                    return new(manyNoConsumeErr, next.Start);
                 else
                     results.Add(next.Result.Value);
             }
@@ -38,7 +38,7 @@ public static partial class Combinators {
             return new(results, next.Error, start, next.End);
         };
     }
-
+    
     /// <summary>
     /// Applies a parser repeatedly until it errors, and returns a list of all results.
     /// <br/>Note that if the parser errors fatally, this will error fatally as well.
@@ -61,8 +61,7 @@ public static partial class Combinators {
                         null, next.Error), start) :
                     new(results, next.Error, start, next.End);
             else if (!next.Consumed)
-                return new(
-                    new ParserError.Failure("`Many` parser parsed an object without consuming text."), next.Start);
+                return new(manyNoConsumeErr, next.Start);
             else
                 results.Add(next.Result.Value);
         }
@@ -74,13 +73,13 @@ public static partial class Combinators {
     /// <br/>See <see cref="Many{T,R}"/>.
     /// </summary>
     public static Parser<T, List<R>> Many1<T, R>(this Parser<T, R> p) => Many(p, true);
-    
-    
+
+    private static readonly ParserError skipManyNoConsumeErr =
+        new ParserError.Failure("`SkipMany` parser parsed an object without consuming text.");
     /// <summary>
-    /// Applies a parser repeatedly until it errors.
-    /// <br/>Note that if the parser errors fatally, this will error fatally as well.
+    /// Applies a parser repeatedly until it errors non-fatally.
+    /// <br/>If the parser errors fatally, this will error fatally as well.
     /// <br/>To avoid infinite recursion, if the parser succeeds without consumption, this will fail.
-    /// <br/>FParsec many
     /// </summary>
     /// <param name="p">Parser to apply repeatedly</param>
     /// <param name="atleastOne">If true, then will require at least one result</param>
@@ -97,8 +96,7 @@ public static partial class Combinators {
                     new(new ParserError.IncorrectNumber(atleastOne ? 1 : 0, 0, null, next.Error), start) :
                     new(Unit.Default, next.Error, start, next.End);
             else if (!next.Consumed)
-                return new(
-                    new ParserError.Failure("`SkipMany` parser parsed an object without consuming text."), next.Start);
+                return new(skipManyNoConsumeErr, next.Start);
             else
                 foundOne = true;
         }

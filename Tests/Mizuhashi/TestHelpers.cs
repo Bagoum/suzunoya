@@ -80,7 +80,7 @@ public static class TestHelpers {
         var res = p.Run(s, out var strm).Error?.Show(strm);
         if (res == null)
             Assert.Fail("Did not receive an error from execution.");
-        if (!new Regex(regex).Match(res).Success)
+        if (!new Regex(regex).Match(res!).Success)
             Assert.Fail($"Could not find pattern `{regex}` in:\n{res}");
         Console.WriteLine($"Successfully found failure pattern `{regex}` in:\n{res}");
     }

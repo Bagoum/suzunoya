@@ -739,11 +739,10 @@ public static class ListExtensions {
     /// </summary>
     public static int ElementWiseHashCode<T>(this IReadOnlyList<T> arr) {
         int result = 17;
-        for (int ii = 0; ii < arr.Count; ++ii) {
+        for (int ii = 0; ii < arr.Count; ++ii)
             unchecked {
                 result = result * 23 + (arr[ii]?.GetHashCode() ?? 0);
             }
-        }
         return result;
     }
 
@@ -815,7 +814,7 @@ public static class DictExtensions {
     /// <summary>
     /// Copy all key/value pairs from `src` into `target`.
     /// </summary>
-    public static void CopyInto<K, V>(this Dictionary<K, V> src, Dictionary<K, V> target) {
+    public static void CopyInto<K, V>(this Dictionary<K, V> src, Dictionary<K, V> target) where K : notnull {
         foreach (var kv in src) target[kv.Key] = kv.Value;
     }
     
@@ -909,7 +908,7 @@ public static class DictExtensions {
     /// <summary>
     /// Get the value associated with a key, or return null.
     /// </summary>
-    public static V? GetOrNull<K, V>(this Dictionary<K, V> dict, K key) where V : struct {
+    public static V? GetOrNull<K, V>(this Dictionary<K, V> dict, K key) where K : notnull where V : struct {
         if (dict.TryGetValue(key, out var res)) return res;
         return default(V?);
     }
@@ -917,7 +916,7 @@ public static class DictExtensions {
     /// <summary>
     /// Push a value onto the stack mapped to the provided key.
     /// </summary>
-    public static void Push<K, V>(this Dictionary<K, Stack<V>> dict, K key, V value) {
+    public static void Push<K, V>(this Dictionary<K, Stack<V>> dict, K key, V value) where K : notnull {
         if (!dict.TryGetValue(key, out var s)) s = dict[key] = new Stack<V>();
         s.Push(value);
     }
@@ -925,7 +924,7 @@ public static class DictExtensions {
     /// <summary>
     /// Pop a value from the stack mapped to the provided key. Clear the key if the stack becomes empty.
     /// </summary>
-    public static void Pop<K, V>(this Dictionary<K, Stack<V>> dict, K key) {
+    public static void Pop<K, V>(this Dictionary<K, Stack<V>> dict, K key) where K : notnull {
         var s = dict[key];
         s.Pop();
         if (s.Count == 0) dict.Remove(key);

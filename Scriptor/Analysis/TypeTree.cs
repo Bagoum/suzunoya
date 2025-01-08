@@ -1,12 +1,13 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using BagoumLib.Unification;
 using static BagoumLib.Unification.TypeDesignation;
 
-namespace BagoumLib.Unification {
+namespace Scriptor.Analysis {
 /// <summary>
 /// A basic implementation of <see cref="ITypeTree"/>.
 /// </summary>
-public abstract record TypeTree {
+internal abstract record TypeTree {
     /// <summary>
     /// Degenerate interface inheriting <see cref="ITypeTree"/>.
     /// </summary>

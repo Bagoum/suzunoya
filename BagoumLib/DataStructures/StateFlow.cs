@@ -6,8 +6,7 @@ using JetBrains.Annotations;
 namespace BagoumLib.DataStructures;
 
 /// <summary>
-/// A helper to manage state flow between states of type <see cref="T"/>.
-/// 
+/// A helper to manage state flow between states of type T.
 /// </summary>
 [PublicAPI]
 public abstract class StateFlow<T> {

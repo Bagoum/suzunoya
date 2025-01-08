@@ -39,7 +39,7 @@ public abstract record BoundedContextData(string Key, KeyValueRepository Locals,
     /// </summary>
     public BoundedContextData GetNested(string key) => GetNested(this, key);
     
-    /// <inheritdoc cref="GetNested"/>
+    /// <inheritdoc cref="GetNested(string)"/>
     public BoundedContextData<T> GetNested<T>(string key) => GetNested<T>(this, key);
 
     /// <summary>

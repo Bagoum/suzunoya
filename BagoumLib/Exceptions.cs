@@ -11,11 +11,17 @@ namespace BagoumLib {
 /// </summary>
 [PublicAPI]
 public class MultiException : Exception {
+    /// <summary>
+    /// List of exceptions aggregated within this.
+    /// </summary>
     public List<Exception> InnerExceptions { get; }
 
+    /// <inheritdoc cref="MultiException"/>
     public MultiException(string message, IEnumerable<Exception> innerExcs) : base(message) {
         this.InnerExceptions = innerExcs.ToList();
     }
+    
+    /// <inheritdoc cref="MultiException"/>
     public MultiException(string message, params Exception[] innerExcs) : this(message, innerExcs as IEnumerable<Exception>) { }
 }
 

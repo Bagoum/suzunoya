@@ -29,6 +29,7 @@ public class ChunkerEvent<T> : IObserver<T>, IObservable<T[]> {
     private readonly Event<T[]> ev = new();
     private readonly bool pushOnCompletion = false;
 
+    /// <inheritdoc cref="ChunkerEvent{T}"/>
     public ChunkerEvent(int blockSize, bool pushOnCompletion=false) {
         BlockSize = blockSize;
         NextChunk = new T[blockSize];

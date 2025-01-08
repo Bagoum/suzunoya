@@ -23,12 +23,15 @@ public record ADVData(InstanceData VNData) {
 
     /// <summary>
     /// While in a VN segment, put the serialized save data before entering the segment here.
+    /// <br/>It can then be loaded via <see cref="GetUnmodifiedSaveData"/> if it is necessary to
+    ///  replay the VN segment.
     /// </summary>
     public string? UnmodifiedSaveData { get; private set; } = null;
 
     /// <summary>
     /// When entering a context where save/load is not allowed (<see cref="StrongBoundedContext{T}.LoadSafe"/> is false),
     ///  put the save data at that point in time in this field.
+    /// <br/>It can then be loaded if save/load occurs during this context.
     /// </summary>
     [JsonIgnore] public (List<string> ParentContexts, string Data)? LockedContextData { get; private set; } = null;
     /// <summary>
@@ -65,15 +68,21 @@ public record ADVData(InstanceData VNData) {
     }
 
     private static ADVData Deserialize(string data) {
-        var save = Serialization.DeserializeJson<ADVData>(data) ?? 
+        var save = data.DeserializeJson<ADVData>() ?? 
                    throw new Exception($"Couldn't deserialize ADV data");
         save.VNData._SetGlobalData_OnlyUseForInitialization(ServiceLocator.Find<IGlobalVNDataProvider>().GlobalVNData);
         return save;
     }
     
+    /// <summary>
+    /// If present, deserialize <see cref="UnmodifiedSaveData"/>.
+    /// </summary>
     public ADVData? GetUnmodifiedSaveData() => 
         UnmodifiedSaveData is null ? null : Deserialize(UnmodifiedSaveData);
 
+    /// <summary>
+    /// If present, deserialize <see cref="LockedContextData"/>.
+    /// </summary>
     public ADVData? GetLockedSaveData() =>
         LockedContextData?.Data is { } data ? Deserialize(data) : null;
 
@@ -84,7 +93,7 @@ public record ADVData(InstanceData VNData) {
     ///  and replay it until it is equal to the savedata at the point of saving.
     /// </summary>
     public void PreserveData() {
-        UnmodifiedSaveData = Serialization.SerializeJson(this, Formatting.None);
+        UnmodifiedSaveData = this.SerializeJson(Formatting.None);
     }
 
     /// <summary>

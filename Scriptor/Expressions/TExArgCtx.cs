@@ -21,7 +21,7 @@ namespace Scriptor.Expressions;
 /// </summary>
 public class TExArgCtx {
     /// <summary>
-    /// Context that is shared by any copies of this.
+    /// Context that is shared by any copies of <see cref="TExArgCtx"/>.
     /// </summary>
     public class RootCtx {
         /// <summary>
@@ -76,11 +76,25 @@ public class TExArgCtx {
     /// <inheritdoc cref="Proxy{T}"/>
     public object Proxy(object replacee) => Ctx.BakeTracker.Proxy(replacee, replacee.GetType());
     
+    /// <summary>
+    /// An argument provided to the expression being compiled. Might be a parameter, function argument, implicit, etc.
+    /// </summary>
     public readonly struct Arg {
+        /// <summary>
+        /// Argument name.
+        /// </summary>
         public readonly string name;
-        //typeof(TExPI)
+        /// <summary>
+        /// Type of the expression, eg. typeof(TEx{float}).
+        /// </summary>
         public readonly Type texType;
+        /// <summary>
+        /// Expression representing the argument.
+        /// </summary>
         public readonly TEx expr;
+        /// <summary>
+        /// True if this expression should be prioritized when querying variables by type.
+        /// </summary>
         public readonly bool hasTypePriority;
 
         private Arg(string name, Type texType, TEx expr, bool hasTypePriority) {
@@ -90,28 +104,41 @@ public class TExArgCtx {
             this.hasTypePriority = hasTypePriority;
         }
 
+        /// <summary>
+        /// Create an <see cref="Arg"/> from a <see cref="TEx{T}"/>.
+        /// </summary>
         public static Arg FromTEx(string name, TEx expr, bool hasTypePriority) =>
             new(name, expr.GetType(), expr, hasTypePriority);
     }
     
+    /// <summary>
+    /// A disposable representing the lifetime of a local variable in <see cref="RootCtx"/>.<see cref="RootCtx.AliasStack"/>.
+    /// </summary>
     public class LocalLet : IDisposable {
         private readonly string alias;
         private readonly TExArgCtx ctx;
 
+        /// <inheritdoc cref="LocalLet"/>
         public LocalLet(TExArgCtx ctx, string alias, Ex val) {
             this.alias = alias;
             (this.ctx = ctx).Ctx.AliasStack.Push(alias, val);
         }
 
+        /// <inheritdoc/>
         public void Dispose() {
             ctx.Ctx.AliasStack.Pop(alias);
         }
     }
 
+    /// <summary>
+    /// Temporarily add a variable to <see cref="RootCtx"/>.<see cref="RootCtx.AliasStack"/>.
+    /// </summary>
     public LocalLet Let(string alias, Ex val) => new(this, alias, val);
     
+    /// <summary>
+    /// Arguments provided to this TExArgCtx. Does not carry parent arguments.
+    /// </summary>
     public readonly Arg[] Args;
-    public IEnumerable<Ex> Expressions => Args.Select(a => (Ex)a.expr);
     private readonly Dictionary<string, int> argNameToIndexMap;
     //Maps typeof(TExPI) to index
     private readonly Dictionary<Type, int> argExTypeToIndexMap;
@@ -120,11 +147,22 @@ public class TExArgCtx {
 
     private readonly RootCtx? ctx;
     private readonly TExArgCtx? parent;
+    /// <inheritdoc cref="RootCtx"/>
     public RootCtx Ctx => ctx ?? parent?.Ctx ?? throw new StaticException("No RootCtx found");
+    
+    /// <summary>
+    /// Get the linked expression representing the (most-priotized) float argument.
+    /// </summary>
     public TEx<float> FloatVal => GetByExprType<TEx<float>>();
+    
+    /// <summary>
+    /// Get the linked expression representing the environment frame argument.
+    /// </summary>
     public TEx EnvFrame => GetByType<EnvFrame>();
 
+    /// <inheritdoc cref="TExArgCtx"/>
     public TExArgCtx(params Arg[] args) : this(null, args) { }
+    /// <inheritdoc cref="TExArgCtx"/>
     public TExArgCtx(TExArgCtx? parent, params Arg[] args) {
         this.parent = parent;
         if (parent == null)
@@ -152,11 +190,18 @@ public class TExArgCtx {
         }
     }
 
+    /// <summary>
+    /// Get the argument of a specific name and type. Fails if not found.
+    /// </summary>
     public TEx<T> GetByName<T>(string name) {
         if (!argNameToIndexMap.TryGetValue(name, out var idx))
             throw new CompileException($"The variable \"{name}\" is not provided as an argument.");
         return Args[idx].expr as TEx<T> ?? throw new BadTypeException($"The variable \"{name}\" (#{idx+1}/{Args.Length}) is not of type {typeof(T).SimpRName()}");
     }
+    
+    /// <summary>
+    /// Try to get the argument of a specific name and type. Returns null if not found.
+    /// </summary>
     public TEx<T>? MaybeGetByName<T>(string name) {
         if (!argNameToIndexMap.TryGetValue(name, out var idx))
             return null;
@@ -165,6 +210,8 @@ public class TExArgCtx {
             //Still throw an error in this case
             throw new BadTypeException($"The variable \"{name}\" (#{idx+1}/{Args.Length}) is not of type {typeof(T).SimpRName()}");
     }
+    
+    /// <inheritdoc cref="GetByName{T}"/>
     public TEx GetByName(Type typ, string name) {
         if (!argNameToIndexMap.TryGetValue(name, out var idx))
             throw new CompileException($"The variable \"{name}\" is not provided as an argument.");
@@ -173,6 +220,7 @@ public class TExArgCtx {
                 throw new BadTypeException($"The variable \"{name}\" (#{idx+1}/{Args.Length}) is not of type {typ.SimpRName()}");
     }
     
+    /// <inheritdoc cref="MaybeGetByName{T}"/>
     public TEx? MaybeGetByName(Type typ, string name) {
         if (!argNameToIndexMap.TryGetValue(name, out var idx))
             return null;
@@ -182,60 +230,94 @@ public class TExArgCtx {
             throw new BadTypeException($"The variable \"{name}\" (#{idx+1}/{Args.Length}) is not of type {typ.SimpRName()}");
     }
     
+    /// <inheritdoc cref="GetByType{T}()"/>
     public TEx GetByType<T>(out int idx) {
         if (!argTypeToIndexMap.TryGetValue(typeof(T), out idx))
             throw new CompileException($"No variable of type {typeof(T).SimpRName()} is provided as an argument.");
         return Args[idx].expr;
     }
+    
+    /// <summary>
+    /// Get the most-prioritized argument of a certain type. Throws if none exists.
+    /// </summary>
     public TEx GetByType<T>() => GetByType<T>(out _);
+    
+    /// <summary>
+    /// Try to get the most-prioritized argument of a certain type. Returns null if none exists.
+    /// </summary>
     public TEx? MaybeGetByType<T>(out int idx) => 
         argTypeToIndexMap.TryGetValue(typeof(T), out idx) ? 
             Args[idx].expr : 
             null;
     
+    /// <inheritdoc cref="GetByExprType{T}()"/>
     public Tx GetByExprType<Tx>(out int idx) where Tx : TEx {
         if (!argExTypeToIndexMap.TryGetValue(typeof(Tx), out idx))
             throw new CompileException($"No variable of type {typeof(Tx).SimpRName()} is provided as an argument.");
         return (Tx)Args[idx].expr;
     }
+    
+    /// <summary>
+    /// Get the most-prioritized argument of a certain TEx type. Throws if none exists.
+    /// </summary>
     public Tx GetByExprType<Tx>() where Tx : TEx => GetByExprType<Tx>(out _);
+    
+    /// <summary>
+    /// Try to get the most-prioritized argument of a certain TEx type. Returns null if none exists.
+    /// </summary>
     public Tx? MaybeGetByExprType<Tx>(out int idx) where Tx : TEx => 
         argExTypeToIndexMap.TryGetValue(typeof(Tx), out idx) ? 
             (Tx) Args[idx].expr : 
             null;
 
+    /// <summary>
+    /// Derive a child TExArgCtx from this one, replacing the `idx`'th argument with `newArg`.
+    /// </summary>
     public TExArgCtx MakeCopyWith(int idx, Arg newArg) {
         var newargs = Args.ToArray();
         newargs[idx] = newArg;
         return new TExArgCtx(this, newargs);
     }
 
+    /// <summary>
+    /// Derive a child TExArgCtx from this one, replacing the first argument of type T with a new argument.
+    /// </summary>
     public TExArgCtx MakeCopyForType<T>(out TEx<T> currEx, out TEx<T> copyEx)  {
         currEx = (Ex)GetByType<T>(out int idx);
         copyEx = new TEx<T>();
         return MakeCopyWith(idx, Arg.FromTEx(Args[idx].name, copyEx, Args[idx].hasTypePriority));
     }
     
+    /// <summary>
+    /// Derive a child TExArgCtx from this one, replacing the first argument of type T with `newEx`.
+    /// </summary>
     public TExArgCtx MakeCopyForType<T>(TEx<T> newEx) {
         _ = GetByType<T>(out int idx);
         return MakeCopyWith(idx, Arg.FromTEx(Args[idx].name, newEx, Args[idx].hasTypePriority));
     }
     
+    /// <summary>
+    /// Derive a child TExArgCtx from this one, replacing the first argument of TEx type T with a new argument.
+    /// </summary>
     public TExArgCtx MakeCopyForExType<T>(out T currEx, out T copyEx) where T: TEx, new() {
         currEx = GetByExprType<T>(out int idx);
         copyEx = new T();
         return MakeCopyWith(idx, Arg.FromTEx(Args[idx].name, copyEx, Args[idx].hasTypePriority));
     }
     
+    /// <summary>
+    /// Derive a child TExArgCtx from this one, replacing the first argument of TEx type T with `newEx`.
+    /// </summary>
     public TExArgCtx MakeCopyForExType<T>(T newEx) where T: TEx {
         _ = GetByExprType<T>(out int idx);
         return MakeCopyWith(idx, Arg.FromTEx(Args[idx].name, newEx, Args[idx].hasTypePriority));
     }
 
+    /// <summary>
+    /// Derive a copy TExArgCtx from this one, adding a new argument at the end of <see cref="Args"/>.
+    /// </summary>
     public TExArgCtx Append(string name, TEx ex, bool hasPriority=true) {
         var newArgs = Args.Append(Arg.FromTEx(name, ex, hasPriority)).ToArray();
         return new TExArgCtx(this, newArgs);
     }
-    
-    public Ex When(Func<TExArgCtx, TEx<bool>> pred, Ex then) => Ex.IfThen(pred(this), then);
 }

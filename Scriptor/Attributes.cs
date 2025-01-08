@@ -16,12 +16,18 @@ public class ExpressionBoundaryAttribute : Attribute { }
 
 
 /// <summary>
-/// Attribute marking that the `typeIndex`th generic variable in this method should only be allowed
+/// Attribute marking that the `typeIndex`th generic type in this method should only be allowed
 ///  to take on one of the provided `possibleTypes`.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
 public class RestrictTypesAttribute : Attribute {
+    /// <summary>
+    /// Index of the generic type.
+    /// </summary>
     public readonly int typeIndex;
+    /// <summary>
+    /// Restricted types for the generic.
+    /// </summary>
     public readonly Type[] possibleTypes;
 
     /// <summary></summary>
@@ -31,11 +37,13 @@ public class RestrictTypesAttribute : Attribute {
     }
 }
 
-
+/// <summary>
+/// Attribute providing information about where in the codebase it was created.
+/// </summary>
 public class FileLinkAttribute : Attribute {
-    public readonly string file;
-    public readonly string member;
-    public readonly int line;
+    private readonly string file;
+    internal readonly string member;
+    private readonly int line;
 
     /// <summary></summary>
     public FileLinkAttribute([CallerFilePath] string file = "",
@@ -46,6 +54,9 @@ public class FileLinkAttribute : Attribute {
         this.line = line;
     }
     
+    /// <summary>
+    /// Create a link to the attribute's location.
+    /// </summary>
     public string FileLink(string? content = null) => Logging.ToFileLink(file, line, content);
 }
 
@@ -54,6 +65,9 @@ public class FileLinkAttribute : Attribute {
 /// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public class ConstableAttribute : Attribute {
+    /// <summary>
+    /// True if this function/methods can also be converted into a constant expression in AoT compilation contexts.
+    /// </summary>
     public readonly bool constableInAOT;
 
     /// <summary></summary>
@@ -62,13 +76,20 @@ public class ConstableAttribute : Attribute {
     }
 }
 
+/// <summary>
+/// Mark that a specific function/method/class should not be reflected.
+/// </summary>
 [AttributeUsage(AttributeTargets.All)]
 public class DontReflectAttribute : Attribute { }
+
 /// <summary>
 /// Attribute marking a reflection alias for this method.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple=true)]
 public class AliasAttribute : Attribute {
+    /// <summary>
+    /// Method alias.
+    /// </summary>
     public readonly string alias;
 
     /// <summary></summary>
@@ -84,6 +105,9 @@ public class AliasAttribute : Attribute {
 [AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class)]
 [MeansImplicitUse(ImplicitUseTargetFlags.WithMembers)]
 public class ReflectAttribute : FileLinkAttribute {
+    /// <summary>
+    /// Optionally, the restriction on return types of reflected functions.
+    /// </summary>
     public readonly Type? returnType;
     /// <summary></summary>
     public ReflectAttribute(Type? returnType = null, 
@@ -103,13 +127,8 @@ public class ReflectAttribute : FileLinkAttribute {
 /// </summary>
 [AttributeUsage((AttributeTargets.Method))]
 public class FallthroughAttribute : Attribute {
-    //TODO you probably don't need priority anymore
-    public readonly int priority;
-
     /// <summary></summary>
-    public FallthroughAttribute(int priority=0) {
-        this.priority = priority;
-    }
+    public FallthroughAttribute() { } 
 }
 
 /// <summary>
@@ -120,7 +139,13 @@ public class FallthroughAttribute : Attribute {
 /// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Constructor)]
 public class CreatesInternalScopeAttribute : Attribute {
+    /// <summary>
+    /// AutoVarMethod type.
+    /// </summary>
     public readonly int type;
+    /// <summary>
+    /// True if the scope is dynamically-accessed.
+    /// </summary>
     public readonly bool dynamic;
 
     /// <summary></summary>
@@ -135,6 +160,9 @@ public class CreatesInternalScopeAttribute : Attribute {
 /// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Constructor)]
 public class ExtendsInternalScopeAttribute : Attribute {
+    /// <summary>
+    /// AutoVarExtend type.
+    /// </summary>
     public readonly int type;
 
     /// <summary></summary>
@@ -148,6 +176,9 @@ public class ExtendsInternalScopeAttribute : Attribute {
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public class AssignsAttribute : Attribute {
+    /// <summary>
+    /// Argument indexes which receive writes.
+    /// </summary>
     public int[] Indices { get; }
 
     /// <summary></summary>
@@ -174,6 +205,9 @@ public class BDSL2OperatorAttribute : Attribute { }
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public class BDSL2MULTIPLY_OPERATORAttribute : Attribute {
+    /// <summary>
+    /// True iff this operator should be used if any generic type maps to int.
+    /// </summary>
     public readonly bool isIntValid;
     /// <summary></summary>
     public BDSL2MULTIPLY_OPERATORAttribute(bool isIntValid) {
@@ -189,9 +223,17 @@ public class OperatorAttribute : Attribute { }
 
 // --- BDSL1 attributes
 
+/// <summary>
+/// Marks that using this method should result in a warning.
+/// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public class WarnOnStrictAttribute : Attribute {
+    /// <summary>
+    /// Only issue a warnbing when parsing strictness is greater than this value.
+    /// </summary>
     public readonly int strictness;
+    
+    /// <inheritdoc cref="WarnOnStrictAttribute"/>
     public WarnOnStrictAttribute(int strict = 1) {
         strictness = strict;
     }
@@ -203,7 +245,13 @@ public class WarnOnStrictAttribute : Attribute {
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
 public class BDSL1AutoSpecializeAttribute : Attribute {
+    /// <summary>
+    /// Index of the generic type to be mapped.
+    /// </summary>
     public readonly int typeIndex;
+    /// <summary>
+    /// Type to which the generic should be mapped.
+    /// </summary>
     public readonly Type specializeAs;
 
     /// <summary></summary>

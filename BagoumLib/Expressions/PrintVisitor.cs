@@ -251,6 +251,9 @@ public class PrintVisitor : PrintVisitorAbs {
         return node;
     }
     
+    /// <summary>
+    /// Visit a conditional expression, but print it as an if/else block instead of a ternary.
+    /// </summary>
     public Expression VisitConditionalAsIfElse(ConditionalExpression node) {
         Add("if (");
         Visit(node.Test);
@@ -419,10 +422,11 @@ public class PrintVisitor : PrintVisitorAbs {
     }
 
     //This delegates to the other methods
+    /*
     /// <inheritdoc />
     protected override MemberBinding VisitMemberBinding(MemberBinding node) {
         return base.VisitMemberBinding(node);
-    }
+    }*/
 
     /// <inheritdoc />
     protected override Expression VisitMemberInit(MemberInitExpression node) {

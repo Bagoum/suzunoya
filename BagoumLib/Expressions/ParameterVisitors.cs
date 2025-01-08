@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq.Expressions;
+using JetBrains.Annotations;
 
 namespace BagoumLib.Expressions;
 
@@ -20,7 +21,11 @@ public class ReplaceParameterVisitor(ParameterExpression source, Expression repl
 /// <summary>
 /// Checks if a expression tree has any parameters not bound in a Block.
 /// </summary>
+[PublicAPI]
 public class HasUnboundParameterVisitor : ExpressionVisitor {
+    /// <summary>
+    /// All the unbound parameters.
+    /// </summary>
     public readonly List<ParameterExpression> UnboundParameters = new();
     private readonly HashSet<ParameterExpression> blockParameters = new();
 

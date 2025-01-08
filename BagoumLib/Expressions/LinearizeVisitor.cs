@@ -115,7 +115,7 @@ public class LinearizeVisitor : ExpressionVisitor {
             // A || B
             // A ? true : B;
             ExpressionType.OrElse => Visit(Ex.Condition(node.Left, Ex.Constant(true), node.Right)),
-            _ => Linearize(exs => Ex.MakeBinary(node.NodeType, exs[0], exs[1]), new[] {node.Left, node.Right},
+            _ => Linearize(exs => Ex.MakeBinary(node.NodeType, exs[0], exs[1]), [node.Left, node.Right],
                 !node.NodeType.IsAssign())
         };
     }
@@ -233,7 +233,7 @@ public class LinearizeVisitor : ExpressionVisitor {
 
     /// <inheritdoc />
     protected override Expression VisitNew(NewExpression node) =>
-        Linearize(args => Ex.New(node.Constructor, args), node.Arguments.ToArray());
+        Linearize(args => Ex.New(node.Constructor!, args), node.Arguments.ToArray());
 
     /// <inheritdoc />
     protected override Expression VisitNewArray(NewArrayExpression node) =>

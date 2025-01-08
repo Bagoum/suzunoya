@@ -4,7 +4,7 @@ using System;
 
 namespace BagoumLib.SignalProcessing;
 
-internal static unsafe class fftsg {
+internal static unsafe class FFTsg {
     internal static void cdft(int n, int isgn, double* a, int* ip, double* w) {
         int nw;
 

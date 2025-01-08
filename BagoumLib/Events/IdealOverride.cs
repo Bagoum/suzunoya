@@ -14,6 +14,9 @@ namespace BagoumLib.Events {
 /// </summary>
 [PublicAPI]
 public class IdealOverride<T> : ICSubject<T> {
+    /// <summary>
+    /// The ideal value, which is the current value if there is no override.
+    /// </summary>
     public Evented<T> Ideal { get; }
     private Evented<Maybe<T>> overrider { get; } = new(Maybe<T>.None);
     
@@ -32,6 +35,7 @@ public class IdealOverride<T> : ICSubject<T> {
     /// </summary>
     public void RevokeOverride() => overrider.Value = Maybe<T>.None;
 
+    /// <inheritdoc cref="IdealOverride{T}"/>
     public IdealOverride(T val) {
         Ideal = new(val);
         onSet = new(val);
@@ -55,6 +59,9 @@ public class IdealOverride<T> : ICSubject<T> {
     /// <inheritdoc />
     public void OnNext(T value) => Value = value;
 
+    /// <summary>
+    /// Modify <see cref="Ideal"/>.
+    /// </summary>
     public void SetIdeal(T value) => Ideal.Value = value;
 }
 }

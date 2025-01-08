@@ -13,9 +13,18 @@ using static Mizuhashi.Combinators;
 
 namespace Scriptor.Definition;
 
+/// <summary>
+/// Metadata output by the lexer but not compiled to the ST.
+/// </summary>
 public record LexerMetadata {
-    public readonly List<(PositionRange pos, string text)> Comments = new();
+    /// <summary>
+    /// All comments in the source code.
+    /// </summary>
+    public List<(PositionRange pos, string text)> Comments { get; } = new();
 
+    /// <summary>
+    /// Store a comment.
+    /// </summary>
     public void AddComment(Lexer.Token comment) {
         var c = comment.Content;
         if (c.StartsWith("///") && c.EndsWith("///") && c.Length >= 6)
@@ -130,6 +139,10 @@ public static class Lexer {
     [Flags]
     public enum TokenFlags {
         /// <summary>
+        /// No flags.
+        /// </summary>
+        None = 0,
+        /// <summary>
         /// This token is preceded by no tokens other than whitespace until the previous newline.
         /// </summary>
         PrecededByNewline = 1 << 0,
@@ -146,7 +159,6 @@ public static class Lexer {
         ///  and therefore should not be taken as a partial function application argument.
         /// </summary>
         ImplicitBreak = 1 << 3,
-        Default = 0
     }
 
     /// <summary>
@@ -216,7 +228,13 @@ public static class Lexer {
         /// Close brace, }
         /// </summary>
         CloseBrace,
+        /// <summary>
+        /// Comma ,
+        /// </summary>
         Comma,
+        /// <summary>
+        /// Semicolon ;
+        /// </summary>
         Semicolon,
         /// <summary>
         /// An identifier that may be for a variable or method or class or type, etc.
@@ -249,7 +267,14 @@ public static class Lexer {
         /// </summary>
         LString
     }
-    public readonly struct Token {
+    
+    /// <summary>
+    /// A token produced by the lexer.
+    /// </summary>
+    public readonly struct Token: IEquatable<Token> {
+        /// <summary>
+        /// String content of the token.
+        /// </summary>
         public string Content { get; }
         
         /// <summary>
@@ -269,15 +294,21 @@ public static class Lexer {
         public int Index => Position.Start.Index;
         private (TokenType, TokenFlags, string, PositionRange) Tuple => (Type, Flags, Content, Position);
 
+        /// <inheritdoc cref="Token"/>
         public Token(TokenType type, Position p, Match m) : this(type, p, m.Value) { }
         
         //flags will be updated in the postprocessor
-        public Token(TokenType type, Position p, string content) : this(type, TokenFlags.Default, p, content) { }
+        /// <inheritdoc cref="Token"/>
+        public Token(TokenType type, Position p, string content) : this(type, TokenFlags.None, p, content) { }
         
+        /// <inheritdoc cref="Token"/>
         public Token(TokenType type, TokenFlags flags, Position p, string content) : 
             this(type, flags, p.CreateRange(content, content.Length), content) { }
-        public Token(TokenType type, PositionRange p, string content) : this(type, TokenFlags.Default, p, content) { }
         
+        /// <inheritdoc cref="Token"/>
+        public Token(TokenType type, PositionRange p, string content) : this(type, TokenFlags.None, p, content) { }
+        
+        /// <inheritdoc cref="Token"/>
         public Token(TokenType type, TokenFlags flags, PositionRange p, string content) {
             Type = type;
             Content = content;
@@ -285,16 +316,34 @@ public static class Lexer {
             Flags = flags;
         }
 
+        /// <summary>
+        /// Create a new token by combining this token's flags with `flags`.
+        /// </summary>
         public Token WithFlags(TokenFlags flags) => new(Type, Flags | flags, Position, Content);
+        
+        /// <summary>
+        /// Create a new token with a different type from this token.
+        /// </summary>
         public Token WithType(TokenType t) => new(t, Flags, Position, Content);
 
+        /// <inheritdoc/>
         public override string ToString() => string.IsNullOrWhiteSpace(Content) ? $"({Type})" : $"\"{Content}\" ({Type})";
 
+        /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is Token t && this == t;
+        /// <inheritdoc/>
+        public bool Equals(Token other) => this == other;
+        /// <inheritdoc/>
         public override int GetHashCode() => Tuple.GetHashCode();
+        /// <summary>
+        /// Equality operator
+        /// </summary>
         public static bool operator==(Token x, Token y) => x.Tuple == y.Tuple;
+        /// <summary>
+        /// Inequality operator
+        /// </summary>
         public static bool operator !=(Token x, Token y) => !(x == y);
-        
+
     }
     
     private static RegexTokenizer<Token> T([RegexPattern] string pattern, TokenType t) =>
@@ -485,10 +534,17 @@ public static class Lexer {
         }
     }
 
+    /// <summary>
+    /// Implementation of <see cref="ITokenWitnessCreator{T}"/> for lexer tokens.
+    /// </summary>
     public record TokenWitnessCreator(string Source) : ITokenWitnessCreator<Token> {
+        /// <inheritdoc/>
         public ITokenWitness Create(InputStream<Token> stream) => new TokenWitness(Source, stream);
     }
 
+    /// <summary>
+    /// Parse a token of the provided type.
+    /// </summary>
     public static Parser<Token, Token> TokenOfType(TokenType typ) {
         var err = new ParserError.Expected($"{typ}");
         return input => {
@@ -499,6 +555,9 @@ public static class Lexer {
         };
     }
     
+    /// <summary>
+    /// Parse a token of any of the provided types.
+    /// </summary>
     public static Parser<Token, Token> TokenOfTypes(params TokenType[] typ) {
         var err = new ParserError.Expected($"one of {string.Join(", ", typ.Select(t => t.ToString()))}");
         return input => {
@@ -512,6 +571,9 @@ public static class Lexer {
         };
     }
     
+    /// <summary>
+    /// Parse a token with the given string content.
+    /// </summary>
     public static Parser<Token, Token> TokenOfValue(string value) {
         var err = new ParserError.Expected(value);
         return input => {
@@ -522,6 +584,9 @@ public static class Lexer {
         };
     }
     
+    /// <summary>
+    /// Parse a token of the provided type and with the given string content.
+    /// </summary>
     public static Parser<Token, Token> TokenOfTypeValue(TokenType typ, string value) {
         var err = new ParserError.Expected($"{typ}: {value}");
         return input => {
@@ -532,6 +597,9 @@ public static class Lexer {
         };
     }
     
+    /// <summary>
+    /// Parse a token of the provided type and with the given string content, but NOT marked with the given flag.
+    /// </summary>
     public static Parser<Token, Token> TokenOfTypeValueNotFlag(TokenType typ, string value, TokenFlags flag, string desc) {
         var err = new ParserError.Expected(desc);
         var flagErr = new ParserError.Expected(flag switch {
@@ -588,11 +656,21 @@ public static class Lexer {
             throw new Exception("Empty enumerable for JoinTokens");
         return token;
     }
-
+    
+    /// <summary>
+    /// Parse an identifier token.
+    /// </summary>
     public static readonly Parser<Token, Token> Ident = TokenOfType(TokenType.Identifier);
+    
+    /// <summary>
+    /// Parse a number token.
+    /// </summary>
     public static readonly Parser<Token, Token> Num = TokenOfType(TokenType.Number);
+    
+    /// <summary>
+    /// Parse (nonzero) inline whitespace.
+    /// </summary>
     public static readonly Parser<Token, Token> ILWhitespace1 = TokenOfType(TokenType.InlineWhitespace);
-    public static readonly Parser<Token, Token> Semicolon = TokenOfType(TokenType.Semicolon);
 
 
     private static readonly Parser<Token, Token> arrayTypePostfix =

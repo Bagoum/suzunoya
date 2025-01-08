@@ -8,6 +8,9 @@ namespace BagoumLib.Mathematics {
 [PublicAPI]
 public static class RandUtils {
     private const string CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    /// <summary>
+    /// Static instance of Random.
+    /// </summary>
     public static readonly Random R = new();
     
     /// <summary>

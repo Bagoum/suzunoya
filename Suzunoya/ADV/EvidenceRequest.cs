@@ -14,6 +14,7 @@ namespace Suzunoya.ADV {
 ///  interrupts VN execution and runs a <see cref="BoundedContext{T}"/> on top.
 /// </summary>
 /// <param name="VN">VN process on which this is running.</param>
+/// <param name="ADV">ADV manager overseeing VN execution.</param>
 /// <typeparam name="E">Type of evidence object.</typeparam>
 [PublicAPI]
 public record EvidenceRequest<E>(IVNState VN, ADVManager? ADV = null) {

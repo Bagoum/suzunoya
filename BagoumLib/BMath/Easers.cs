@@ -79,34 +79,73 @@ public static class Easers {
             0.5f * x * x * x * x :
             1 - 0.5f * (x -= 2) * x * x * x;
 
+    /// <summary>
+    /// Elasticity for <see cref="EInBack"/>/<see cref="EOutBack"/>.
+    /// </summary>
     public const float BackElasticity = 1.7f;
+    
+    /// <summary>
+    /// Elasticity for <see cref="EIOBack"/>.
+    /// </summary>
     public const float IOBackElasticity = BackElasticity * 1.53f;
+    
+    /// <summary>
+    /// Elastic easer starting by going negative and then moving quickly to the endpoint.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EInBack(float x) => x * x * ((BackElasticity + 1) * x - BackElasticity);
+    
+    /// <inheritdoc cref="EInBack"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float CEOutBack(float elast, float x) => 1 + --x * x * ((elast + 1) * x + elast);
+    
+    /// <summary>
+    /// Elastic easer that goes beyond the endpoint and then is pulled back.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutBack(float x) => 1 + --x * x * ((BackElasticity + 1) * x + BackElasticity);
+    
+    /// <summary>
+    /// Elastic easer that starts by going negative, then quickly goes beyond the endpoint, and then is pulled back.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOBack(float x) =>
         (x *= 2f) < 1f ?
             0.5f * x * x * ((IOBackElasticity + 1) * x - IOBackElasticity) :
             1 - 0.5f * (x -= 2) * x * ((-1 - IOBackElasticity) * x - IOBackElasticity);
 
+    /// <summary>
+    /// Elastic easer that oscillates around the starting point.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EInElastic(float x) => 
         (float)(-Math.Pow(2, 10 * x - 10) * Math.Sin((x - 1.075) * Math.PI / 0.15));
+    
+    /// <summary>
+    /// Elastic easer that oscillates around the ending point.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutElastic(float x) => 
         (float)(1+Math.Pow(2, -10 * x) * Math.Sin((x - .075) * Math.PI / 0.15));
+    
+    /// <summary>
+    /// Elastic easer that oscillates around the starting and ending points.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOElastic(float x) =>
         (x *= 2f) < 1f ?
             (float) (-Math.Pow(2, 10 * x - 11) * Math.Sin((x - 1.1) * Math.PI / 0.2)) :
             (float) (1 - Math.Pow(2, 9 - 10 * x) * Math.Sin((1.9 - x) * Math.PI / 0.2));
 
+    /// <summary>
+    /// Easer that bounces increasingly to the endpoint.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EInBounce(float x) => 1 - EOutBounce(1 - x);
+    
+    /// <summary>
+    /// Easer that quickly goes to the endpoint, then bounces decreasingly.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EOutBounce(float x) {
         //Expanded form of CEOutBounce for points [-1/3, 1/3, 2/3, 5.3/6, 1]
@@ -118,6 +157,10 @@ public static class Easers {
             return 9 * (x - 4.65f / 6) * (x - 4.65f / 6) + .894375f;
         return 9 * (x - 5.65f / 6) * (x - 5.65f / 6) + .969375f;
     }
+    
+    /// <summary>
+    /// Easer that bounces increasingly to the endpoint, then bounces decreasingly.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float EIOBounce(float x) =>
         (x *= 2f) < 1f ?
@@ -134,7 +177,9 @@ public static class Easers {
     /// </summary>
     public static float EIdentity(float x) => x;
 
-    
+    /// <summary>
+    /// 1 - (1-x)^(pow)
+    /// </summary>
     public static float CEOutPow(float x, float pow) => 1f - (float) Math.Pow(1 - x, pow);
     
     /// <summary>

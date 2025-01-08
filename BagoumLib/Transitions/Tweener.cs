@@ -82,7 +82,7 @@ public record Tweener<T> : TransitionBase<T> {
 /// A tweener that does nothing for the provided amount of time.
 /// </summary>
 public record NoopTweener : TransitionBase<Unit> {
-    /// <inheritdoc cref="NoopTweener{T}"/>
+    /// <inheritdoc cref="NoopTweener"/>
     public NoopTweener(float time, ICancellee? cT = null) {
         Time = time;
         CToken = cT;

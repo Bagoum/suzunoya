@@ -34,6 +34,7 @@ public class CompactingArray<T> {
     public int NullElements { get; protected set; } = 0;
     private readonly int firstResize;
 
+    /// <inheritdoc cref="CompactingArray{T}"/>
     public CompactingArray(int size = 8, int firstResize=16) {
         Data = new T[size];
         Deleted = new bool[size];
@@ -82,7 +83,10 @@ public class CompactingArray<T> {
         return true;
     }
 
-    public void AddRef(ref T obj) {
+    /// <summary>
+    /// Add an element to the end of the array. Takes a reference for struct-type optimization.
+    /// </summary>
+    public void AddRef(in T obj) {
         if (count >= Data.Length) {
             var nLen = Math.Max(Data.Length * 2, firstResize);
             var narr = new T[nLen];
@@ -96,7 +100,10 @@ public class CompactingArray<T> {
         Data[count++] = obj;
     }
 
-    public void Add(T obj) => AddRef(ref obj);
+    /// <summary>
+    /// Add an element to the end of the array.
+    /// </summary>
+    public void Add(T obj) => AddRef(in obj);
 
     /// <inheritdoc cref="AnyTypeDMCompactingArray{D}.Empty"/>
     public void Empty() {
@@ -106,9 +113,17 @@ public class CompactingArray<T> {
         NullElements = 0;
     }
 
+    /// <summary>
+    /// Get the index'th element in the array. Note that this object may be marked as deleted.
+    /// </summary>
     public ref T this[int index] => ref Data[index];
+    
+    /// <inheritdoc cref="this"/>
     public T ItemAt(int index) => Data[index];
 
+    /// <summary>
+    /// Get the index'th element in the array only if it has not been marked as deleted.
+    /// </summary>
     public bool TryGet(int index, out T obj) {
         if (Deleted[index]) {
             obj = default!;

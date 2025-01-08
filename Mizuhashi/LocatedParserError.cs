@@ -152,6 +152,9 @@ public abstract record ParserError {
         public virtual bool Equals(OneOf? other) =>
             other != null && Errors.Count == other.Errors.Count &&
             Enumerable.Range(0, Errors.Count).All(i => Errors[i] == other.Errors[i]);
+
+        /// <inheritdoc/>
+        public override int GetHashCode() => Errors.ElementWiseHashCode();
     }
     
     /// <summary>
@@ -175,7 +178,7 @@ public abstract record ParserError {
 /// <summary>
 /// A <see cref="ParserError"/> paired with a location in the source string.
 /// </summary>
-public readonly struct LocatedParserError {
+public readonly struct LocatedParserError: IEquatable<LocatedParserError> {
     //Store Index instead of position because it's more space-efficient. We can expand back to position if there are parsing errors
     /// <summary>
     /// The index in the source stream where the error started.
@@ -194,10 +197,10 @@ public readonly struct LocatedParserError {
 
     private (int, int, ParserError) Tuple => (Index, End, Error);
 
-    /// <summary>
-    /// Create a <see cref="LocatedParserError"/>.
-    /// </summary>
+    /// <inheritdoc cref="LocatedParserError"/>
     public LocatedParserError(int index, ParserError error) : this(index, index, error) { }
+    
+    /// <inheritdoc cref="LocatedParserError"/>
     public LocatedParserError(int index, int endIndex, ParserError error) {
         Index = index;
         End = endIndex;

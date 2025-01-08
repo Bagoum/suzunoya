@@ -20,7 +20,7 @@ public static class Helpers {
     
     /// <summary>
     /// Returns either the result of a parser, or its final failure, for a basic string parser.
-    /// <br/>Does not include backtracking information, but that is stored in s.
+    /// <br/>Does not include backtracking information.
     /// </summary>
     public static Either<R, LocatedParserError> ResultOrError<R>(this Parser<char, R> p, string s) {
         var result = p(new(s, "String parser"));

@@ -9,6 +9,9 @@ namespace BagoumLib.Mathematics {
 /// </summary>
 [PublicAPI]
 public static class BMath {
+    /// <summary>
+    /// int.MaxValue/2
+    /// </summary>
     public const int IntFloatMax = int.MaxValue / 2;
     /// <summary>
     /// Half of pi.
@@ -147,12 +150,13 @@ public static class BMath {
     /// Returns (x - a) / (b - a); ie. t such that LerpUnclamped(a, b, t) = x.
     /// </summary>
     public static double Ratio(double a, double b, double x) => (x - a) / (b - a);
+    
+    /// <inheritdoc cref="Ratio(double,double,double)"/>
     public static float Ratio(float a, float b, float x) => (x - a) / (b - a);
     
     /// <summary>
     /// Returns (x - a) / (b - a) clamped to (0, 1).
     /// </summary>
-    
     public static float RatioC(float a, float b, float x) => Clamp(0, 1, (x - a) / (b - a));
     
     /// <summary>

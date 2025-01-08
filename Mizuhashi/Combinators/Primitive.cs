@@ -7,13 +7,13 @@ using BagoumLib.Functional;
 namespace Mizuhashi {
 public static partial class Combinators {
     /// <summary>
-    /// FParsec preturn
+    /// A parser that always succeeds with no consumption and returns a fixed value. (FParsec preturn)
     /// </summary>
     public static Parser<T, R> PReturn<T, R>(R val) => input =>
         new ParseResult<R>(new(val), null as LocatedParserError?, input.Index, input.Index);
 
     /// <summary>
-    /// FParsec >>%
+    /// Apply `p`, and if it succeeds, return the fixed value `val`. (FParsec >>%)
     /// </summary>
     public static Parser<T, B> ThenPReturn<T, A, B>(this Parser<T, A> p, B val) => input => {
         var result = p(input);
@@ -63,7 +63,7 @@ public static partial class Combinators {
         result.IsLeft ? PReturn<T, R>(result.Left) : Error<T, R>(result.Right);
 
     /// <summary>
-    /// FParsec .>>
+    /// Run two parsers in sequence. If both succeed, return the result from the first parser. (FParsec .>>)
     /// </summary>
     public static Parser<T, A> ThenIg<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var rx = first(input);
@@ -75,7 +75,7 @@ public static partial class Combinators {
     };
     
     /// <summary>
-    /// FParsec >>.
+    /// Run two parsers in sequence. If both succeed, return the result from the second parser. (FParsec >>.)
     /// </summary>
     public static Parser<T, B> IgThen<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var rx = first(input);
@@ -87,7 +87,7 @@ public static partial class Combinators {
     };
     
     /// <summary>
-    /// FParsec .>>.
+    /// Run two parsers in sequence. If both succeed, return both results as a tuple. (FParsec .>>.)
     /// </summary>
     public static Parser<T, (A a, B b)> Then<T, A, B>(this Parser<T, A> first, Parser<T, B> second) => input => {
         var rx = first(input);
@@ -100,7 +100,7 @@ public static partial class Combinators {
     };
 
     /// <summary>
-    /// FParsec between
+    /// Run three parsers in sequence. If all succeed, return the result from the middle parser. (FParsec between)
     /// </summary>
     public static Parser<T, B> Between<T, A, B, C>(this Parser<T, A> left, Parser<T, B> middle, Parser<T, C> right) => input => {
         var rx = left(input);
@@ -116,8 +116,8 @@ public static partial class Combinators {
     };
 
     /// <summary>
-    /// Parse the outer parser, then the middle parse, then the outer parser again, and return
-    /// the result from the middle parser.
+    /// Parse the outer parser, then the middle parser, then the outer parser again.
+    /// If all succeed, return the result from the middle parser.
     /// </summary>
     public static Parser<T, B> Between<T, A, B>(this Parser<T, A> outer, Parser<T, B> middle) => Between(outer, middle, outer);
 
@@ -142,19 +142,18 @@ public static partial class Combinators {
         return res;
     };
 
+    private static readonly ParserError anyErr = new ParserError.Expected("any token");
     /// <summary>
     /// Match any token (except end-of-file).
     /// </summary>
-    public static Parser<T, T> Any<T>() {
-        var err = new ParserError.Expected("any token");
-        return input => input.Empty ?
-            new(err, input.Index) :
+    public static Parser<T, T> Any<T>() =>
+        input => input.Empty ?
+            new(anyErr, input.Index) :
             new(new(input.Next), null as LocatedParserError?, input.Index, input.Step(1));
-    }
-    
-    
+
+
     /// <summary>
-    /// FParsec &lt;|&gt;
+    /// Execute the first parser. If it fails non-fatally, execute the second parser instead. FParsec &lt;|&gt;
     /// </summary>
     public static Parser<T, R> Or<T, R>(this Parser<T, R> p, Parser<T, R> other) => input => {
         var result = p(input);
@@ -165,8 +164,8 @@ public static partial class Combinators {
     };
     
     /// <summary>
-    /// Parse one of the two provided parsers, returning an <see cref="Either{L,R}"/>
-    ///  indicating which was used and its result.
+    /// Execute the first parser. If it fails non-fatally, execute the second parser instead.
+    /// If either succeeds, return an <see cref="BagoumLib.Functional.Either{L,R}"/> indicating which was used and its result.
     /// </summary>
     public static Parser<T, Either<R1, R2>> Either<T, R1, R2>(Parser<T, R1> left, Parser<T, R2> right) => input => {
         var result = left(input);
@@ -255,7 +254,7 @@ public static partial class Combinators {
     }
     
     /// <summary>
-    /// FParsec choiceL
+    /// <see cref="Choice{T,R}"/> with a specific label used for errors if no parser succeeds. (FParsec choiceL)
     /// </summary>
     public static Parser<T, R> ChoiceL<T, R>(string label, params Parser<T, R>[] ps) {
         if (ps.Length == 0) return Error<T, R>("No choice arms");
@@ -272,9 +271,8 @@ public static partial class Combinators {
     }
 
     /// <summary>
-    /// FParsec opt
-    /// <br/>Try to parse an object of type R, and return it as type Maybe&lt;R&gt;.
-    /// If it fails (non-catastrophically), then succeed with Maybe.None.
+    /// Try to parse an object of type R, and return it as type Maybe&lt;R&gt;.
+    /// If it fails non-fatally, then succeed with Maybe.None. (FParsec opt)
     /// </summary>
     public static Parser<T, Maybe<R>> Opt<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
@@ -296,9 +294,7 @@ public static partial class Combinators {
     };
     
     /// <summary>
-    /// FParsec optional
-    /// <br/>Try to parse an object of type R.
-    /// If it fails (non-catastrophically), then succeed.
+    /// Try to parse an object of type R. If it fails non-fatally, then succeed. (FParsec optional)
     /// </summary>
     public static Parser<T, Unit> Optional<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
@@ -309,9 +305,7 @@ public static partial class Combinators {
     };
 
     /// <summary>
-    /// FParsec &lt;|&gt;?
-    /// <br/>Try to parse an object of type R.
-    /// If it fails (non-catastrophically), then return the default.
+    /// Try to parse an object of type R. If it fails non-fatally, then return the default. (FParsec &lt;|&gt;?)
     /// </summary>
     public static Parser<T, R> OptionalOr<T, R>(this Parser<T, R> p, R pret) => input => {
         var result = p(input);
@@ -322,29 +316,17 @@ public static partial class Combinators {
         };
     };
 
-
+    private static readonly ParserError notEmptyErr = new ParserError.Expected("non-empty parse result");
+    
     /// <summary>
-    /// Try to parse an object of type R, and return it as type R?.
-    /// If it fails (non-catastrophically), then succeed with null(R?).
-    /// </summary>
-    public static Parser<T, R?> OptionalOrNull<T, R>(this Parser<T, R> p) where R : struct => input => {
-        var result = p(input);
-        return result.Status switch {
-            ResultStatus.ERROR => new ParseResult<R?>(Maybe<R?>.Of(null), 
-                result.Error, result.Start, result.End),
-            _ => result.FMap<R?>(x => x)
-        };
-    };
-
-    /// <summary>
-    /// FParsec notEmpty
+    /// Run a parser. If it succeeds without consuming input, then fail, otherwise return its result. (FParsec notEmpty)
     /// </summary>
     public static Parser<T, R> NotEmpty<T, R>(this Parser<T, R> p) => input => {
         var result = p(input);
         return result.Status == ResultStatus.OK ?
             result.Consumed ?
                 result :
-                new(Maybe<R>.None, input.MakeError(new ParserError.Expected("non-empty parse result")),
+                new(Maybe<R>.None, input.MakeError(notEmptyErr),
                     result.Start, result.End) :
             result;
     };
