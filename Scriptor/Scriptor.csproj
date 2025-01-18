@@ -18,7 +18,7 @@
     
     <ItemGroup>
       <Reference Include="LanguageServer.Contracts">
-        <HintPath>..\..\LanguageServer.NET\LanguageServer.Contracts\bin\Release\netstandard2.1\LanguageServer.Contracts.dll</HintPath>
+        <HintPath>..\..\..\lang\LanguageServer.NET\LanguageServer.Contracts\bin\Release\netstandard2.1\LanguageServer.Contracts.dll</HintPath>
       </Reference>
     </ItemGroup>
 

@@ -24,6 +24,7 @@ using static BagoumLib.IEnumExtensions;
 namespace Tests.BagoumLib;
 
 public class FFT {
+    internal const string root = "E:\\Workspace\\debug_content\\";
     private static readonly IFFT[] providers = {
         new OouraFFT(), new CombFFT(), new RecursiveFFT(),
     };
@@ -116,7 +117,7 @@ public class FFT {
         l3.LineStyle.Color = Colors.DarkRed;
         l3.Label = "FFT * FFT";
         plt.ShowLegend();
-        plt.SavePng("../../../../../doublefft.png", 3200, 700);
+        plt.SavePng($"{root}out\\doublefft.png", 3200, 700);
     }
 
     [Test]
@@ -142,7 +143,7 @@ public class FFT {
         var l5 = GraphRealSignals(plt, 1, corr2, color: Colors.DarkGoldenRod);
         l5.Label = "Correlation TxR";
         plt.ShowLegend();
-        plt.SavePng("../../../../../correlation01.png", 3200, 700);
+        plt.SavePng($"{root}out\\correlation01.png", 3200, 700);
     }
 
     [Test]
@@ -169,7 +170,7 @@ public class FFT {
         l4.Label = "Autocorrelation (PSD)";
         
         plt.ShowLegend();
-        plt.SavePng("../../../../../correlation02.png", 3200, 700);
+        plt.SavePng($"{root}out\\correlation02.png", 3200, 700);
     }
 
     /// <summary>
@@ -222,7 +223,7 @@ public class FFT {
         plt.Axes.Left.Min = -1;
         plt.Axes.Left.Max = 2.4;
         plt.ShowLegend();
-        plt.SavePng("../../../../../wavelet_basic.png", 3200, 1000);
+        plt.SavePng($"{root}out\\wavelet_basic.png", 3200, 1000);
     }
     
     [Test]
@@ -259,7 +260,7 @@ public class FFT {
         plt.Axes.Left.Max = 40;
         
         plt.ShowLegend();
-        plt.SavePng("../../../../../wavelet_fft.png", 3200, 1000);
+        plt.SavePng($"{root}out\\wavelet_fft.png", 3200, 1000);
     }
     
     /// <summary>
@@ -311,7 +312,7 @@ public class FFT {
         plt.Axes.Top.Min = 0;
         plt.Axes.Top.Max = plt.Axes.Bottom.Max * sr;
         plt.ShowLegend();
-        plt.SavePng("../../../../../gaussian01.png", 3200, 700);
+        plt.SavePng($"{root}out\\gaussian01.png", 3200, 700);
     }
     
     [Test]
@@ -334,7 +335,7 @@ public class FFT {
         data.ToObservable().Subscribe(smear);
         await smear.Completion.Task;
         plt.Axes.Bottom.Max = times * N / sr;
-        plt.SavePng("../../../../../chunk01.png", 3200, 700);
+        plt.SavePng($"{root}out\\chunk01.png", 3200, 700);
     }
 
     [Test]
@@ -348,7 +349,7 @@ public class FFT {
         var hannSmear = DataForFn(i => Filters.HalfHann(i, 73), N).NormalizeReals();
         fft.Convolve(data, hannSmear);
         plt.Add.Signal(data.Select(x => x.Real).ToArray(), 1/sr, Colors.Red);
-        plt.SavePng("../../../../../pollution.png", 1600, 500);
+        plt.SavePng($"{root}out\\pollution.png", 1600, 500);
 
         //pollution02.png: incorrect response filter produced when response filters are convolved.
         //The black line has polluted data. The blue line has the correct combination.
@@ -365,7 +366,7 @@ public class FFT {
         var smearAndDgaussNaive = fft.Convolve(smear.ToArray(), dgauss.ToArray());
         GraphRealSignals(plt, sr, smearAndDgaussNaive, color: Colors.Black).Label = "convolve (naive)";
         plt.ShowLegend();
-        plt.SavePng("../../../../../pollution02.png", 1600, 500);
+        plt.SavePng($"{root}out\\pollution02.png", 1600, 500);
     }
     
     [Test]
@@ -382,18 +383,18 @@ public class FFT {
             return total;
         }
         var sig = CreateFFTGraph(sr, DataForFnAtRate(Signal, sr, N));
-        sig.SavePng("../../../../../freqs1.png", 2400, 700);
+        sig.SavePng($"{root}out\\freqs1.png", 2400, 700);
 
         N = 163;
         var ptN = NextPowerOfTwo(N);
         var lowpass = CreateFFTGraph(sr, DataForFilter(x => Filters.LowPass(x, N, 400/sr), ptN));
-        lowpass.SavePng("../../../../../lowpass1.png", 1600, 500);
+        lowpass.SavePng($"{root}out\\lowpass1.png", 1600, 500);
         
         var highpass = CreateFFTGraph(sr, DataForFilter(x => Filters.HighPass(x, N, 600/sr), ptN));
-        highpass.SavePng("../../../../../highpass1.png", 1600, 500);
+        highpass.SavePng($"{root}out\\highpass1.png", 1600, 500);
 
         var bandpass = CreateFFTGraph(sr, new OouraFFT().BandPass(N, ptN, 800/sr, 1400/sr));
-        bandpass.SavePng("../../../../../bandpass1.png", 1600, 500);
+        bandpass.SavePng($"{root}out\\bandpass1.png", 1600, 500);
         
     }
 
@@ -427,7 +428,7 @@ public class FFT {
 
     [Test]
     public void Spectrogram() {
-        var fn = "../../../../../short-perc-loop.mp3";
+        var fn = $"{root}audio\\short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
         var wf = file.WaveFormat;
         var sr = file.WaveFormat.SampleRate;
@@ -444,7 +445,7 @@ public class FFT {
         var lacf = GraphFrequencies(mp1, sr, autocorrf.SelectInPlace(x => Math.Log10(Math.Max(0.1, x.Magnitude))));
         lacf.Label = "Power Spectrum";
         mp1.ShowLegend();
-        mp1.SavePng("../../../../../spectro01.png", 3200, 700);
+        mp1.SavePng($"{root}out\\spectro01.png", 3200, 700);
 
     }
 
@@ -455,7 +456,7 @@ public class FFT {
         // Black line: amplitude derivative, calculated as a sequential convolution on the blue line.
         // Brown line: amplitude derivative, calculated as a single combined convolution of half-Hann + gaussian derivative.
         //
-        var fn = "../../../../../short-perc-loop.mp3";
+        var fn = $"{root}audio\\short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
 
         var mp1 = new Plot();
@@ -505,14 +506,14 @@ public class FFT {
         });
         cdata.ToObservable().Subscribe(lowPass);
         await hannAndDGauss.Completion.Task;
-        mp1.SavePng("../../../../../rawSoundTime.png", 3200, 700);
+        mp1.SavePng($"{root}out\\rawSoundTime.png", 3200, 700);
         mp2.Axes.Bottom.Min = 0;
         mp2.Axes.Bottom.Max = 6;
         //mp2.Axes.Bottom.TickGenerator = new NumericFixedInterval() { Interval = N * 1.0 / sr };
         mp2.Axes.Right.Label.Text = "Gaussian derivative";
         mp2.Axes.Right.Max = 10;
         mp2.Axes.Right.Min = -10;
-        mp2.SavePng("../../../../../convSoundTimeSignal.png", 3800, 900);
+        mp2.SavePng($"{root}out\\convSoundTimeSignal.png", 3800, 900);
         
         return;
         var outp = new WaveOutEvent();
@@ -528,7 +529,7 @@ public class FFT {
     [Test]
     public async Task TestPowerCalculationOnAudio() {
         //v2: logic based on power calculation
-        var fn = "../../../../../short-perc-loop.mp3";
+        var fn = $"{root}audio\\short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
         double sr = file.WaveFormat.SampleRate;
         var mp3 = new Plot();
@@ -588,7 +589,7 @@ public class FFT {
         mp3.Axes.Bottom.Max = 6;
         mp3.Axes.Right.Min = -100;
         mp3.Axes.Right.Max = 100;
-        mp3.SavePng("../../../../../convSoundTimePower.png", 3800, 900);
+        mp3.SavePng($"{root}out\\convSoundTimePower.png", 3800, 900);
         
     }
 
@@ -596,7 +597,7 @@ public class FFT {
     
     [Test]
     public async Task TestAutocorrelationCalculationOnAudio() {
-        var fn = "../../../../../short-perc-loop.mp3";
+        var fn = $"{root}audio\\short-perc-loop.mp3";
         var file = new AudioFileReader(fn);
         double sr = file.WaveFormat.SampleRate;
         var mp1 = new Plot();
@@ -608,7 +609,7 @@ public class FFT {
         l4.Label = "Autocorrelation";
         
         mp1.ShowLegend();
-        mp1.SavePng("../../../../../convSoundTimeAutocorrelation.png", 3800, 900);
+        mp1.SavePng($"{root}out\\convSoundTimeAutocorrelation.png", 3800, 900);
     }
 
     

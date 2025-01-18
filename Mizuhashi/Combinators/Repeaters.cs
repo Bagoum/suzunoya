@@ -38,7 +38,7 @@ public static partial class Combinators {
             return new(results, next.Error, start, next.End);
         };
     }
-    
+
     /// <summary>
     /// Applies a parser repeatedly until it errors, and returns a list of all results.
     /// <br/>Note that if the parser errors fatally, this will error fatally as well.
@@ -47,23 +47,28 @@ public static partial class Combinators {
     /// </summary>
     /// <param name="p">Parser to apply repeatedly</param>
     /// <param name="atleastOne">If true, then will require at least one result</param>
+    /// <param name="silence">If true, then no errors will be returned on success</param>
     /// <returns></returns>
-    public static Parser<T, List<R>> Many<T, R>(this Parser<T, R> p, bool atleastOne=false) => input => {
+    public static Parser<T, List<R>> Many<T, R>(this Parser<T, R> p, bool atleastOne=false, bool silence=false) => input => {
         var results = new List<R>();
         var start = input.Index;
+        LocatedParserError? lastErr = null;
         while (true) {
             var next = p(input);
             if (next.Status == ResultStatus.FATAL)
                 return next.CastFailure<List<R>>();
-            else if (next.Status == ResultStatus.ERROR)
-                return (results.Count == 0 && atleastOne) ?
-                    new(next.Error?.Error ?? new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count, 
-                        null, next.Error), start) :
-                    new(results, next.Error, start, next.End);
-            else if (!next.Consumed)
+            else if (next.Status == ResultStatus.ERROR) {
+                if (results.Count == 0 && atleastOne)
+                    return new(next.Error?.Error ?? new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count,
+                        null, next.Error), start);
+                else
+                    return new(results, silence ? null : LocatedParserError.Merge(lastErr, next.Error), start, next.End);
+            } else if (!next.Consumed)
                 return new(manyNoConsumeErr, next.Start);
-            else
+            else {
+                lastErr = next.Error;
                 results.Add(next.Result.Value);
+            }
         }
     };
 

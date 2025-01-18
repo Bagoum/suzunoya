@@ -78,7 +78,7 @@ public static class Utilities {
         return tasks.Count switch {
             0 => Task.CompletedTask,
             1 => tasks[0]!,
-            _ => Task.WhenAll(tasks!)
+            _ => Task.WhenAll(tasks as List<Task>)
         };
     }
 
@@ -119,6 +119,8 @@ public static class Utilities {
     public static Task ContinueWithSync(this Task t, Action? done = null, bool? logOnCancelled = null) {
         //By default, log cancellations if there is no continuation
         var logCancel = logOnCancelled ?? (done is null);
+        //Optimize already-completed case to avoid await allocation
+        // (it would be correct to just call _ContinueWithSync in all cases)
         if (t.IsCompleted) {
             //don't directly throw here. store the exception in the task result
             // so an exception is only thrown if the task is awaited.

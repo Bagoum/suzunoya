@@ -70,7 +70,6 @@ public class Event<T, U> : IBSubject<T, U> {
     /// <inheritdoc/>
     public U Value { get; private set; } = default!;
     
-    
     private readonly Func<T, U> mapper;
     /// <summary>
     /// Create an event with a function to map from intake to output values.
@@ -141,22 +140,38 @@ public class Event<T> : Event<T, T>, IBSubject<T> {
 /// <summary>
 /// An event that records all its published values in a list.
 /// </summary>
-public class AccEvent<T> : Event<T> {
+public class AccEvent<T> : IBSubject<T> {
     private readonly List<T> published = new();
     /// <summary>
     /// All values published by this event.
     /// </summary>
     public IReadOnlyList<T> Published => published;
+    /// <inheritdoc/>
+    public bool HasValue => ev.HasValue;
+    /// <inheritdoc/>
+    public T Value => ev.Value;
+    
+    private readonly Event<T> ev = new();
 
     /// <inheritdoc/>
-    public override void OnNext(T value) {
+    public void OnNext(T value) {
         published.Add(value);
-        base.OnNext(value);
+        ev.OnNext(value);
     }
+
+    /// <inheritdoc/>
+    public void OnCompleted() => ev.OnCompleted();
+
+    /// <inheritdoc/>
+    public void OnError(Exception error) => ev.OnError(error);
+
+    /// <inheritdoc/>
+    public IDisposable Subscribe(IObserver<T> observer) => ev.Subscribe(observer);
 
     /// <summary>
     /// Clear the accumulated values in Published.
     /// </summary>
     public void Clear() => published.Clear();
+
 }
 }

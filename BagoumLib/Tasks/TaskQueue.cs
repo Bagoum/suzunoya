@@ -22,10 +22,12 @@ public class TaskQueue {
     /// <summary>
     /// True when a task is being executed.
     /// </summary>
-    public Evented<bool> ExecutingTransition { get; } = new(false);
+    public Evented<bool> IsExecuting { get; } = new(false);
 
     /// <summary>
-    /// If true, then only one task can be queued up at a time. True by default.
+    /// If true, then only one task can be queued up at a time.
+    /// Queued tasks will be cleared when a new task is added.
+    /// True by default.
     /// </summary>
     public bool AllowOnlyOneQueued { get; set; } = true;
 
@@ -48,13 +50,15 @@ public class TaskQueue {
     private void StartNextTask() {
         _currentTask = null;
         if (queue.TryDequeue(out var task)) {
-            ExecutingTransition.PublishIfNotSame(true);
+            IsExecuting.PublishIfNotSame(true);
             _currentTask = new(task);
             _ = _currentTask.Task;
         } else 
-            ExecutingTransition.PublishIfNotSame(false);
+            IsExecuting.PublishIfNotSame(false);
     }
     
+    //this indirection is used so we can have a lazy reference to the generated task (CurrentTask prop)
+    // without being required to run the task immediately
     private class LazyTask(Func<Task> gen) {
         private Task? generated;
         public Task Task => generated ??= gen();

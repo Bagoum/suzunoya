@@ -15,7 +15,7 @@ namespace Scriptor.Reflection;
 /// <summary>
 /// An annotated method signature. This may be for a static/instance function, constructor, field, or property.
 /// </summary>
-public record MethodSignature : IMethodSignature {
+public class MethodSignature : IMethodSignature {
     private static readonly List<Type> hideReturnTypes = [];
     private static readonly Dictionary<MemberInfo, MethodSignature> globals = new();
     /// <inheritdoc/>
@@ -220,7 +220,11 @@ public interface IGenericMethodSignature : IMethodSignature {
 }
 
 /// <inheritdoc cref="MethodSignature"/>
-public record GenericMethodSignature(TypeMember.Method Minf, NamedParam[] Params) : MethodSignature(Minf, Params), IGenericMethodSignature {
+public class GenericMethodSignature(TypeMember.Method Minf, NamedParam[] Params) : MethodSignature(Minf, Params), IGenericMethodSignature {
+    /// <summary>
+    /// Same as <see cref="MethodSignature.Member"/>, type-restricted as <see cref="TypeMember.Method"/>.
+    /// </summary>
+    public TypeMember.Method Minf { get; } = Minf;
     /// <summary>
     /// Number of generic parameters.
     /// </summary>
@@ -267,13 +271,23 @@ public record GenericMethodSignature(TypeMember.Method Minf, NamedParam[] Params
 /// some internal reflection functions are of type <see cref="TExArgCtx"/>->TEx,
 ///  but it is generally easier to write them as type TEx where possible.
 /// </summary>
-/// <param name="Original">The source method, with the signature (A, B, C)->R.</param>
-/// <param name="FuncedParams">The parameter list [T->A, T->B, T->C]. This is provided as <see cref="MethodSignature.Params"/>.</param>
-/// <param name="BaseParams">The parameter list [A, B, C].</param>
-public abstract record LiftedMethodSignature(MethodSignature Original, NamedParam[] FuncedParams, NamedParam[] BaseParams) 
-    : MethodSignature(Original.Member, FuncedParams) {
+/// <param name="original">The source method, with the signature (A, B, C)->R.</param>
+/// <param name="funcedParams"><see cref="FuncedParams"/></param>
+/// <param name="baseParams"><see cref="BaseParams"/></param>
+public abstract class LiftedMethodSignature(MethodSignature original, NamedParam[] funcedParams, NamedParam[] baseParams) 
+    : MethodSignature(original.Member, funcedParams) {
     private protected static readonly Dictionary<(Type, Type), (Type lmsTR, ConstructorInfo constr)> typeSpecCache = new();
     private protected static readonly Type[] consTypes = [typeof(MethodSignature), typeof(NamedParam[]), typeof(NamedParam[])];
+
+    /// <summary>
+    /// The parameter list [T->A, T->B, T->C]. Same as <see cref="MethodSignature"/>.<see cref="MethodSignature.Params"/>.
+    /// </summary>
+    public NamedParam[] FuncedParams => Params;
+    
+    /// <summary>
+    /// The parameter list [A, B, C].
+    /// </summary>
+    public NamedParam[] BaseParams { get; } = baseParams;
 
     /// <inheritdoc/>
     public override InvokedMethod Call(string? calledAs) => new LiftedInvokedMethod(this, calledAs);
@@ -310,8 +324,8 @@ public abstract record LiftedMethodSignature(MethodSignature Original, NamedPara
 }
 
 /// <inheritdoc cref="LiftedMethodSignature"/>
-public abstract record LiftedMethodSignature<T>(MethodSignature Original, NamedParam[] FuncedParams, NamedParam[] BaseParams) :
-    LiftedMethodSignature(Original, FuncedParams, BaseParams) {
+public abstract class LiftedMethodSignature<T>(MethodSignature original, NamedParam[] funcedParams, NamedParam[] baseParams) :
+    LiftedMethodSignature(original, funcedParams, baseParams) {
     private static readonly Dictionary<MemberInfo, LiftedMethodSignature<T>> liftCache = new();
     
     /// <summary>
@@ -342,7 +356,7 @@ public abstract record LiftedMethodSignature<T>(MethodSignature Original, NamedP
 }
 
 /// <inheritdoc cref="LiftedMethodSignature"/>
-public record GenericLiftedMethodSignature<T>(MethodSignature Original, TypeMember.Method Minf, NamedParam[] FuncedParams, NamedParam[] BaseParams) : LiftedMethodSignature<T>(Original, FuncedParams, BaseParams), IGenericMethodSignature  {
+public class GenericLiftedMethodSignature<T>(MethodSignature original, TypeMember.Method Minf, NamedParam[] funcedParams, NamedParam[] baseParams) : LiftedMethodSignature<T>(original, funcedParams, baseParams), IGenericMethodSignature  {
     /// <inheritdoc/>
     public override Type ReturnType => TypeLifter.Func2Type(typeof(T), base.ReturnType);
 
@@ -354,7 +368,6 @@ public record GenericLiftedMethodSignature<T>(MethodSignature Original, TypeMemb
     public override Ex InvokeEx(params Ex[] args) {
         throw new Exception("Lifted methods cannot be invoked as expressions");
     }
-    
     
     /// <inheritdoc cref="GenericMethodSignature.Specialize"/>
     public LiftedMethodSignature<T> Specialize(Type[] t) {
@@ -376,8 +389,8 @@ public record GenericLiftedMethodSignature<T>(MethodSignature Original, TypeMemb
 //Note that we must eventually specify the R in LiftedMethodSignature in order to ensure that
 // InvokeMiFunced creates a correctly-typed Func<T,R>.
 /// <inheritdoc cref="LiftedMethodSignature"/>
-public record LiftedMethodSignature<T, R>(MethodSignature Original, NamedParam[] FuncedParams, NamedParam[] BaseParams) 
-    : LiftedMethodSignature<T>(Original, FuncedParams, BaseParams) {
+public class LiftedMethodSignature<T, R>(MethodSignature original, NamedParam[] funcedParams, NamedParam[] baseParams) 
+    : LiftedMethodSignature<T>(original, funcedParams, baseParams) {
     private static readonly Dictionary<MemberInfo, LiftedMethodSignature<T, R>> liftCache = new();
     /// <inheritdoc/>
     public override Type ReturnType => typeof(Func<T, R>);

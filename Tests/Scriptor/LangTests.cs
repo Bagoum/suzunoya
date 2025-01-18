@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
+using Scriptor;
 using Scriptor.Analysis;
 using Scriptor.Compile;
 using static NUnit.Framework.Assert;
@@ -13,8 +16,73 @@ public class LangTests {
     public static void Setup() {
         _ = new DefaultLangCustomizer();
     }
+
+    [Test]
+    public static void TestOperators() {
+        Assert.AreEqual(64, @"2 ^ 2 ^ 3".Value<float>());
+        Assert.AreEqual(60, @"2 ^ 2 ^- 3".Value<float>());
+        Assert.AreEqual(-64, @"-2 ^^ 2 ^ 3".Value<float>());
+        Assert.AreEqual(2, "2 * 6 / 2 / 2 - 1".Value<float>());
+        Assert.AreEqual(2, "2 + 6 * 2 / 4 - 3".Value<float>());
+        var result = @"
+var x = 5.0;
+var y = x++ + 6 / 2;
+x-- * 100 + ++y
+".ValueEF<float>(out var ef);
+        Assert.AreEqual(609, result);
+        
+        StringsApproxEqual(@"Variables:
+	x<float>: 5
+	y<float>: 9
+Functions:", ef.Debug());
+    }
+
+    [Test]
+    public static void TestOperatorsErrMsg() {
+        Assert.AreEqual(-1, "2 + (2 - 5)".Value<float>());
+        AssertHelpers.ThrowsMessage("Expected term", () => "2 + (2 - 5 + )".Value<float>());
+        AssertHelpers.ThrowsMessage("partial function application", () => "var w = $()".Value<float>());
+        AssertHelpers.ThrowsMessage("partial function application.*CloseParen", () => "var w = $(f, 5 6)".Value<float>());
+        "var w = $(f, g 6)".AssertFailsAnnotation("any method by the name `f`");
+        AssertHelpers.ThrowsMessage("partial function application", () => "var w = $ (f, x, y)".Value<float>());
+        Assert.AreEqual(-5, "2.0\n-5.0".Value<float>());
+        AssertHelpers.ThrowsMessage("no implicit break before infix", () => "2.0\n- 5.0".Value<float>());
+        Assert.AreEqual(-3, "2.0\n\t- 5.0".Value<float>());
+        AssertHelpers.ThrowsMessage("no whitespace after prefix", () => "true & ! false".Value<bool>());
+        AssertHelpers.ThrowsMessage("no whitespace after prefix", () => "true & !! false".Value<bool>());
+        //this one doesn't work since nonfatals that bubble up to `statement` choice are silenced
+        //AssertHelpers.ThrowsMessage("no whitespace after prefix", () => "! false".Value<bool>());
+        AssertHelpers.ThrowsMessage("no whitespace before postfix", () => "5 ++ + 4".Value<bool>());
+        AssertHelpers.ThrowsMessage("function application.*Operator: :", () => "BMath.Mod<T>(false ? 2)".Value<float>());
+        AssertHelpers.ThrowsMessage("function application.*Operator: :", () => "BMath.Mod(false ? 2)".Value<float>());
+    }
     
     private delegate int MyDelegateType(int a, int b, out EnvFrame ef);
+
+    [Test]
+    public static void TestMembers() {
+        var result = @"
+        var lis = new List<int>();
+        lis.Add(5);
+        var ct = lis.Count;
+        var s = Math.Round(BMath.PI as double);
+        BMath.Mod(4., 7.)
+".ValueEF<int>(out var ef);
+        Assert.AreEqual(3, result);
+        
+        StringsApproxEqual(@"Variables:
+	lis<List<int>>: { 5 }
+	ct<int>: 1
+	s<double>: 3
+Functions:", ef.Debug());
+    }
+
+    [Test]
+    public static void TestMemberErr() {
+        _ = "Math.Round<int>()".Parse();
+        AssertHelpers.ThrowsMessage("Line 1, Cols 5-16.*generic function", () => "Math.Round<int>".Parse());
+        "Math.".AssertFailsAnnotation("1-6.*after this period");//special cased to parse but fail in annotation
+    }
 
     [Test]
     public static void TestFn() {
@@ -27,8 +95,7 @@ function increment():: void {
 b + block{
     increment();
     c;
-}"
-            .Compile<MyDelegateType>(D<int>("a"), D<int>("b"), CompileHelpers.OutEnvFrameArg);
+}".Compile<MyDelegateType>(D<int>("a"), D<int>("b"), CompileHelpers.OutEnvFrameArg);
         
         AreEqual(1245, fn(120, 1004, out var ef));
         

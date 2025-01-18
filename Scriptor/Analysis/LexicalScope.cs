@@ -500,8 +500,8 @@ public class LexicalScope {
     ///  stored locally in an environment frame for this scope,
     ///  or stored locally in any parent environment frame.
     /// <br/>The returned expression is in the form
-    ///  `(envFrame.Parent.Parent....FrameVars[i] as FrameVars{T}).Values[j]`.
-    /// <br/>Note that MSIL will optimize out the common frameVars access if many variables are referenced.
+    ///  `(envFrame.Parent.Parent....Variables[i] as T[])[j]`.
+    /// <br/>Note that MSIL will optimize out the common Variables access if many variables are referenced.
     /// </summary>
     public Ex LocalOrParentVariable(TExArgCtx tac, Ex? envFrame, VarDecl variable) {
         if (variable.Constant && variable.ConstantValue.Try(out var val))
@@ -532,6 +532,7 @@ public class LexicalScope {
     }
 
     /// <inheritdoc cref="LocalOrParentVariable"/>
+    [PublicAPI]
     public Ex? TryGetLocalOrParentVariable(TExArgCtx tac, Type t, string varName, out VarDecl? decl) {
         decl = FindVariable(varName);
         if (decl == null || decl.FinalizedType != t) {

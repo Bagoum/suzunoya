@@ -41,6 +41,7 @@ public class SingletonConverter<T> : JsonConverter {
             .SelectMany(a => a.GetTypes())
             .Where(type => type.IsSubclassOf(typeof(T)))
             .ToArray();
+    // ReSharper disable once StaticMemberInGenericType
     private static string? _keyProp;
     private static string KeyProp => _keyProp ??=
         (typeof(T).GetProperty("SINGLETON_KEY")?.GetValue(null) as string) ?? "S";

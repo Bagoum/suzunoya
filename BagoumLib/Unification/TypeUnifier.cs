@@ -98,20 +98,32 @@ internal class _ArrayGenericTypeHelperDoNotUse<A>;
 /// <br/>This is a more general form of <see cref="ReflectionUtils"/>.ConstructedGenericTypeMatch.
 /// </summary>
 [PublicAPI]
-public abstract class TypeDesignation {
+#pragma warning disable CS0660, CS0661
+//pragma: GetHashCode is overridden in subtypes except Variable, which uses referenceequals
+public abstract class TypeDesignation: IEquatable<TypeDesignation> {
+#pragma warning restore CS0660, CS0661
     /// <summary>
     /// The arguments provided to this type constructor (if this is a type constructor).
     /// </summary>
     public TypeDesignation[] Arguments { get; }
-
+    
     /// <summary>
     /// True iff this type and its arguments are all resolved, and can thus be constructed into a concrete type.
     /// </summary>
-    public virtual bool IsResolved => Arguments.All(a => a.IsResolved);
+    public bool IsResolved { get; }
 
     /// <inheritdoc cref="TypeDesignation"/>
-    protected TypeDesignation(params TypeDesignation[] arguments) {
+    protected TypeDesignation(bool isResolved, params TypeDesignation[] arguments) {
         this.Arguments = arguments;
+        // ReSharper disable once AssignmentInConditionalExpression
+        if (IsResolved = isResolved) {
+            foreach (var a in Arguments) {
+                if (!a.IsResolved) {
+                    IsResolved = false;
+                    break;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -134,6 +146,8 @@ public abstract class TypeDesignation {
         return unifier;
     }
     private static Either<Unifier, TypeUnifyErr> UnifyStep(TypeDesignation left, TypeDesignation right, Unifier unifier) {
+        //nb: all dictionary lookups have an implicit hash + equality call so
+        // it would not be an optimization to remove this check.
         if (left == right)
             return unifier;
         var ld = unifier[left];
@@ -163,7 +177,7 @@ public abstract class TypeDesignation {
     /// Check if a variable type designation occurs in this type tree.
     /// </summary>
     public bool Occurs(Variable v) {
-        if (this == v)
+        if (ReferenceEquals(this, v))
             return true;
         for (int ii = 0; ii < Arguments.Length; ++ii)
             if (Arguments[ii].Occurs(v))
@@ -180,7 +194,7 @@ public abstract class TypeDesignation {
         (leftResolved, rightResolved) switch {
             (Known kl, Known kr) => kl.Typ != kr.Typ ? new TypeUnifyErr.NotEqual<Known>(left, right, kl, kr) : null,
             (Dummy dl, Dummy dr) => dl.Typ != dr.Typ ? new TypeUnifyErr.NotEqual<Dummy>(left, right, dl, dr) : null,
-            (Variable vl, Variable vr) => vl != vr ? new TypeUnifyErr.NotEqual<Variable>(left, right, vl, vr) : null,
+            (Variable vl, Variable vr) => !ReferenceEquals(vl, vr) ? new TypeUnifyErr.NotEqual<Variable>(left, right, vl, vr) : null,
             ({ } l, { } r) => new TypeUnifyErr.NotEqual(left, right, l, r)
         };
 
@@ -204,7 +218,7 @@ public abstract class TypeDesignation {
     /// </summary>
     public bool OccursInSimplification(Unifier u, Variable v) {
         if (this is Variable var)
-            return var == v || (u.TypeVarBindings.TryGetValue(var, out var nxt) && nxt.OccursInSimplification(u, v));
+            return ReferenceEquals(var, v) || (u.TypeVarBindings.TryGetValue(var, out var nxt) && nxt.OccursInSimplification(u, v));
         for (int ii = 0; ii < Arguments.Length; ++ii)
             if (Arguments[ii].OccursInSimplification(u, v))
                 return true;
@@ -213,20 +227,23 @@ public abstract class TypeDesignation {
 
     /// <summary>
     /// Simplify an array of types using the unifier.
+    /// If no simplifications were made, return null.
     /// </summary>
     protected static TypeDesignation[]? SimplifyArgs(Unifier u, TypeDesignation[] args) {
-        int diff = 0;
-        for (; diff < args.Length; ++diff) {
-            if (args[diff].Simplify(u) != args[diff])
-                goto do_simplify;
+        for (var diff = 0; diff < args.Length; ++diff) {
+            //Variable -> identity determined by ReferenceEquals.
+            //Known/Dummy -> Simplify returns self if SimplifyArgs returns null.
+            var diffsimp = args[diff].Simplify(u);
+            if (!ReferenceEquals(diffsimp, args[diff])) {
+                var nargs = new TypeDesignation[args.Length];
+                for (int ii = 0; ii < args.Length; ++ii) {
+                    nargs[ii] = ii <= diff ? args[ii] : args[ii].Simplify(u);
+                }
+                nargs[diff] = diffsimp;
+                return nargs;
+            }
         }
         return null;
-        do_simplify:
-        var nargs = new TypeDesignation[args.Length];
-        for (int ii = 0; ii < args.Length; ++ii) {
-            nargs[ii] = ii < diff ? args[ii] : args[ii].Simplify(u);
-        }
-        return nargs;
     }
 
     /// <summary>
@@ -247,13 +264,23 @@ public abstract class TypeDesignation {
     /// </summary>
     public Known MakeArrayType() => new Known(Known.ArrayGenericType, this);
 
+    /// <inheritdoc/>
+    public bool Equals(TypeDesignation? other) => this == other;
+
+    /// <inheritdoc/>
+#pragma warning disable CS0659 // Type overrides Object.Equals(object o) but does not override Object.GetHashCode()
+    public override bool Equals(object? other) => other is TypeDesignation td && this == td;
+#pragma warning restore CS0659 // Type overrides Object.Equals(object o) but does not override Object.GetHashCode()
+    
     /// <summary>
     /// Equality operator.
     /// </summary>
     public static bool operator ==(TypeDesignation? a, TypeDesignation? b) {
-        if (a is null)
-            return b is null;
-        return a.Equals(b);
+        if (a is Known ka) {
+            return b is Known kb && ka.Typ == kb.Typ && ka.Arguments.AreSame(kb.Arguments);
+        } else if (a is Dummy da) {
+            return b is Dummy db && da.Typ == db.Typ && da.Arguments.AreSame(db.Arguments);
+        } else return ReferenceEquals(a, b);
     }
 
     /// <summary>
@@ -285,7 +312,7 @@ public abstract class TypeDesignation {
         /// <summary>
         /// A known type.
         /// </summary>
-        public Known(Type typ, params TypeDesignation[] arguments) : base(arguments) {
+        public Known(Type typ, params TypeDesignation[] arguments) : base(true, arguments) {
             this.Typ = typ;
         }
 
@@ -340,9 +367,6 @@ public abstract class TypeDesignation {
         }
 
         /// <inheritdoc/>
-        public override bool Equals(object? obj) => obj is Known k && Typ == k.Typ && Arguments.AreSame(k.Arguments);
-
-        /// <inheritdoc/>
         public override int GetHashCode() => (Typ, Arguments.ElementWiseHashCode()).GetHashCode();
 
         /// <inheritdoc/>
@@ -376,7 +400,7 @@ public abstract class TypeDesignation {
         /// <summary>
         /// A dummy type for nesting multiple restriction trees, such as 'method'.
         /// </summary>
-        public Dummy(string typ, params TypeDesignation[] arguments) : base(arguments) {
+        public Dummy(string typ, params TypeDesignation[] arguments) : base(true, arguments) {
             this.Typ = typ;
         }
 
@@ -386,6 +410,14 @@ public abstract class TypeDesignation {
         /// <param name="returnTyp">Method return type</param>
         /// <param name="argTyps">Method parameter types, preceded by the instance type if this is an instance method</param>
         public static Dummy Method(TypeDesignation returnTyp, params TypeDesignation[] argTyps)
+            => new(METHOD_KEY, argTyps.Append(returnTyp).ToArray());
+        
+        /// <summary>
+        /// Create a type designation representing a method call.
+        /// </summary>
+        /// <param name="returnTyp">Method return type</param>
+        /// <param name="argTyps">Method parameter types, preceded by the instance type if this is an instance method</param>
+        public static Dummy Method(TypeDesignation returnTyp, IEnumerable<TypeDesignation> argTyps)
             => new(METHOD_KEY, argTyps.Append(returnTyp).ToArray());
 
         /// <summary>
@@ -426,9 +458,6 @@ public abstract class TypeDesignation {
         
         /// <inheritdoc cref="RecreateVariables"/>
         public Dummy RecreateVariablesD() => RecreateVariablesD(new());
-        
-        /// <inheritdoc/>
-        public override bool Equals(object? obj) => obj is Dummy k && Typ == k.Typ && Arguments.AreSame(k.Arguments);
 
         /// <inheritdoc/>
         public override int GetHashCode() => (Typ, Arguments.ElementWiseHashCode()).GetHashCode();
@@ -457,9 +486,9 @@ public abstract class TypeDesignation {
         ///  and each numeric literal can be `int`, `float`, or `double`. There are 3^6 = 729 possible unifiers!
         /// </summary>
         public IReadOnlyCollection<Known>? RestrictedTypes { get; init; }
-
-        /// <inheritdoc/>
-        public override bool IsResolved => false;
+        
+        /// <inheritdoc cref="TypeDesignation.Variable"/>
+        public Variable() : base(false) { }
 
         /// <inheritdoc/>
         public override TypeDesignation Simplify(Unifier unifier) => unifier[this];
@@ -532,6 +561,5 @@ public abstract class TypeDesignation {
         } else
             return new Known(t);
     }
-    
 }
 }

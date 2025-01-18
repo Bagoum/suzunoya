@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BagoumLib;
 using BagoumLib.Reflection;
 using JetBrains.Annotations;
 
@@ -85,7 +86,7 @@ public static class TypeLifter {
                                ?.MakeGenericMethod(funced_gts) ??
                            throw new StaticException("Couldn't find tuple decomposition method");
             AddDefuncifier(res, (x, bpi) => {
-                var argarr = tupToArr.Invoke(null, new[] {x}) as object[] ??
+                var argarr = tupToArr.Invoke(null, [x]) as object[] ??
                              throw new StaticException("Couldn't decompose tuple to array");
                 for (int ii = 0; ii < funced_gts.Length; ++ii)
                     argarr[ii] = Defuncify(base_gts[ii], funced_gts[ii], argarr[ii], bpi);
@@ -120,8 +121,11 @@ public static class TypeLifter {
     /// <param name="arg">Argument with which to execute func.</param>
     /// <returns></returns>
     private static object FuncInvoke(object func, Type funcType, object? arg) {
-        if (func.GetType() != funcType) //TODO verify usage of this exception for BDSL2
+        if (func.GetType() != funcType) {
+            Logging.Logs.Warning($"Tried to execute func type {funcType.RName()}, " +
+                                 $"but received an instance of type {func.GetType().RName()}");
             funcType = func.GetType();
+        }
             
         if (!funcInvokeCache.TryGetValue(funcType, out var mi)) {
             mi = funcInvokeCache[funcType] = funcType.GetMethod("Invoke") ??

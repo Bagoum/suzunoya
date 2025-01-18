@@ -32,8 +32,8 @@ public static class ExMHelpers {
     public static readonly Ex phi = Ex.Constant(PHI);
     /// <inheritdoc cref="IPHI"/>
     public static readonly Ex iphi = Ex.Constant(IPHI);
-    /// <summary>360 * phi</summary>
-    public static readonly Ex phi360 = Ex.Constant(360f * PHI);
+    /// <summary>360 / phi</summary>
+    public static readonly Ex iphi360 = Ex.Constant(360f * IPHI);
 
     /// <summary>0f</summary>
     public static readonly Ex E0 = Ex.Constant(0.0f);

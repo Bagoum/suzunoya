@@ -10,15 +10,31 @@ namespace BagoumLib.Events {
 ///  an OnNext call, and then noop until it is reset.
 /// </summary>
 [PublicAPI]
-public class TriggerEvent<T> : Event<T> {
+public class TriggerEvent<T> : IBSubject<T> {
+    /// <inheritdoc/>
+    public bool HasValue => ev.HasValue;
+    /// <inheritdoc/>
+    public T Value => ev.Value;
+    
     private bool OnNextAllowed { get; set; } = true;
+    
+    private readonly Event<T> ev = new();
 
     /// <inheritdoc/>
-    public override void OnNext(T value) {
+    public IDisposable Subscribe(IObserver<T> observer) => ev.Subscribe(observer);
+
+    /// <inheritdoc/>
+    public void OnNext(T value) {
         if (!OnNextAllowed) return;
         OnNextAllowed = false;
-        base.OnNext(value);
+        ev.OnNext(value);
     }
+
+    /// <inheritdoc/>
+    public void OnCompleted() => ev.OnCompleted();
+
+    /// <inheritdoc/>
+    public void OnError(Exception error) => ev.OnError(error);
 
     /// <summary>
     /// Reset the trigger so it can be called again.
@@ -32,6 +48,6 @@ public class TriggerEvent<T> : Event<T> {
     /// </summary>
     public IDisposable ResetOn<R>(IObservable<R> resetter) =>
         resetter.Subscribe(_ => Reset());
-    
+
 }
 }

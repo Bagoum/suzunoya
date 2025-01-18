@@ -10,16 +10,16 @@ namespace BagoumLib.Functional {
 /// A value of type T that may or may not exist.
 /// </summary>
 [PublicAPI]
-public readonly struct Maybe<T> {
-    /// <summary>
-    /// True iff the value exists.
-    /// </summary>
-    public bool Valid { get; }
-    
+public readonly struct Maybe<T>: IEquatable<Maybe<T>> {
     /// <summary>
     /// The underlying value. Undefined if <see cref="Valid"/> is false.
     /// </summary>
     public T Value { get; }
+    
+    /// <summary>
+    /// True iff the value exists.
+    /// </summary>
+    public bool Valid { get; }
 
     [JsonIgnore]
     private (bool, T) Tuple => (Valid, Valid ? Value : default!);
@@ -58,6 +58,12 @@ public readonly struct Maybe<T> {
     /// </summary>
     public Maybe<U> FMap<U>(Func<T, U> f) => Valid ? new(f(Value)) : Maybe<U>.None;
 
+    /// <summary>
+    /// Applicative apply.
+    /// </summary>
+    public Maybe<U> RApply<U>(Maybe<Func<T, U>> f) => 
+        Valid && f.Valid ? new(f.Value(Value)) : Maybe<U>.None;
+    
     /// <summary>
     /// Monadic bind.
     /// </summary>

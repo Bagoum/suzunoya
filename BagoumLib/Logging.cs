@@ -226,7 +226,7 @@ public class Logger : ILogListener {
     /// Log an error.
     /// </summary>
     public void Error(Exception? exception, string message = "") {
-        if (!CanSkipMessage(LogLevel.ERROR))
+        if (!CanSkipMessage(LogLevel.ERROR, exception))
             dispatcher.OnNext(new(message, LogLevel.ERROR, exception, true));
     }
 }

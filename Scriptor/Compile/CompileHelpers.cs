@@ -32,11 +32,11 @@ public static class CompileHelpers {
     /// <summary>
     /// (Stage 0) Convert the provided script into an ST.
     /// </summary>
-    public static Either<ST.Block, ReflectionException> Parse(ref string source, out LexerMetadata metadata) {
+    public static ST.Block Parse(ref string source, out LexerMetadata metadata) {
         var tokens = Lexer.Lex(ref source, out metadata);
         var parse = LangParser.Parse(source, tokens, out var stream);
         if (parse.IsRight) 
-            return new ReflectionException(stream.TokenWitness.ToPosition(parse.Right.Index, parse.Right.End), 
+            throw new ReflectionException(stream.TokenWitness.ToPosition(parse.Right.Index, parse.Right.End), 
                 stream.ShowAllFailures(parse.Right));
         return parse.Left;
     }
@@ -53,10 +53,8 @@ public static class CompileHelpers {
     /// <exception cref="ReflectionException">Thrown when the script could not be parsed or there are basic errors in the AST.</exception>
     public static (IAST, LexicalScope) ParseAnnotate(ref string source, params IDelegateArg[] args) {
         var parse = Parse(ref source, out var metadata);
-        if (parse.IsRight)
-            throw parse.Right;
         var scope = LexicalScope.NewTopLevelScope();
-        var ast = parse.Left.AnnotateWithParameters(new(scope), args).LeftOrRight<AST.Block, AST.Failure, IAST>();
+        var ast = parse.AnnotateWithParameters(new(scope), args).LeftOrRight<AST.Block, AST.Failure, IAST>();
         scope.SetDocComments(metadata);
         return (ast, scope);
     }

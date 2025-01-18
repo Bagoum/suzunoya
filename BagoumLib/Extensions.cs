@@ -93,6 +93,8 @@ public static class Extensions {
     /// </summary>
     public static string Or(this string? x, string y) => string.IsNullOrEmpty(x) ? y : x;
 
+    public static T? AsNullable<T>(this T val) where T : struct => val;
+
     /// <summary>
     /// Subscribe to an event, but dispose the token after it is triggered once.
     /// </summary>
@@ -324,6 +326,36 @@ public static class ArrayExtensions {
         for (int ii = 0; ii < arr.Length; ++ii)
             arr[ii] = map(arr[ii], ii);
         return arr;
+    }
+
+    /// <summary>
+    /// = arr.Select(map).ToArray()
+    /// </summary>
+    public static U[] SelectToArr<T, U>(this T[] arr, Func<T, U> map) {
+        var result = new U[arr.Length];
+        for (int ii = 0; ii < arr.Length; ++ii)
+            result[ii] = map(arr[ii]);
+        return result;
+    }
+    
+    /// <summary>
+    /// = arr.Select(map).ToArray()
+    /// </summary>
+    public static U[] SelectToArr<T, U>(this IReadOnlyList<T> arr, Func<T, U> map) {
+        var result = new U[arr.Count];
+        for (int ii = 0; ii < arr.Count; ++ii)
+            result[ii] = map(arr[ii]);
+        return result;
+    }
+    
+    /// <summary>
+    /// = arr.Select(map).ToLis()
+    /// </summary>
+    public static List<U> SelectToList<T, U>(this IReadOnlyList<T> arr, Func<T, U> map) {
+        var result = new List<U>(arr.Count);
+        for (int ii = 0; ii < arr.Count; ++ii)
+            result.Add(map(arr[ii]));
+        return result;
     }
 }
 
@@ -1029,11 +1061,17 @@ public static class DataStructureExtensions {
     /// </summary>
     public static T? TryPeek<T>(this Stack<T> stack) where T : class =>
         stack.Count > 0 ? stack.Peek() : null;
+    
     /// <summary>
     /// Try to get the top element in a <see cref="StackList{T}"/>.
     /// </summary>
     public static T? TryPeek<T>(this StackList<T> stack) where T : class =>
         stack.Count > 0 ? stack.Peek() : null;
+
+    /// <summary>
+    /// Push an entry to a stack, and return a disposable that pops it.
+    /// </summary>
+    public static IDisposable WithPush<T>(this Stack<T> stack, T entry) => new StackLet<T>(stack, entry);
 }
 
 /// <summary>

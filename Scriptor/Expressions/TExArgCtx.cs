@@ -25,6 +25,11 @@ public class TExArgCtx {
     /// </summary>
     public class RootCtx {
         /// <summary>
+        /// All active lexical scopes through which this expression context is being passed.
+        /// </summary>
+        public Stack<LexicalScope> Scope { get; } = new();
+        
+        /// <summary>
         /// Local variable aliases.
         /// </summary>
         public Dictionary<string, Stack<Ex>> AliasStack { get; } =
@@ -110,31 +115,13 @@ public class TExArgCtx {
         public static Arg FromTEx(string name, TEx expr, bool hasTypePriority) =>
             new(name, expr.GetType(), expr, hasTypePriority);
     }
-    
-    /// <summary>
-    /// A disposable representing the lifetime of a local variable in <see cref="RootCtx"/>.<see cref="RootCtx.AliasStack"/>.
-    /// </summary>
-    public class LocalLet : IDisposable {
-        private readonly string alias;
-        private readonly TExArgCtx ctx;
-
-        /// <inheritdoc cref="LocalLet"/>
-        public LocalLet(TExArgCtx ctx, string alias, Ex val) {
-            this.alias = alias;
-            (this.ctx = ctx).Ctx.AliasStack.Push(alias, val);
-        }
-
-        /// <inheritdoc/>
-        public void Dispose() {
-            ctx.Ctx.AliasStack.Pop(alias);
-        }
-    }
 
     /// <summary>
     /// Temporarily add a variable to <see cref="RootCtx"/>.<see cref="RootCtx.AliasStack"/>.
     /// </summary>
-    public LocalLet Let(string alias, Ex val) => new(this, alias, val);
-    
+    public IDisposable Let(string alias, Ex val) => 
+        Ctx.AliasStack.SetDefault(alias).WithPush(val);
+
     /// <summary>
     /// Arguments provided to this TExArgCtx. Does not carry parent arguments.
     /// </summary>
@@ -145,10 +132,14 @@ public class TExArgCtx {
     //Maps typeof(ParametricInfo) to index
     private readonly Dictionary<Type, int> argTypeToIndexMap;
 
+    /// <summary>
+    /// Contains the base TExArgCtx from which this was copied
+    ///  (if this is a copy with extra arguments).
+    /// </summary>
+    public TExArgCtx? Parent { get; }
     private readonly RootCtx? ctx;
-    private readonly TExArgCtx? parent;
     /// <inheritdoc cref="RootCtx"/>
-    public RootCtx Ctx => ctx ?? parent?.Ctx ?? throw new StaticException("No RootCtx found");
+    public RootCtx Ctx => ctx ?? Parent?.Ctx ?? throw new StaticException("No RootCtx found");
     
     /// <summary>
     /// Get the linked expression representing the (most-priotized) float argument.
@@ -164,7 +155,7 @@ public class TExArgCtx {
     public TExArgCtx(params Arg[] args) : this(null, args) { }
     /// <inheritdoc cref="TExArgCtx"/>
     public TExArgCtx(TExArgCtx? parent, params Arg[] args) {
-        this.parent = parent;
+        this.Parent = parent;
         if (parent == null)
             this.ctx = new RootCtx();
         this.Args = args;

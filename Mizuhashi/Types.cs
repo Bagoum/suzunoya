@@ -10,7 +10,7 @@ namespace Mizuhashi {
 /// <summary>
 /// A description of a position in a string, including line and column information.
 /// </summary>
-public readonly struct Position {
+public readonly struct Position: IEquatable<Position> {
     /// <summary>
     /// Index in the source string (0-indexed) of the next character.
     /// <br/>This points out of bounds when the source has no elements left.
@@ -105,7 +105,7 @@ public readonly struct Position {
     /// <summary>
     /// new PositionRange(this, this)
     /// </summary>
-    public PositionRange CreateEmptyRange() => new(this, this);
+    public PositionRange EmptyRange() => new(this, this);
 
     /// <summary>
     /// Creates a position range between this position and `steps` characters ahead, using
@@ -178,7 +178,7 @@ public readonly struct Position {
 /// A description of a position range in a stream, with an inclusive start and exclusive end.
 /// <br/>When printed, the columns are printed inclusively.
 /// </summary>
-public readonly struct PositionRange {
+public readonly struct PositionRange: IEquatable<PositionRange> {
     /// <summary>
     /// Start point of the range (inclusive).
     /// </summary>
@@ -297,7 +297,18 @@ public interface IInputStream {
     /// <summary>
     /// Witness describing how to display the tokens over some user-facing source string.
     /// </summary>
-    public ITokenWitness TokenWitness { get; }
+    ITokenWitness TokenWitness { get; }
+}
+
+
+/// <summary>
+/// Base interface for parseable input streams, with the token type specified.
+/// </summary>
+public interface IInputStream<T>: IInputStream {
+    ITokenWitness IInputStream.TokenWitness => TokenWitness;
+    
+    /// <inheritdoc cref="IInputStream.TokenWitness"/>
+    new ITokenWitness<T> TokenWitness { get; }
 }
 
 /// <summary>
@@ -305,9 +316,9 @@ public interface IInputStream {
 /// <br/>A single mutable instance of this is threaded through the parsing process.
 /// </summary>
 /// <typeparam name="Token">Type of the stream tokens ('char' for a string parser)</typeparam>
-public class InputStream<Token> : IInputStream {
+public class InputStream<Token> : IInputStream<Token> {
     /// <inheritdoc/>
-    public ITokenWitness TokenWitness { get; }
+    public ITokenWitness<Token> TokenWitness { get; }
 
     /// <summary>
     /// The source stream as a string (if Token = char).
@@ -534,6 +545,12 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
     public ParseResult(LocatedParserError? err, int start, int? end = null) : this(Maybe<R>.None, err ?? throw new Exception("Missing error"), start, end ?? start) {
     }
 
+    /// <summary>
+    /// Create a nonfatal error parse result without an error message.
+    /// <br/>DO NOT USE THIS EXCEPT IN CASES WHERE YOU KNOW THE ERROR MESSAGE IS IGNORED.
+    /// </summary>
+    public static ParseResult<R> SilentErr(int start) => new(Maybe<R>.None, null, start, start);
+
     // <inheritdoc cref="ParseResult{R}"/>
     /*public ParseResult(Maybe<R> result, ParserError error, int start, int end) : 
         this(result, new LocatedParserError(start, end, error), start, end) {
@@ -549,6 +566,15 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
     }
 
     /// <summary>
+    /// Add an error at the end position of this object (representing an optional parse that failed).
+    /// </summary>
+    public ParseResult<R> WithErrAtEnd(in ParserError? err) {
+        if (err is null)
+            return this;
+        return new(Result, LocatedParserError.Merge(Error, new LocatedParserError(End, err)), Start, End);
+    }
+
+    /// <summary>
     /// Join the errors and consumption range of this parse result with a preceding parse result.
     /// <br/>Use this whenever parsers are run in sequence.
     /// </summary>
@@ -559,6 +585,13 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
     public ParseResult<R> WithPrecedingNullable<R2>(in ParseResult<R2>? prev) {
         if (prev.Try(out var p))
             return new(Result, p.MergeErrors(this), p.Start, End);
+        return this;
+    }
+    
+    /// <inheritdoc cref="WithPrecedingNullable{R2}"/>
+    public ParseResult<R> WithNextNullable<R2>(in ParseResult<R2>? next) {
+        if (next.Try(out var p))
+            return new(Result, MergeErrors(p), Start, p.End);
         return this;
     }
 
@@ -588,12 +621,10 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
             throw new Exception($"{nameof(WithResult)} should not be called on error parse results");
 
     /// <summary>
-    /// Convert a successful parse result into an error.
+    /// Convert a parse result into an error.
     /// </summary>
     public ParseResult<R2> AsError<R2>(LocatedParserError newError, bool dontConsume = true) =>
-        Result.Valid ?
-            new(Maybe<R2>.None, newError, Start, dontConsume ? Start : End) :
-            throw new Exception($"{nameof(AsError)} should not be called on error parse results");
+        new(Maybe<R2>.None, newError, Start, dontConsume ? Start : End);
     
     /// <inheritdoc cref="AsError{R2}(Mizuhashi.LocatedParserError,bool)"/>
     public ParseResult<R2> AsError<R2>(ParserError newError, bool dontConsume = true) => 
@@ -621,7 +652,6 @@ public readonly struct ParseResult<R>(Maybe<R> result, LocatedParserError? error
 /// <typeparam name="T">Type of stream token ('char' for string parsers)</typeparam>
 /// <typeparam name="R">Type of parsing result (eg. 'SyntaxTree' for a language parser)</typeparam>
 public delegate ParseResult<R> Parser<T, R>(InputStream<T> input);
-
 
 /// <summary>
 /// A degenerate class that defines how to display a stream over tokens.
@@ -685,6 +715,10 @@ public interface ITokenWitness {
         ShowConsumed(parsed.Start, parsed.End);
 }
 
+/// <inheritdoc cref="ITokenWitness"/>
+public interface ITokenWitness<T> : ITokenWitness {
+}
+
 /// <summary>
 /// A degenerate class that defines how to create an <see cref="ITokenWitness"/> from a stream.
 /// </summary>
@@ -692,13 +726,13 @@ public interface ITokenWitnessCreator<T> {
     /// <summary>
     /// Create a token witness linked to a stream.
     /// </summary>
-    public ITokenWitness Create(InputStream<T> stream);
+    public ITokenWitness<T> Create(InputStream<T> stream);
 }
 
 /// <summary>
 /// A degenerate class that defines how to display string (char[]) streams.
 /// </summary>
-public record CharTokenWitness(InputStream<char> Stream, string? Source = null) : ITokenWitness {
+public record CharTokenWitness(InputStream<char> Stream, string? Source = null) : ITokenWitness<char> {
     private string Source { get; } = Source ?? new(Stream.Source);
 
     /// <inheritdoc/>
@@ -741,7 +775,7 @@ public record CharTokenWitness(InputStream<char> Stream, string? Source = null) 
 /// </summary>
 public record CharTokenWitnessCreator(string? Source = null) : ITokenWitnessCreator<char> {
     /// <inheritdoc/>
-    public ITokenWitness Create(InputStream<char> stream)
+    public ITokenWitness<char> Create(InputStream<char> stream)
         => new CharTokenWitness(stream, Source);
 }
 

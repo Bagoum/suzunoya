@@ -47,17 +47,27 @@ public static class AssertHelpers {
         }
     }
 
-    public static void ThrowsMessage(string pattern, Action code) {
+    public static void ThrowsMessage(string? pattern, Action code) {
         try {
             code();
-            Assert.Fail("Expected code to fail");
+            if (pattern is not null)
+                Assert.Fail($"Expected code to fail with error `{pattern}`, but it succeeded");
         } catch (Exception e) {
-            RegexMatches(pattern, e.Message);
+            if (pattern is null)
+                Assert.Fail($"Expected code to succeed, but it failed with {e}");
+            else
+                RegexMatches(pattern, e.Message);
         }
     }
+
+    public static bool CheckRegexMatches(string pattern, string message) =>
+        new Regex(pattern, RegexOptions.Singleline).Match(message).Success;
+    
     public static void RegexMatches(string pattern, string message) {
-        if (!new Regex(pattern, RegexOptions.Singleline).Match(message).Success) {
-            Assert.Fail($"Could not find pattern `{pattern}` in `{message}`");
+        if (!CheckRegexMatches(pattern, message)) {
+            Assert.Fail($"Could not find pattern\n{pattern}\nin\n{message}\n");
+        } else {
+            Console.WriteLine($"Found pattern\n{pattern}\nin\n{message}\n");
         }
     }
     private const float err = 0.0001f;

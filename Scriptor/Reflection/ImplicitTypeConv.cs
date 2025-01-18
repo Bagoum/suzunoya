@@ -31,7 +31,7 @@ public enum ScopedConversionKind {
     EFScopedExpression,
     
     /// <summary>
-    /// A conversion method not interfacing with expressions, such as GenCtxProperty[] to GenCtxProperties{X}.
+    /// A conversion method not interfacing with expressions, such as GenCtxProperty[] to GenCtxProperties{X}. No local scope is required.
     /// </summary>
     Trivial
 }

@@ -304,6 +304,18 @@ float y = 5f;
 x + x;
 ");
     }
-    
+    [Test]
+    public void TestFieldMethodParen() {
+        var x = Prm<object>("x");
+        var ex1 = Ex.PropertyOrField(x.Cast<MyClass>(), "Property");
+        Prints(ex1, "((MyClass)x).Property");
+        var ex2 = Ex.Call(x.Cast<MyClass>(), typeof(MyClass).GetMethod("Method")!, Ex.Constant(4));
+        Prints(ex2, "((MyClass)x).Method(4)");
+    }
+}
+
+public class MyClass {
+    public int Property => 2;
+    public int Method(int y) => 5 + y;
 }
 }

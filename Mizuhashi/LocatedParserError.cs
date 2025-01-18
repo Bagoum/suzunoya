@@ -178,34 +178,28 @@ public abstract record ParserError {
 /// <summary>
 /// A <see cref="ParserError"/> paired with a location in the source string.
 /// </summary>
-public readonly struct LocatedParserError: IEquatable<LocatedParserError> {
-    //Store Index instead of position because it's more space-efficient. We can expand back to position if there are parsing errors
-    /// <summary>
-    /// The index in the source stream where the error started.
-    /// </summary>
-    public readonly int Index;
-    
-    /// <summary>
-    /// The index in the source stream where the error ended.
-    /// </summary>
-    public readonly int End;
-    
+public readonly struct LocatedParserError(int index, int endIndex, ParserError error): IEquatable<LocatedParserError> {
     /// <summary>
     /// Error.
     /// </summary>
-    public readonly ParserError Error;
+    public ParserError Error { get; } = error;
+    
+    //Store Index instead of position because it's more space-efficient. We can expand back to position
+    // if the error needs to be raised.
+    /// <summary>
+    /// The index in the source stream where the error started.
+    /// </summary>
+    public int Index { get; } = index;
+
+    /// <summary>
+    /// The index in the source stream where the error ended.
+    /// </summary>
+    public int End { get; } = endIndex;
 
     private (int, int, ParserError) Tuple => (Index, End, Error);
 
     /// <inheritdoc cref="LocatedParserError"/>
     public LocatedParserError(int index, ParserError error) : this(index, index, error) { }
-    
-    /// <inheritdoc cref="LocatedParserError"/>
-    public LocatedParserError(int index, int endIndex, ParserError error) {
-        Index = index;
-        End = endIndex;
-        Error = error;
-    }
 
     /// <summary>
     /// Change the <see cref="ParserError"/> attached to this struct.

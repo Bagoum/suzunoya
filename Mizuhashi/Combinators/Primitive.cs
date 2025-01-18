@@ -254,7 +254,7 @@ public static partial class Combinators {
     }
     
     /// <summary>
-    /// <see cref="Choice{T,R}"/> with a specific label used for errors if no parser succeeds. (FParsec choiceL)
+    /// <see cref="Choice{T,R}"/> with a specific override label used for errors if no parser succeeds. (FParsec choiceL)
     /// </summary>
     public static Parser<T, R> ChoiceL<T, R>(string label, params Parser<T, R>[] ps) {
         if (ps.Length == 0) return Error<T, R>("No choice arms");
@@ -274,22 +274,24 @@ public static partial class Combinators {
     /// Try to parse an object of type R, and return it as type Maybe&lt;R&gt;.
     /// If it fails non-fatally, then succeed with Maybe.None. (FParsec opt)
     /// </summary>
-    public static Parser<T, Maybe<R>> Opt<T, R>(this Parser<T, R> p) => input => {
+    /// <param name="p">Parser to apply.</param>
+    /// <param name="silence">If true, then errors from the nonfatal case will be removed.</param>
+    public static Parser<T, Maybe<R>> Opt<T, R>(this Parser<T, R> p, bool silence = false) => input => {
         var result = p(input);
         return result.Result.Try(out var res) ? 
             new ParseResult<Maybe<R>>(Maybe<R>.Of(res), result.Error, result.Start, result.End) : 
             result.Status == ResultStatus.ERROR ?
-                new ParseResult<Maybe<R>>(Maybe<R>.None, result.Error, result.Start, result.End) :
+                new ParseResult<Maybe<R>>(Maybe<R>.None, silence ? null : result.Error, result.Start, result.End) :
                 result.CastFailure<Maybe<R>>();
     };
     
     /// <inheritdoc cref="Opt{T,R}"/>
-    public static Parser<T, R?> OptN<T, R>(this Parser<T, R> p) where R : struct => input => {
+    public static Parser<T, R?> OptN<T, R>(this Parser<T, R> p, bool silence = false) where R : struct => input => {
         var result = p(input);
         return result.Result.Try(out var res) ? 
             new ParseResult<R?>(res, result.Error, result.Start, result.End) : 
             result.Status == ResultStatus.ERROR ?
-                new ParseResult<R?>(Maybe<R?>.Of(null), result.Error, result.Start, result.End) :
+                new ParseResult<R?>(Maybe<R?>.Of(null), silence ? null : result.Error, result.Start, result.End) :
                 result.CastFailure<R?>();
     };
     

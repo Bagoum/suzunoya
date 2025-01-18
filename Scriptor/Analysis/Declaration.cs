@@ -269,7 +269,6 @@ public class ImplicitArgDecl : VarDecl, IDelegateArg {
     
     /// <inheritdoc/>
     public override string ToString() => $"{Name}<{FinalizedType?.SimpRName()}>";
-
 }
 
 /// <inheritdoc cref="ImplicitArgDecl"/>

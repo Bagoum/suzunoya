@@ -23,7 +23,7 @@ public class MapStateTransition<I, D> where I: ADVIdealizedState where D: ADVDat
     /// True when the map state is changing.
     /// <br/>Consumers may want to disable certain functionalities while this is true.
     /// </summary>
-    public Evented<bool> ExecutingTransition => taskQueue.ExecutingTransition;
+    public Evented<bool> ExecutingTransition => taskQueue.IsExecuting;
     
     /// <summary>
     /// The task describing the current map update, if a map update is occuring.

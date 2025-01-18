@@ -9,12 +9,7 @@ namespace BagoumLib.Functional {
 /// A value that is either of type L (left) or of type R (right).
 /// </summary>
 [PublicAPI]
-public readonly struct Either<L, R> {
-    /// <summary>
-    /// True iff the value is of type L.
-    /// </summary>
-    public bool IsLeft { get; }
-    
+public readonly struct Either<L, R>: IEquatable<Either<L, R>> {
     /// <summary>
     /// The left-value of this type. Only valid if <see cref="IsLeft"/> is true.
     /// </summary>
@@ -24,6 +19,11 @@ public readonly struct Either<L, R> {
     /// The right-value of this type. Only valid if <see cref="IsLeft"/> is false.
     /// </summary>
     public R Right { get; }
+    
+    /// <summary>
+    /// True iff the value is of type L.
+    /// </summary>
+    public bool IsLeft { get; }
     
     /// <summary>
     /// !<see cref="IsLeft"/>

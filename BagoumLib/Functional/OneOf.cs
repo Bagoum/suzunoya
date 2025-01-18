@@ -9,7 +9,22 @@ namespace BagoumLib.Functional {
 /// A value that is one of three possible types.
 /// </summary>
 [PublicAPI]
-public readonly struct OneOf<A,B,C> {
+public readonly struct OneOf<A,B,C>: IEquatable<OneOf<A,B,C>> {
+    /// <summary>
+    /// The A-value of this type. Only valid if <see cref="IsA"/> is true.
+    /// </summary>
+    public A ValA { get; } = default!;
+    
+    /// <summary>
+    /// The B-value of this type. Only valid if <see cref="IsB"/> is true.
+    /// </summary>
+    public B ValB { get; } = default!;
+    
+    /// <summary>
+    /// The C-value of this type. Only valid if <see cref="IsC"/> is true.
+    /// </summary>
+    public C ValC { get; } = default!;
+    
     /// <summary>
     /// The index of the correct type (0=A, 1=B, 2=C).
     /// </summary>
@@ -32,21 +47,6 @@ public readonly struct OneOf<A,B,C> {
     /// </summary>
     [JsonIgnore]
     public bool IsC => Index == 2;
-
-    /// <summary>
-    /// The A-value of this type. Only valid if <see cref="IsA"/> is true.
-    /// </summary>
-    public A ValA { get; } = default!;
-    
-    /// <summary>
-    /// The B-value of this type. Only valid if <see cref="IsB"/> is true.
-    /// </summary>
-    public B ValB { get; } = default!;
-    
-    /// <summary>
-    /// The C-value of this type. Only valid if <see cref="IsC"/> is true.
-    /// </summary>
-    public C ValC { get; } = default!;
     
     
     /// <summary>

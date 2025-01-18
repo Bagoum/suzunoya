@@ -63,7 +63,13 @@ public class EnvFrame {
     /// <summary>
     /// The variables stored in this environment frame.
     /// </summary>
-    public FrameVars[] Variables = null!;
+    public object[] Variables = null!;
+    
+    /// <summary>
+    /// The float-typed frame variables in this environment frame
+    ///  (also available in <see cref="Variables"/>).
+    /// </summary>
+    public float[]? FloatVars = null;
 
     /// <summary>
     /// Get the i'th parent of this envframe.
@@ -110,12 +116,13 @@ public class EnvFrame {
         ++Created;
         ef.Scope = scope;
         ef.owners = 1;
-        ef.Variables = EFArrayPool<FrameVars>.Rent(scope.VariableDecls.Length);
+        ef.Variables = EFArrayPool<object>.Rent(scope.VariableDecls.Length);
         for (int ii = 0; ii < scope.VariableDecls.Length; ++ii) {
             var (typ, decls) = scope.VariableDecls[ii];
-            var v = FrameVars.Create(typ);
-            v.AssertLength(decls.Length);
+            var v = IVariableStoreCreator.Create(typ, decls.Length);
             ef.Variables[ii] = v;
+            if (v is float[] vf)
+                ef.FloatVars = vf;
         }
         return ef;
     }
@@ -124,6 +131,8 @@ public class EnvFrame {
     
     /// <summary>
     /// Get a value stored in this envframe or a parent envframe.
+    /// <br/>If the variable does not exist, return Maybe.None.
+    /// If the variable exists but has the wrong type, throw an exception.
     /// </summary>
     public Maybe<T> MaybeGetValue<T>(string varName) {
         for (var envFrame = this; envFrame != null; envFrame = envFrame.Parent) {
@@ -131,7 +140,7 @@ public class EnvFrame {
                 if (decl.FinalizedType != typeof(T))
                     throw new Exception(
                         $"Types do not align for variable {varName}. Requested: {typeof(T).SimpRName()}; found: {decl.FinalizedType?.SimpRName()}");
-                return ((FrameVars<T>)envFrame.Variables[decl.TypeIndex]).Values[decl.Index];
+                return ((T[])envFrame.Variables[decl.TypeIndex])[decl.Index];
             }
         }
         return Maybe<T>.None;
@@ -146,7 +155,7 @@ public class EnvFrame {
                 if (decl.FinalizedType != typeof(T))
                     throw new Exception(
                         $"Types do not align for variable {varName}. Requested: {typeof(T).SimpRName()}; found: {decl.FinalizedType?.SimpRName()}");
-                return ref ((FrameVars<T>)envFrame.Variables[decl.TypeIndex]).Values[decl.Index];
+                return ref ((T[])envFrame.Variables[decl.TypeIndex])[decl.Index];
             }
         }
         throw new Exception($"Variable {varName} not found in environment frame");
@@ -159,7 +168,7 @@ public class EnvFrame {
         if (decl == null) throw new Exception($"Declaration not provided to {nameof(Value)}");
         for (var envFrame = this; envFrame != null; envFrame = envFrame.Parent) {
             if (decl.DeclarationScope == envFrame.Scope || decl.DeclarationScope == envFrame.Scope.DynRealizeSource)
-                return ref ((FrameVars<T>)envFrame.Variables[decl.TypeIndex]).Values[decl.Index];
+                return ref ((T[])envFrame.Variables[decl.TypeIndex])[decl.Index];
         }
         throw new Exception($"Variable {decl.Name}<{decl.FinalizedType!.SimpRName()}> not found in environment frame");
     }
@@ -170,28 +179,15 @@ public class EnvFrame {
     public T NonRefValue<T>(VarDecl decl) => Value<T>(decl);
 
     /// <summary>
-    /// For an envFrame in the provided scope, get the type variables in the ancestor scope `parentage` levels up.
-    /// </summary>
-    public static Ex FrameVarValues(LexicalScope scope, Ex envFrame, int parentage, Type typ) {
-        while (true) {
-            if (scope.UseEF) {
-                if (parentage-- == 0) break;
-                envFrame = envFrame.Field(nameof(Parent));
-            }
-            scope = scope.Parent!;
-        }
-        return FrameVarValues(envFrame, Ex.Constant(scope.TypeIndexMap[typ]), typ);
-    }
-
-    /// <summary>
     /// Get the local type variables for an envFrame.
     /// </summary>
-    public static Ex FrameVarValues(Ex envFrame, Ex typeIdx, Type typ) =>
-        //(ef.Variables[var.FinalizedType] as VariableStore<var.FinalizedType>).Values
-        envFrame
-            .Field(nameof(Variables)).Index(typeIdx)
-            .As(FrameVars.GetVarStoreType(typ))
-            .Field(nameof(FrameVars<float>.Values));
+    public static Ex FrameVarValues(Ex envFrame, Ex typIdx, Type typ) =>
+        //(ef.Variables[var.TypIdx] as {var.Typ}[])
+        (typ == typeof(float) ?
+            envFrame.Field(nameof(FloatVars)) :
+            envFrame
+                .Field(nameof(Variables)).Index(typIdx)
+                .As(typ.MakeArrayType()));
     
     /// <summary>
     /// Get the value of a local variable for an envFrame.
@@ -200,7 +196,7 @@ public class EnvFrame {
         FrameVarValues(envFrame, typeIdx, typ).Index(valueIdx);
 
     /// <summary>
-    /// Free this EnvFrame. It will only be returned to the cache when all dependencies have freed it.
+    /// Free this EnvFrame. It will only be returned to the cache when all dependents have freed it.
     /// </summary>
     public void Free() {
         if (this == Empty) return;
@@ -223,9 +219,10 @@ public class EnvFrame {
         if (this == Empty) return;
         //Logs.Log($"DISPOSED {Ctr} ({Parent?.Ctr})", stackTrace: true);
         ++Disposed;
+        FloatVars = null;
         for (int ii = 0; ii < Scope.VariableDecls.Length; ++ii)
-            Variables[ii].Cache();
-        EFArrayPool<FrameVars>.Return(Variables);
+            IVariableStoreCreator.CacheAny(Variables[ii]);
+        EFArrayPool<object>.Return(Variables);
         Variables = null!;
         cache.Push(this);
         TakeParent(null); //calls FreeDependent
@@ -254,124 +251,83 @@ public class EnvFrame {
         nxt.owners = 1;
         //Logs.Log($"CLONE {nxt.Ctr} <- {Ctr} ({Parent?.Ctr})", stackTrace: true);
         ++Cloned;
-        nxt.Variables = EFArrayPool<FrameVars>.Rent(Scope.VariableDecls.Length);
-        for (int ii = 0; ii < Scope.VariableDecls.Length; ++ii)
-            nxt.Variables[ii] = Variables[ii].Clone();
+        nxt.Variables = EFArrayPool<object>.Rent(Scope.VariableDecls.Length);
+        for (int ii = 0; ii < Scope.VariableDecls.Length; ++ii) {
+            nxt.Variables[ii] = IVariableStoreCreator.CloneAny(Variables[ii]);
+            if (nxt.Variables[ii] is float[] fv)
+                nxt.FloatVars = fv;
+        }
         return nxt;
     }
 }
 
 /// <summary>
-/// Variables of a specific type stored in an <see cref="EnvFrame"/>.
+/// Helper interface for creating typed variable arrays in <see cref="EnvFrame"/>.
 /// </summary>
-public abstract class FrameVars {
+internal interface IVariableStoreCreator {
     private static readonly Dictionary<Type, IVariableStoreCreator> creators = new();
-    //maps T to VariableStore<T>
-    private static readonly Dictionary<Type, Type> varStoreTypes = new();
-    /// <summary>
-    /// Type of the stored variables.
-    /// </summary>
-    public abstract Type Type { get; }
+    
+    /// <inheritdoc cref="Create(Type, int)"/>
+    protected object Create(int len);
+
+    /// <inheritdoc cref="CacheAny"/>
+    protected void Cache(object data);
+    
+    /// <inheritdoc cref="CloneAny"/>
+    protected object Clone(object data);
 
     /// <summary>
-    /// Called before storing variable data.
-    /// Ensure that there is enough allocated space to store the provided number of variables.
+    /// Get an instance of T[].
     /// </summary>
-    public abstract void AssertLength(int numVars);
-    
-    /// <summary>
-    /// Dispose of this instance by returning it to a cache.
-    /// </summary>
-    public abstract void Cache();
-    
-    /// <summary>
-    /// Copy the values in this variable store.
-    /// </summary>
-    public abstract FrameVars Clone();
-
-    /// <summary>
-    /// Get the type FrameVars{t}.
-    /// </summary>
-    public static Type GetVarStoreType(Type t) => varStoreTypes.TryGetValue(t, out var vst) ?
-        vst :
-        varStoreTypes[t] = typeof(FrameVars<>).MakeGenericType(t);
-    
-    /// <summary>
-    /// Get an instance of object FrameVars{t}.
-    /// </summary>
-    public static FrameVars Create(Type t) {
+    public static object Create(Type t, int len) {
         if (!creators.TryGetValue(t, out var c))
             creators[t] = c = Activator.CreateInstance(typeof(VariableStoreCreator<>).MakeGenericType(t)) 
                                   as IVariableStoreCreator ?? 
                               throw new Exception($"Failed to generate VariableStoreCreator for type {t.SimpRName()}");
-        return c.Create();
+        return c.Create(len);
     }
-    
-}
-
-/// <inheritdoc cref="FrameVars"/>
-public class FrameVars<T> : FrameVars {
-    private static readonly Stack<FrameVars<T>> cache = new();
-    
-    /// <inheritdoc/>
-    public override Type Type { get; } = typeof(T);
     
     /// <summary>
-    /// Create an instance of <see cref="FrameVars{T}"/>.
+    /// Dispose of any array T[] by returning it to a type-specific cache.
     /// </summary>
-    public static FrameVars<T> Create() => cache.Count > 0 ? cache.Pop() : new();
-
-    private int len;
-    /// <summary>
-    /// Values of the stored variables.
-    /// </summary>
-    public T[] Values = null!;
-
-
-    /// <inheritdoc/>
-    public override void AssertLength(int numVars) {
-        Values = EFArrayPool<T>.Rent(len = numVars, clear: true);
-    }
-
-    /// <inheritdoc/>
-    public override void Cache() {
-        EFArrayPool<T>.Return(Values);
-        Values = null!;
-        cache.Push(this);
-    }
-
-    /// <inheritdoc/>
-    public override FrameVars Clone() {
-        var nxt = Create();
-        nxt.Values = EFArrayPool<T>.Rent(nxt.len = len);
-        Array.Copy(Values, nxt.Values, len);
-        return nxt;
-    }
+    public static void CacheAny(object data) =>
+        creators[data.GetType().GetElementType()!].Cache(data);
     
-    static FrameVars() => EnvFrame.ClearCache.Subscribe(_ => cache.Clear());
-}
-
-//using this instead of referencing the VariableStore<T>.Create method makes EF instantiation faster
-/// <summary>
-/// Helper interface/class for creating an instance of FrameVars{T}.
-/// </summary>
-public interface IVariableStoreCreator {
     /// <summary>
-    /// Create an instance of FrameVars{T}.
+    /// Clone any array T[].
     /// </summary>
-    FrameVars Create();
+    public static object CloneAny(object data) => 
+        creators[data.GetType().GetElementType()!].Clone(data);
 }
 
 /// <inheritdoc cref="IVariableStoreCreator"/>
-public class VariableStoreCreator<T> : IVariableStoreCreator {
-    FrameVars IVariableStoreCreator.Create() => FrameVars<T>.Create();
+internal class VariableStoreCreator<T> : IVariableStoreCreator {
+    object IVariableStoreCreator.Create(int len) => EFArrayPool<T>.Rent(len, clear: true);
+
+    /// <inheritdoc/>
+    public void Cache(object data) {
+        if (data is not T[] arr)
+            throw new Exception(
+                $"Frame data for caching should be of type {typeof(T[]).RName()} but was of type {data.GetType().RName()}");
+        EFArrayPool<T>.Return(arr);
+    }
+
+    /// <inheritdoc/>
+    public object Clone(object data) {
+        if (data is not T[] arr)
+            throw new Exception(
+                $"Frame data for cloning should be of type {typeof(T[]).RName()} but was of type {data.GetType().RName()}");
+        var cpy = EFArrayPool<T>.Rent(arr.Length);
+        Array.Copy(arr, cpy, arr.Length);
+        return cpy;
+    }
 }
 
 //Implementation of ArrayPool of small lengths that isn't thread-safe but has zero amortized allocation
 /// <summary>
-/// Cache for storing arrays of small length, for use by <see cref="FrameVars{T}"/>.
+/// Cache for storing arrays of small length.
 /// </summary>
-public static class EFArrayPool<T> {
+internal static class EFArrayPool<T> {
     //We have buckets as follows:
     //One bucket for each length up to 8.
     //From there, one bucket for each exponent [8+2^n, 8+2*2^n).
@@ -382,24 +338,26 @@ public static class EFArrayPool<T> {
             buckets.Add(new());
     }
 
-    static int BucketForGetLength(in int len) {
+    internal static int BucketForGetLength(in int len) {
+        if (len <= 8)
+            return len - 1;
+        var idx = 8;
+        for (int diff = len - 8; diff > 1; diff /= 2)
+            ++idx;
+        //Unless the required length is the minimum in the bucket,
+        // we need to go up one bucket to guarantee that the array is long enough.
+        //eg. bucket 10 contains arrays of length [12,16).
+        // if we need an array of length 14, we need to go up to bucket 11.
+        return len == 8 + (1 << (idx - 8)) ? idx : idx + 1;
+    }
+    
+    internal static int BucketForSetLength(in int len) {
         if (len <= 8)
             return len - 1;
         var idx = 8;
         for (int diff = len - 8; diff > 1; diff /= 2)
             ++idx;
         return idx;
-    }
-    static int BucketForSetLength(in int len) {
-        if (len <= 8)
-            return len - 1;
-        var idx = 8;
-        for (int diff = len - 8; diff > 1; diff /= 2)
-            ++idx;
-        var exp = 1;
-        for (int ii = 8; ii < idx; ++ii)
-            exp *= 2;
-        return (len == 8 + exp) ? idx: idx + 1;
     }
 
     /// <summary>
@@ -416,12 +374,12 @@ public static class EFArrayPool<T> {
     /// Rent an array from the cache, and if required, clear its data to 0.
     /// </summary>
     public static T[] Rent(int len, bool clear = false) {
-        if (len == 0) return Array.Empty<T>();
+        if (len == 0) return [];
         var bucket = BucketForGetLength(len);
         for (; bucket < buckets.Count; ++bucket)
             if (buckets[bucket].TryDequeue(out var arr)) {
                 if (clear)
-                    Array.Clear(arr, 0, len);
+                    Array.Clear(arr, 0, arr.Length);
                 return arr;
             }
         return new T[len];

@@ -8,13 +8,19 @@ namespace BagoumLib.Events {
 /// An event that sends the <see cref="History"/> most recent published elements to any new subscribers.
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public class ReplayEvent<T> : Event<T> {
-    private readonly DMCompactingArray<IObserver<T>> callbacks = new();
+public class ReplayEvent<T> : IBSubject<T> {
     /// <summary>
     /// Maximum number of recently published elements to send to new subscribers.
     /// </summary>
     public int History { get; }
+
+    /// <inheritdoc/>
+    public bool HasValue => ev.HasValue;
+    /// <inheritdoc/>
+    public T Value => ev.Value;
+    
     private readonly CircularList<T> buffer;
+    private readonly Event<T> ev = new();
 
     /// <summary>
     /// Create a new <see cref="ReplayEvent{T}"/>.
@@ -31,21 +37,21 @@ public class ReplayEvent<T> : Event<T> {
     }
 
     /// <inheritdoc/>
-    public override IDisposable Subscribe(IObserver<T> observer) {
+    public IDisposable Subscribe(IObserver<T> observer) {
         ReplayFor(observer);
-        return base.Subscribe(observer);
-    }
-    
-    /// <inheritdoc/>
-    public override IDisposable Subscribe(IObserver<T> observer, int priority) {
-        ReplayFor(observer);
-        return base.Subscribe(observer, priority);
+        return ev.Subscribe(observer);
     }
 
     /// <inheritdoc/>
-    public override void OnNext(T value) {
+    public void OnNext(T value) {
         buffer.Add(value);
-        base.OnNext(value);
+        ev.OnNext(value);
     }
+
+    /// <inheritdoc/>
+    public void OnCompleted() => ev.OnCompleted();
+    
+    /// <inheritdoc/>
+    public void OnError(Exception error) => ev.OnError(error);
 }
 }

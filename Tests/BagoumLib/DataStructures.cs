@@ -258,6 +258,24 @@ public class DataStructures {
         ca.Empty();
         Assert.AreEqual(ca.Count, 0);
     }
+
+    [Test]
+    public void StackLetTest() {
+        var stack = new Stack<int>();
+        var a = stack.WithPush(10);
+        var b = stack.WithPush(20);
+        Assert.AreEqual(20, stack.Peek());
+        Assert.AreEqual(2, stack.Count);
+        b.Dispose();
+        Assert.AreEqual(10, stack.Peek());
+        Assert.AreEqual(1, stack.Count);
+        var c = stack.WithPush(30);
+        Assert.AreEqual(30, stack.Peek());
+        Assert.AreEqual(2, stack.Count);
+        c.Dispose();
+        a.Dispose();
+        Assert.AreEqual(0, stack.Count);
+    }
     
 }
 }

@@ -140,6 +140,7 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
 
     /// <inheritdoc cref="IAST.Realize"/>
     public TEx Realize(TExArgCtx tac) {
+        using var _ = LocalScope is null ? null : tac.Ctx.Scope.WithPush(LocalScope);
         if (ImplicitCast == null)
             return SameTypeCast == null ?
                 _RealizeWithoutCast(tac) :
@@ -524,7 +525,7 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
         /// <param name="Params">Arguments to the method</param>
         /// <param name="overloadsEq"><see cref="OverloadsAreInterchangeable"/></param>
         public static MethodCall Make(PositionRange Position, PositionRange MethodPosition, STAnnotater EnclosingScope, 
-            InvokedMethod[] Methods, IEnumerable<ST> Params, bool overloadsEq = false) {
+            InvokedMethod[] Methods, ST[] Params, bool overloadsEq = false) {
             var localScope = MaybeMakeLocalScope(EnclosingScope, MethodPosition, Methods);
             InvokedMethod[]? intValid = null;
             if (Methods.Length > 0 && Methods[0].Mi.GetAttribute<BDSL2MULTIPLY_OPERATORAttribute>() != null) {
@@ -532,7 +533,7 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
                     m.Mi.GetAttribute<BDSL2MULTIPLY_OPERATORAttribute>()?.isIntValid is true).ToArray();
             }
             return new MethodCall(Position, MethodPosition, EnclosingScope.Scope, Methods,
-                Params.Select(p => p.Annotate(localScope ?? EnclosingScope)).ToArray()) {
+                (localScope ?? EnclosingScope).AnnotateAll(Params)) {
                 LocalScope = localScope?.Scope,
                 OverloadsAreInterchangeable = overloadsEq,
                 specialIntMethods = intValid is null ? null : (Methods, intValid)
@@ -600,16 +601,17 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
                 AllowInvokeAsConst = cstattr.constableInAOT ||
                                      ServiceLocator.Find<ILangCustomizer>().AOTMode is AOTMode.None;
             }
-            return base.WillSelectOverload(mi, cast, u).FMapL(u => {
-                //Handles cases where compilation is done inside functions (eg. MoveTarget)
-                if (mi.Mi.GetAttribute<ExpressionBoundaryAttribute>() != null && LocalScope == null) {
-                    LocalScope = LexicalScope.Derive(EnclosingScope);
-                    LocalScope.Type = LexicalScopeType.ExpressionBlock;
-                    foreach (var a in Params)
-                        a.ReplaceScope(EnclosingScope, LocalScope);
-                }
-                return u;
-            });
+            var bres = base.WillSelectOverload(mi, cast, u);
+            if (bres.IsRight)
+                return bres;
+            //Handles cases where compilation is done inside functions (eg. MoveTarget)
+            if (mi.Mi.GetAttribute<ExpressionBoundaryAttribute>() != null && LocalScope == null) {
+                LocalScope = LexicalScope.Derive(EnclosingScope);
+                LocalScope.Type = LexicalScopeType.ExpressionBlock;
+                foreach (var a in Params)
+                    a.ReplaceScope(EnclosingScope, LocalScope);
+            }
+            return bres;
         }
 
         IEnumerable<ReflectionException> IAST.Verify() {
@@ -773,7 +775,20 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
                     // then it's some kind of compilation function, so we use the parameter as is.
                     if (mi.Params[ii].Type.IsTExFuncType(out var inner)) {
                         var index = ii;
-                        prms[ii] = Ex.Constant(tac.Proxy((object)inner.MakeTypedLambda(tac => prmGetter(index, tac))));
+                        prms[ii] = Ex.Constant(tac.Proxy((object)inner.MakeTypedLambda(ctac => {
+                            //In the case where there's no compilation (such as an UncompiledCode function),
+                            // we don't need a check on the scope
+                            if ((ast as AST)?.LocalScope is not { } ls)
+                                return prmGetter(index, ctac);
+                            //ctac here is created by the compiler function (`mi`) without any reference to tac.
+                            //It might be possible to force it as a child of tac, but that could cause some issues
+                            // with RootCtx sharing.
+                            //Instead, we just add the current lexical scope to ctac.
+                            if (ctac.Parent != null || ctac.Ctx.Scope.Count > 0)
+                                throw new CompileException("Compiler arg-container should be empty, but isn't");
+                            using var _ = ctac.Ctx.Scope.WithPush(ls);
+                            return prmGetter(index, ctac);
+                        })));
                     } else if (mi.Params[ii].Type.IsTExType(out inner))
                         prms[ii] = Ex.Constant(tac.Proxy((object)inner.MakeTypedTEx(prmGetter(ii, tac))));
                     else if (ast is MethodCall meth)
@@ -1611,7 +1626,7 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
                     Condition == null ? null : new Known(typeof(bool)),
                     Finalizer == null ? null : new Variable(),
                     new Variable()
-                }.Where(x => x != null).ToArray()!)
+                }.Where(x => x is not null).ToArray()!)
             ];
         }
 
@@ -1865,16 +1880,14 @@ public abstract record AST(PositionRange Position, LexicalScope EnclosingScope, 
                         if (prm == ef)
                             return null;
                         return d.variable.Value(tac.EnvFrame, tac).Is(prm);
-                    }) :
-                    System.Array.Empty<Expression>();
+                    }) : [];
                 var copyBackToRefParams = fp != null ?
                     fp.SelectNotNull(d => {
                         var prm = d.prm.Value(tac.EnvFrame, tac);
                         if (prm == ef || prm is not ParameterExpression { IsByRef: true })
                             return null;
                         return prm.Is(d.variable.Value(tac.EnvFrame, tac));
-                    }) :
-                    System.Array.Empty<Expression>();
+                    }) : [];
                 var statements = 
                     copyFromParams.Concat(stmts(tac))
                     .Prepend(ef.Is(EnvFrame.exCreate.Of(Ex.Constant(tac.Proxy(localScope)), parentEf)))

@@ -48,13 +48,13 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
     private Evented<D> _dataChanged;
     
     private string prevMap;
-    
+
     /// <summary>
     /// Handler for managing maps and assertions.
     /// </summary>
-    public MapStateManager<I, D> MapStates { get; private set; }
-    
-    private MapStateTransition<I, D> mapTransition;
+    public MapStateManager<I, D> MapStates { get; private set; } = null!;
+
+    private MapStateTransition<I, D> mapTransition = null!;
     
     /// <inheritdoc cref="MapStateTransition{I,D}.MapUpdateTask"/>
     protected Task MapTransitionTask => mapTransition.MapUpdateTask ?? Task.CompletedTask;
@@ -82,7 +82,8 @@ public abstract class BaseExecutingADV<I, D> : IExecutingADV<I, D> where I : ADV
 
     /// <summary>
     /// Constructor for <see cref="BaseExecutingADV{I,D}"/>.
-    /// <br/>Note that <see cref="ConfigureMapStates"/> is called in this constructor.
+    /// <br/>Note that <see cref="ConfigureMapStates"/> is NOT called in this constructor.
+    ///  Implementing classes must call <see cref="SetupMapStates"/>.
     /// </summary>
     public BaseExecutingADV(ADVInstance inst) {
         this.Inst = inst;

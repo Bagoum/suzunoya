@@ -17,24 +17,32 @@ public class NullDisposable : IDisposable {
     public void Dispose() { }
 }
 /// <summary>
-/// An event that ignores subscriptions and values.
+/// An event that ignores subscriptions, values, errors, and completions.
 /// </summary>
 [PublicAPI]
-public class NullEvent<T> : Event<T> {
+public class NullEvent<T> : IBSubject<T, T> {
     /// <summary>
     /// Singleton instance of <see cref="NullEvent{T}"/>.
     /// </summary>
     public static readonly NullEvent<T> Default = new();
-    
-    /// <inheritdoc/>
-    public override void OnNext(T value) {}
 
     /// <inheritdoc/>
-    public override IDisposable Subscribe(IObserver<T> observer) => 
-        NullDisposable.Default;
+    public bool HasValue => false;
     
     /// <inheritdoc/>
-    public override IDisposable Subscribe(IObserver<T> observer, int priority) => 
+    public T Value => default!;
+
+    /// <inheritdoc/>
+    public void OnNext(T value) {}
+
+    /// <inheritdoc/>
+    public void OnCompleted() {}
+    
+    /// <inheritdoc/>
+    public void OnError(Exception error) {}
+
+    /// <inheritdoc/>
+    public IDisposable Subscribe(IObserver<T> observer) => 
         NullDisposable.Default;
 }
 }

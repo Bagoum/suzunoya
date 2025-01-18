@@ -162,7 +162,7 @@ public class LinearizeVisitor : ExpressionVisitor {
             // to just evaluate both branches and return the correct one.
             //Instead, we declare a variable outside an if statement, and write to it in the branches.
             var prm = Ex.Parameter(node.Type, $"$flatTernary{counter++}");
-            return Ex.Block(new[] {prm},
+            return Ex.Block([prm],
                 Linearize(cond => Ex.Condition(cond, WithAssign(ifT, prm), WithAssign(ifF, prm), typeof(void)), node.Test),
                 prm
             );

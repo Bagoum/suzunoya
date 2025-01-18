@@ -7,8 +7,6 @@ using JetBrains.Annotations;
 
 namespace BagoumLib.Unification;
 
-
-
 /// <summary>
 /// A wrapper around a dictionary containing type bindings.
 /// <br/>The binding dictionary is immutable.
@@ -34,24 +32,31 @@ public readonly struct Unifier {
         TypeVarBindings = bindings;
     }
 
-    private Unifier(IEnumerable<KeyValuePair<TypeDesignation.Variable, TypeDesignation>> kvs) {
-        TypeVarBindings = kvs.ToImmutableDictionary(kv => kv.Key, kv => kv.Value);
-    }
-
     /// <summary>
     /// Return a unifier that does not have any bindings with the given variable.
     /// </summary>
-    public Unifier Without(TypeDesignation.Variable v) =>
-        new Unifier(TypeVarBindings.Where(b => b.Key != v && b.Value != v));
+    public Unifier Without(TypeDesignation.Variable v) {
+        var res = TypeVarBindings;
+        foreach (var (k, val) in TypeVarBindings) {
+            if (ReferenceEquals(k, v) || ReferenceEquals(val, v)) {
+                res = res.Remove(k);
+            }
+        }
+        return new Unifier(res);
+    }
 
     /// <summary>
     /// Get the ultimate binding of a variable type designation, or the designation itself if it is not variable.
     /// </summary>
     public TypeDesignation this[TypeDesignation d] {
         get {
-            if (d is not TypeDesignation.Variable ub_ || !TypeVarBindings.ContainsKey(ub_))
+            //separate the first loop iteration. if we fail the first loop iteration, then directly return d instead
+            // of querying IsResolved/d.Simplify.
+            if (d is TypeDesignation.Variable ub_ && TypeVarBindings.TryGetValue(ub_, out var bound))
+                d = bound;
+            else
                 return d;
-            while (d is TypeDesignation.Variable ub && TypeVarBindings.TryGetValue(ub, out var bound))
+            while (d is TypeDesignation.Variable ub && TypeVarBindings.TryGetValue(ub, out bound))
                 d = bound;
             //Cases where eg. (X, Func<int, B>) and (B, float) are both bound,
             // such that u[X] should return Func<int, float> instead of Func<int, B>
@@ -77,7 +82,7 @@ public readonly struct Unifier {
     /// </summary>
     public Either<Unifier, TypeUnifyErr> Bind(TypeDesignation vsource, TypeDesignation tsource, 
             TypeDesignation.Variable v, TypeDesignation target) {
-        if (v == target)
+        if (ReferenceEquals(v, target))
             throw new Exception($"Self-binding of {v} to {target}");
         if (target.OccursInSimplification(this, v))
             return new TypeUnifyErr.RecursionBinding(vsource, tsource, v, target);

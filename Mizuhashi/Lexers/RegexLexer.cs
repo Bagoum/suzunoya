@@ -52,8 +52,8 @@ public class RegexLexer<T> {
         this.tokenizers = tokenizers;
         //\G is like ^, except it also works when you use regex.Match(str, startFromIndex).
         //See https://learn.microsoft.com/en-us/dotnet/standard/base-types/anchors-in-regular-expressions
-        //Use a timeout of 10ms since we can't use NoBacktracking in standard2.1 (used by Unity)
-        regexes = tokenizers.Select(t => new Regex($"\\G{t.RegexPattern}", t.Flags, TimeSpan.FromMilliseconds(10))).ToArray();
+        //Use a timeout of 100ms since we can't use NoBacktracking in standard2.1 (used by Unity)
+        regexes = tokenizers.Select(t => new Regex($"\\G{t.RegexPattern}", t.Flags, TimeSpan.FromMilliseconds(100))).ToArray();
         /*groupNames = new string[tokenizers.Length];
         regex = new Regex($"\\G({string.Join("|", tokenizers.Select((h, i) => $"(?<{groupNames[i] = $"regexLexerGroup{i}"}>{h.RegexPattern})"))})",
             RegexOptions.Multiline | RegexOptions.ExplicitCapture | RegexOptions.Compiled);*/

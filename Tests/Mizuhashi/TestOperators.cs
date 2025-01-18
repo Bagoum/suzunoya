@@ -31,26 +31,10 @@ public class TestOperators {
     //    Combinators.AnyOf(":!#$%&*+./<=>?@\\^|-~".ToCharArray());
     private static Parser<char, char> opTail = 
         Combinators.AnyOf(":!#$%&*+./<=>?@\\^|-~".ToCharArray());
-    
-    private static Parser<char, string> reservedOp(string op) {
-        var str = String(op);
-        var isContinued = new ParserError.Unexpected($"more operator characters after '{op}'");
-        return inp => {
-            var ss0 = inp.Stative;
-            var result = str(inp);
-            if (!result.Result.Valid)
-                return result;
-            var ss1 = inp.Stative;
-            var postOpChars = opTail(inp);
-            inp.RollbackFast(ss1);
-            if (postOpChars.Result.Valid) {
-                inp.RollbackFast(ss0);
-                return new(isContinued, result.Start);
-            }
-            return result;
-        };
-    }
 
+    //Operator parser that doesn't allow operators to be next to each other without spaces in between.
+    // This is not the only way to handle an operator parser; see TestLexing for an example that uses
+    // a trie during tokenization to separate adjacent operators.
     private static Parser<char, string> reservedOpWithSpaces(string op) {
         var str = String(op);
         var isContinued = new ParserError.Unexpected($"more operator characters after '{op}'");
@@ -91,6 +75,13 @@ public class TestOperators {
             assoc,
             priority);
     
+    private static FPrefix<char, Tree> fprefix(char op) => 
+        new(op, (s, x) => new Tree.Prefix(op.ToString(), x), c => null);
+    private static FPostfix<char, Tree> fpostfix(char op) => 
+        new(op, (x, s) => new Tree.Postfix(op.ToString(), x), c => null);
+    private static FInfix<char, Tree> finfix(char op, int priority, Associativity assoc) => 
+        new(op, (x, s, y) => new Tree.Infix(op.ToString(), x, y), assoc, priority, c => null);
+    
     private static readonly Operator<char, Tree, string>[] operators = {
         prefix("-", 10), postfix("++", 10),
         infix("+++", 9, Associativity.Right),
@@ -98,31 +89,63 @@ public class TestOperators {
         infix("+", 6, Associativity.Left), infix("~", 6, Associativity.Right)
     };
 
-    private static readonly Parser<char, Tree> parser = 
-        ParseOperators(operators, AsciiLetter.FMap(a => new Tree.Char(a) as Tree));
+    private static readonly Parser<char, Tree> term = AsciiLetter.FMap(Tree (a) => new Tree.Char(a));
+    //legacy operator parser
+    private static readonly Parser<char, Tree> opParse1 = 
+        ParseOperators(operators, term);
+
+    //new operator parser with single-token lookup table
+    private static readonly Parser<char, Tree> opParse2 =
+        ParseOperatorsFast(
+            ParsePrefixPostfixFast(term, EqualityComparer<char>.Default, [fprefix('-'), fprefix('!')], [fpostfix('.'),fpostfix('!')]), 
+            EqualityComparer<char>.Default, [
+            finfix('^', 9, Associativity.Right),
+            finfix('*', 8, Associativity.Left), finfix('#', 8, Associativity.None),
+            finfix('+', 6, Associativity.Left), finfix('~', 6, Associativity.Right)
+        ]);
+
+    [Test]
+    public void TestAssocV2() {
+        opParse2.AssertSuccessAny("-x!+!y", x => AssertHelpers.AssertStringEq("(((-x)!)+(!y))", x));
+        opParse2.AssertFailRegex("-x+!", "Expected ASCII");
+        opParse2.AssertFailRegex("-x+.y", "Expected ASCII");
+        opParse2.AssertSuccessAny("x+y", x => AssertHelpers.AssertStringEq("(x+y)", x));
+        opParse2.AssertSuccessAny("x*y*z*a", x => x.ToString() == "(((x*y)*z)*a)");
+        opParse2.AssertSuccessAny("x*y+z*a", x => x.ToString() == "((x*y)+(z*a))");
+        opParse2.AssertFailRegex("x*y#z", @"Found ambiguous non-associative operator # when parsing the left-associative operator \*");
+        opParse2.AssertFailRegex("x#y#z", "multiple non-associative operators of the same priority");
+        opParse2.AssertSuccessAny("x#y", x => x.ToString() == "(x#y)");
+        opParse2.AssertFailRegex("x+y~z", @"Found ambiguous right-associative operator ~ when parsing the left-associative operator \+");
+        opParse2.AssertFailRegex("x~y+z", @"Found ambiguous left-associative operator \+ when parsing the right-associative operator ~");
+        opParse2.AssertSuccessAny("x~y~z~a", x => x.ToString() == "(x~(y~(z~a)))");
+        opParse2.AssertSuccessAny("--x!!~!!y!!.!^c", x => AssertHelpers.AssertStringEq(
+            "((((-(-x))!)!)~((((((!(!y))!)!).)!)^c))", x));
+        //test case where term fails after operator
+    }
 
     [Test]
     public void TestAssoc() {
         //++* fails under reservedOp
-        parser.AssertSuccessAny("- x++*y", x => AssertHelpers.AssertStringEq("(-x)", x));
-        parser.AssertSuccessAny("-x++ *y", x => AssertHelpers.AssertStringEq("(((-x)++)*y)", x));
-        parser.AssertSuccessAny("x*y*z*a", x => x.ToString() == "(((x*y)*z)*a)");
-        parser.AssertSuccessAny("x*y+z*a", x => x.ToString() == "((x*y)+(z*a))");
-        parser.AssertFailRegex("x*y#z", @"Found ambiguous non-associative operator # when parsing the left-associative operator \*");
-        parser.AssertFailRegex("x#y#z", "multiple non-associative operators of the same priority");
-        parser.AssertSuccessAny("x#y", x => x.ToString() == "(x#y)");
-        parser.AssertFailRegex("x+y~z", @"Found ambiguous right-associative operator ~ when parsing the left-associative operator \+");
-        parser.AssertFailRegex("x~y+z", @"Found ambiguous left-associative operator \+ when parsing the right-associative operator ~");
-        parser.AssertSuccessAny("x~y~z~a", x => x.ToString() == "(x~(y~(z~a)))");
-        parser.AssertSuccessAny("x+++y~z*a++ +++ -b*c++", x => AssertHelpers.AssertStringEq(
+        opParse1.AssertSuccessAny("- x++*y", x => AssertHelpers.AssertStringEq("(-x)", x));
+        opParse1.AssertSuccessAny("-x++ *y", x => AssertHelpers.AssertStringEq("(((-x)++)*y)", x));
+        opParse1.AssertSuccessAny("x*y*z*a", x => x.ToString() == "(((x*y)*z)*a)");
+        opParse1.AssertSuccessAny("x*y+z*a", x => x.ToString() == "((x*y)+(z*a))");
+        opParse1.AssertFailRegex("x*y#z", @"Found ambiguous non-associative operator # when parsing the left-associative operator \*");
+        opParse1.AssertFailRegex("x#y#z", "multiple non-associative operators of the same priority");
+        opParse1.AssertSuccessAny("x#y", x => x.ToString() == "(x#y)");
+        opParse1.AssertFailRegex("x+y~z", @"Found ambiguous right-associative operator ~ when parsing the left-associative operator \+");
+        opParse1.AssertFailRegex("x~y+z", @"Found ambiguous left-associative operator \+ when parsing the right-associative operator ~");
+        opParse1.AssertSuccessAny("x~y~z~a", x => x.ToString() == "(x~(y~(z~a)))");
+        opParse1.AssertSuccessAny("x+++y~z*a++ +++ -b*c++", x => AssertHelpers.AssertStringEq(
             "((x+++y)~((z*((a++)+++(-b)))*(c++)))", x));
+        
     }
 
     [Test]
     public void TestReservedOp() {
         //Don't parse as ((x++)+y)
-        parser.AssertSuccessAny("x+++y", x => AssertHelpers.AssertStringEq("(x+++y)", x));
-        parser.AssertSuccessAny("x++ +y", x => AssertHelpers.AssertStringEq("((x++)+y)", x));
+        opParse1.AssertSuccessAny("x+++y", x => AssertHelpers.AssertStringEq("(x+++y)", x));
+        opParse1.AssertSuccessAny("x++ +y", x => AssertHelpers.AssertStringEq("((x++)+y)", x));
     }
     
 }

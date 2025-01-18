@@ -9,11 +9,6 @@ namespace BagoumLib.Functional;
 [PublicAPI]
 public readonly struct Delayed<T> {
     /// <summary>
-    /// True iff this struct is represented by a concrete value.
-    /// </summary>
-    public bool IsConcrete { get; }
-    
-    /// <summary>
     /// A concrete value. Only valid if <see cref="IsConcrete"/> is true.
     /// </summary>
     public T ConcreteValue { get; }
@@ -22,6 +17,11 @@ public readonly struct Delayed<T> {
     /// A delayed value. Only valid if <see cref="IsConcrete"/> is false.
     /// </summary>
     public Func<T> DelayedValue { get; }
+    
+    /// <summary>
+    /// True iff this struct is represented by a concrete value.
+    /// </summary>
+    public bool IsConcrete { get; }
 
     /// <summary>
     /// Retrieves the concrete value (if provided), else realizes the delayed value.

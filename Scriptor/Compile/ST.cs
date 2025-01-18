@@ -25,7 +25,17 @@ namespace Scriptor.Compile {
 /// <summary>
 /// Record containing state information for annotating an ST into an AST.
 /// </summary>
-public record STAnnotater(LexicalScope Scope, Dictionary<string, ST>? VarReplace = null);
+public record STAnnotater(LexicalScope Scope, Dictionary<string, ST>? VarReplace = null) {
+    /// <summary>
+    /// Annotate all the provided arguments with this annotater.
+    /// </summary>
+    public IAST[] AnnotateAll(ST[] args) {
+        var results = new IAST[args.Length];
+        for (int ii = 0; ii < args.Length; ++ii)
+            results[ii] = args[ii].Annotate(this);
+        return results;
+    }
+}
 
 /// <summary>
 /// A syntax tree formed by parsing.
@@ -130,7 +140,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (TryFindVariable(Position, this, null, scope) is { } tree)
                 return tree;
             if (scope.GlobalRoot.StaticMethodDeclaration(Name)?.Where(m => m.Params.Length == 0).ToArray() is { Length: >0 } meths)
-                return AST.MethodCall.Make(Position, Position, ann, meths.Select(m => m.Call(Name)).ToArray(), System.Array.Empty<ST>());
+                return AST.MethodCall.Make(Position, Position, ann, meths.SelectToArr(m => m.Call(Name)), System.Array.Empty<ST>());
             if (ann.Scope.GlobalRoot.EnumResolver.TryGetValue(Name, out var vals))
                 return new AST.Reference(Position, scope, null, Name, vals);
 
@@ -363,7 +373,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                                 $"No member {Member.Name} was found on type {typ.RName()}"), ann.Scope) 
                             { Completions = (typ, Member.Name) };
                     var ast = AST.MethodCall.Make(Position, Member.Position, ann,
-                        methods.Select(m => MethodSignature.Get(m).Call(Member.Name)).ToArray(), System.Array.Empty<ST>());
+                        methods.SelectToArr(m => MethodSignature.Get(m).Call(Member.Name)), System.Array.Empty<ST>());
                     ast.AddTokens([Type(id.Position)]);
                     return ast;
                 }
@@ -389,8 +399,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
     /// or `x` may be a type name, in which case this is a static function,
     /// or `x` may be a variable, in which case this is an instance function.
     /// </summary>
-    public record MemberFunction(PositionRange Position, ST Object, Ident Member, List<ST> Args) : ST(Position) {
-        private ST[] AllArgs { get; } = Args.Prepend(Object).ToArray();
+    public record MemberFunction(PositionRange Position, ST Object, Ident Member, ST[] Args) : ST(Position) {
 
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) {
@@ -421,18 +430,18 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                                 m = mi.MakeGenericMethod(typArgs);
                             return TypeMember.MaybeMake(m);
                         })
-                        .Where(m => m.Static && m.Params.Length == Args.Count)
+                        .Where(m => m.Static && m.Params.Length == Args.Length)
                         .ToList();
                     if (methods.Count == 0) {
                         return new AST.Failure(Member.Name.Length == 0 ?
                                     emptyMemberErr :
                                     new(Position,
-                                        $"No method {Member.Name} with {Args.Count} arguments was found on type {typ.RName()}"),
+                                        $"No method {Member.Name} with {Args.Length} arguments was found on type {typ.RName()}"),
                                 ann.Scope)
                             { Completions = (typ, Member.Name) };
                     }
                     var ast = AST.MethodCall.Make(Position, Member.Position, ann,
-                        methods.Select(m => MethodSignature.Get(m).Call(Member.Name)).ToArray(), Args);
+                        methods.SelectToArr(m => MethodSignature.Get(m).Call(Member.Name)), Args);
                     ast.AddTokens([Type(id.Position)]);
                     return ast;
                 }
@@ -552,7 +561,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                         return AST.MethodCall.Make(Position, id.Position, ann, argFilter, 
                             Args, OverloadsInterchangeable);
                     else {
-                        var prms = Args.Select(a => a.Annotate(ann)).ToArray();
+                        var prms = ann.AnnotateAll(Args);
                         if (prms.Length == 0) {
                             var nextPos = new PositionRange(id.Position.End, Position.End);
                             prms = [
@@ -607,12 +616,12 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             var decls = typ!.GetConstructors().SelectNotNull(MethodSignature.MaybeGet).ToList();
             var argFilter = decls.Where(d => d.Params.Length == Args.Length).ToList();
             if (argFilter.Count > 0) {
-                var ast = AST.MethodCall.Make(Position, Typ.Position, ann, argFilter.Select(d => d.Call(null)).ToArray(), Args);
+                var ast = AST.MethodCall.Make(Position, Typ.Position, ann, argFilter.SelectToArr(d => d.Call(null)), Args);
                 ast.AddMethodSemanticToken = false;
                 ast.AddTokens([Keyword(NewKw), Type(Typ.Position)]);
                 return ast;
             } else {
-                var prms = Args.Select(a => a.Annotate(ann)).ToArray();
+                var prms = ann.AnnotateAll(Args);
                 return new AST.Failure(new(Position, Typ.Position,
                     $"There is no constructor for type {typ.RName()} that takes {Args.Length} arguments." +
                     $"\nThe valid constructors are as follows:" +
@@ -644,8 +653,8 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                     var argFilter = decls.Where(d => d.Params.Length >= Args.Length).ToList();
                     if (argFilter.Count > 0)
                         return new AST.PartialMethodCall(Position, Fn.Position, ann.Scope,
-                            argFilter.Select(a => a.Call(Fn.Name)).ToArray(),
-                            Args.Select(a => a.Annotate(ann)).ToArray());
+                            argFilter.SelectToArr(a => a.Call(Fn.Name)),
+                            ann.AnnotateAll(Args));
                     else
                         return new AST.Failure(new(Position, Fn.Position,
                             $"There is no method by name `{Fn.Name}` that takes at least {Args.Length} arguments." +
@@ -657,8 +666,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                     return new AST.PartialLambdaCall(Position, ann.Scope, Args.Select(a => a.Annotate(ann)).Prepend(
                         new AST.Reference(Fn.Position, ann.Scope, null, Fn.Name, varn)).ToArray());
                 } else if (ann.Scope.FindScopedFunction(Fn.Name, DeclarationLookup.Standard) is {} sfn)
-                    return new AST.PartialScriptFunctionCall(Position, Fn.Position, ann.Scope, null, sfn, 
-                        Args.Select(a => a.Annotate(ann)).ToArray());
+                    return new AST.PartialScriptFunctionCall(Position, Fn.Position, ann.Scope, null, sfn, ann.AnnotateAll(Args));
                 else
                     return new AST.Failure(new(Position, FunctionCall.NoMethodFoundErr(Fn.Name, ann.Scope)), ann.Scope)
                         {Completions = null as List<MethodSignature> };
@@ -703,7 +711,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                         Ident id => 
                             Ident.TryFindVariable(id.Position, id, null, ann.Scope) is null &&
                                 ann.Scope.GlobalRoot.StaticMethodDeclaration(id.Name.ToLower()) is { } decls ?
-                                    decls.Select(d => d.Call(id.Name)).ToArray() :
+                                    decls.SelectToArr(d => d.Call(id.Name)) :
                                     null,
                         _ => null
                     } is not { } overloads) {
@@ -885,8 +893,8 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
             if (Body.Args.Count != 1)
                 return new AST.Failure(new(Position, "A macro definition must have a body of exactly one line."),
                     ann.Scope);
-            var decl = new MacroDecl(this, Name.Content, Args.Select(a => a.name.Content).ToArray(),
-                Args.Select(a => a.deflt?.defltVal).ToArray());
+            var decl = new MacroDecl(this, Name.Content, Args.SelectToArr(a => a.name.Content), 
+                                                         Args.SelectToArr(a => a.deflt?.defltVal));
             if (ann.Scope.Declare(decl).TryR(out var prev))
                 return new AST.Failure(new(Position, 
                     $"The macro {decl.Name} has already been declared at {prev.Position}."), ann.Scope);
@@ -979,7 +987,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                 }
             }
             var fnCallType =
-                TypeDesignation.Dummy.Method(rt.Type, args.Select(a => a.TypeDesignation).ToArray());
+                TypeDesignation.Dummy.Method(rt.Type, args.SelectToArr(a => a.TypeDesignation));
             var decl = new ScriptFnDecl(null!, hoist, Name.Content, args, deflts, fnCallType) {
                 IsConstant = localScope.IsConstScope
             };
@@ -1029,13 +1037,15 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
         /// <inheritdoc cref="AST.Block"/>
         public Block(IReadOnlyList<ST> args) : this(args.Count > 0 ? 
             args[0].Position.Merge(args[^1].Position) : 
-            new Position(0, 1, 0).CreateEmptyRange(), args) { }
+            new Position(0, 1, 0).EmptyRange(), args) { }
 
         private IAST[] AnnotateStmts(STAnnotater ann) {
-            var args = Args.Select(a => a.Annotate(ann)).ToArray();
-            if (args.Length == 0)
-                args = [new AST.DefaultValue(Position, ann.Scope, typeof(void))];
-            return args;
+            if (Args.Count == 0)
+                return [new AST.DefaultValue(Position, ann.Scope, typeof(void))];
+            var annotated = new IAST[Args.Count];
+            for (int ii = 0; ii < Args.Count; ++ii)
+                annotated[ii] = Args[ii].Annotate(ann);
+            return annotated;
         }
         
         /// <inheritdoc/>
@@ -1217,7 +1227,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
                         $"Type {Typ.Value.Content} is not an array type"), ann.Scope);
                 typ = typ.GetElementType();
             }
-            var ast = new AST.Array(Position, ann.Scope, typ, Args.Select(a => a.Annotate(ann)).ToArray());
+            var ast = new AST.Array(Position, ann.Scope, typ, ann.AnnotateAll(Args));
             ast.AddTokens([Type(Typ?.Position)]);
             return ast;
         }
@@ -1289,7 +1299,7 @@ public abstract record ST(PositionRange Position) : IDebugPrint {
     public record Tuple(PositionRange Position, List<ST> Args) : ST(Position) {
         /// <inheritdoc/>
         protected override IAST _AnnotateInner(STAnnotater ann) =>
-            new AST.Tuple(Position, ann.Scope, Args.Select(a => a.Annotate(ann)).ToArray());
+            new AST.Tuple(Position, ann.Scope, Args.SelectToArr(a => a.Annotate(ann)));
 
         /// <inheritdoc/>
         public override IEnumerable<PrintToken> DebugPrint() {

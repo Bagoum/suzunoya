@@ -492,17 +492,16 @@ public interface IMethodTypeTree<T>: IMethodTypeTree where T: IMethodDesignation
                     } else {
                         return res.Right;
                     }
-                        
                 }
             }
-            return m.Method.Unify(
-                    Dummy.Method(cinst == null ? resultType : m.Method.Last,
-                        me.Arguments.Select(a => a.SelectedOverloadReturnType!).ToArray()), u)
-                .FMapL(u => {
-                    me.SelectedOverload = (m, m.Method.SimplifyDummy(u));
-                    me.ImplicitCast = cinst?.Realize(u);
-                    return (me.SelectedOverloadReturnType!, u);
-                });
+            var ures = m.Method.Unify(
+                    Dummy.Method(cinst == null ? resultType : m.Method.Last, 
+                        me.Arguments.Select(a => a.SelectedOverloadReturnType!)), u);
+            if (ures.IsRight)
+                return ures.Right;
+            me.SelectedOverload = (m, m.Method.SimplifyDummy(ures.Left));
+            me.ImplicitCast = cinst?.Realize(ures.Left);
+            return (me.SelectedOverloadReturnType!, ures.Left);
         }
     }
 
@@ -546,7 +545,7 @@ public interface IAtomicTypeTree : ITypeTree {
     
     /// <inheritdoc cref="ITypeTree.PossibleUnifiers"/>
     Either<List<(TypeDesignation, Unifier)>, TypeUnifyErr> _PossibleUnifiers(TypeResolver resolver, Unifier unifier) 
-        => PossibleTypes.Select(p => (p.Simplify(unifier), unifier)).ToList();
+        => PossibleTypes.SelectToList(p => (p.Simplify(unifier), unifier));
 
     Either<(TypeDesignation, Unifier), TypeUnifyErr> 
         ITypeTree.ResolveUnifiers(TypeDesignation resultType, TypeResolver resolver, Unifier unifier, 

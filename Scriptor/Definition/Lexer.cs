@@ -267,6 +267,11 @@ public static class Lexer {
         /// </summary>
         LString
     }
+
+    internal class TokenMatchEq : IEqualityComparer<Token> {
+        public bool Equals(Token x, Token y) => x.Content == y.Content;
+        public int GetHashCode(Token obj) => obj.Content?.GetHashCode() ?? 0;
+    }
     
     /// <summary>
     /// A token produced by the lexer.
@@ -327,7 +332,8 @@ public static class Lexer {
         public Token WithType(TokenType t) => new(t, Flags, Position, Content);
 
         /// <inheritdoc/>
-        public override string ToString() => string.IsNullOrWhiteSpace(Content) ? $"({Type})" : $"\"{Content}\" ({Type})";
+        public override string ToString() => string.IsNullOrWhiteSpace(Content) ? 
+            $"({Type} {Position.Print(true)})" : $"\"{Content}\" ({Type} {Position.Print(true)})";
 
         /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is Token t && this == t;
@@ -369,8 +375,16 @@ public static class Lexer {
     
     /// <inheritdoc cref="Lex(ref string, out LexerMetadata)"/>
     public static Token[] Lex(ref string source, out InputStream<Token> initialPostProcess, out LexerMetadata metadata) {
+        var tokens = Tokenize(ref source);
+        return Postprocess(source, tokens, out initialPostProcess, out metadata);
+    }
+
+    internal static List<Token> Tokenize(ref string source) {
         source = source.Replace("\r\n", "\n").Replace("\r", "\n");
-        var tokens = lexer.Tokenize(source);
+        return lexer.Tokenize(source);
+    }
+
+    internal static Token[] Postprocess(string source, List<Token> tokens, out InputStream<Token> initialPostProcess, out LexerMetadata metadata) {
         //Combinator postprocessing: consolidate structures such as TypeIdentifier and V2RV2
         var stream = initialPostProcess = 
             new InputStream<Token>(tokens.ToArray(), "Lexer postprocessing", witness: new TokenWitnessCreator(source));
@@ -451,7 +465,7 @@ public static class Lexer {
         bracket.AssertClosed();
         return processed.ToArray();
     }
-
+    
     private record GroupingHandler(string Source, string Type, string TypePlural, TokenType Open, TokenType Close) {
         private (int opener, int closer)? lastClosedGroupIndex = null;
         private readonly Stack<int> openGroupsIndices = new();
@@ -499,17 +513,18 @@ public static class Lexer {
         }
     }
 
-    private record TokenWitness(string Source, InputStream<Token> Stream) : ITokenWitness {
+    private record TokenWitness(string Source, InputStream<Token> Stream) : ITokenWitness<Token> {
         public string SourceStream => Source;
         
+        //TODO changed
+        private PositionRange IndexToPos(int index) =>
+            Stream.Source.Try(index, out var token) ?
+                token.Position :
+                new PositionRange(new(Source, Source.Length), new(Source, Source.Length));
+
         public string ShowErrorPosition(LocatedParserError error) {
-            var start = Stream.Source.Try(error.Index, out var token) ?
-                token.Position :
-                new PositionRange(new(Source, Source.Length), new(Source, Source.Length));
-            var end = Stream.Source.Try(error.End, out token) ?
-                token.Position :
-                new PositionRange(new(Source, Source.Length), new(Source, Source.Length));
-            return ITokenWitness.ShowErrorPositionInSource(new(start.Start, end.Start), Source);
+            return ITokenWitness.ShowErrorPositionInSource(
+                new(IndexToPos(error.Index).Start, IndexToPos(error.End).Start), Source);
         }
 
         public ParserError Unexpected(int index) => new ParserError.Unexpected(Stream.Source[index].ToString());
@@ -523,14 +538,14 @@ public static class Lexer {
 
         public PositionRange ToPosition(int start, int end) {
             if (start >= Stream.Source.Length)
-                return Stream.Source[^1].Position.End.CreateEmptyRange();
-            return new PositionRange(Stream.Source[start].Position.Start, Stream.Source[end].Position.Start);
+                return Stream.Source[^1].Position.End.EmptyRange();
+            return new PositionRange(IndexToPos(start).Start, IndexToPos(end).Start);
         }
 
         public string ShowConsumed(int start, int end) {
             if (start >= Stream.Source.Length)
                 return "<End of file>";
-            return new string(Source.AsSpan()[Stream.Source[start].Index..Stream.Source[end].Index]);
+            return new string(Source.AsSpan()[IndexToPos(start).Start.Index..IndexToPos(end).Start.Index]);
         }
     }
 
@@ -539,7 +554,7 @@ public static class Lexer {
     /// </summary>
     public record TokenWitnessCreator(string Source) : ITokenWitnessCreator<Token> {
         /// <inheritdoc/>
-        public ITokenWitness Create(InputStream<Token> stream) => new TokenWitness(Source, stream);
+        public ITokenWitness<Token> Create(InputStream<Token> stream) => new TokenWitness(Source, stream);
     }
 
     /// <summary>
@@ -598,16 +613,37 @@ public static class Lexer {
     }
     
     /// <summary>
-    /// Parse a token of the provided type and with the given string content, but NOT marked with the given flag.
+    /// Parse a token of the provided type and with the given string content.
     /// </summary>
-    public static Parser<Token, Token> TokenOfTypeValueNotFlag(TokenType typ, string value, TokenFlags flag, string desc) {
-        var err = new ParserError.Expected(desc);
-        var flagErr = new ParserError.Expected(flag switch {
+    public static Parser<Token, Token> TokenOfTypeValues(TokenType typ, params string[] values) {
+        var err = new ParserError.Expected($"{typ}: any of {string.Join(",", values)}");
+        return input => {
+            if (!input.Empty && input.Next.Type == typ)
+                foreach (var v in values)
+                    if (input.Next.Content == v)
+                        return new(new(input.Next), null, input.Index, input.Step(1));
+            return new(err, input.Index);
+        };
+    }
+
+    /// <summary>
+    /// Helper to create a parser error for when a flag is not expected.
+    /// </summary>
+    public static ParserError ExpectNoFlag(string desc, TokenFlags notFlag) {
+        return new ParserError.Expected(notFlag switch {
             TokenFlags.PrecededByWhitespace => $"no whitespace before {desc}",
             TokenFlags.PostcededByWhitespace => $"no whitespace after {desc}",
             TokenFlags.ImplicitBreak => $"no implicit break before {desc}",
             _ => throw new NotImplementedException()
         });
+    }
+    
+    /// <summary>
+    /// Parse a token of the provided type and with the given string content, but NOT marked with the given flag.
+    /// </summary>
+    public static Parser<Token, Token> TokenOfTypeValueNotFlag(TokenType typ, string value, TokenFlags flag, string desc) {
+        var err = new ParserError.Expected(desc);
+        var flagErr = ExpectNoFlag(desc, flag);
         return input => {
             if (input.Empty || input.Next.Type != typ || input.Next.Content != value)
                 return new(err, input.Index);

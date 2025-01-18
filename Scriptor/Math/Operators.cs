@@ -15,6 +15,12 @@ namespace Scriptor.Math;
 [Reflect]
 public class ExMOperators {
     /// <summary>
+    /// Returns x.
+    /// </summary>
+    [BDSL2Operator]
+    public static TEx<T> ReturnSame<T>(TEx<T> x) => x;
+    
+    /// <summary>
     /// Returns -x.
     /// </summary>
     [BDSL2Operator]
