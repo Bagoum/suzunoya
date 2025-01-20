@@ -20,7 +20,7 @@ public class NullDisposable : IDisposable {
 /// An event that ignores subscriptions, values, errors, and completions.
 /// </summary>
 [PublicAPI]
-public class NullEvent<T> : IBSubject<T, T> {
+public class NullEvent<T> : IBSubject<T> {
     /// <summary>
     /// Singleton instance of <see cref="NullEvent{T}"/>.
     /// </summary>

@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using BagoumLib.DataStructures;
-using BagoumLib.Events;
-using BagoumLib.Mathematics;
 using NUnit.Framework;
 
 namespace Tests.BagoumLib {

@@ -32,7 +32,7 @@ public static class LangParser {
     
     private static readonly Parser<Token, Token> IdentOrType = TokenOfTypes(TokenType.Identifier, TokenType.TypeIdentifier);
     private static readonly Parser<Token, Token?> TypeSuffixStr =
-        op("::").IgThen(IdentOrType).OptN();
+        op("::").IgThen(IdentOrType).OptN(silence: true);
     
     /// <summary>
     /// Try to parse a string as a C# type; otherwise, return an error string.
@@ -83,8 +83,6 @@ public static class LangParser {
     private static readonly Parser<Token, (Token id, Token? typ)> IdentAndType = 
         Ident.Then(TypeSuffixStr);
     
-    private static readonly Parser<Token, Token> openParen = TokenOfType(TokenType.OpenParen);
-    private static readonly Parser<Token, Token> closeParen = TokenOfType(TokenType.CloseParen);
     private static readonly Parser<Token, Token> openBrace = TokenOfType(TokenType.OpenBrace);
     private static readonly Parser<Token, Token> closeBrace = TokenOfType(TokenType.CloseBrace);
     private static readonly Parser<Token, Token> comma = TokenOfType(TokenType.Comma);
@@ -109,14 +107,40 @@ public static class LangParser {
     private static Parser<Token, Token> Kws(params string[] keyword) => TokenOfTypeValues(TokenType.Keyword, keyword);
     private static Parser<Token, PositionRange> Kwp(string keyword) => 
         TokenOfTypeValue(TokenType.Keyword, keyword).FMap(t => t.Position);
+    
+    
+    private static Parser<Token, Token> FlagsAndNotFlags(TokenFlags flags, TokenFlags notFlags, string? expected,
+        string? unexpected) {
+        var err = new ParserError.Expected(expected ?? $"token with flags: {flags}");
+        var uerr = new ParserError.Unexpected(unexpected ?? $"token with flags: {notFlags}");
+        return inp => {
+            if (inp.Empty || (inp.Next.Flags & flags) == 0)
+                return new(err, inp.Index);
+            if ((inp.Next.Flags & notFlags) > 0)
+                return new(uerr, inp.Index);
+            return new(inp.Next, null, inp.Index, inp.Index);
+        };
+    }
+    
+    private static Parser<Token, Token> Flags(TokenFlags flags, string? expected = null) {
+        var err = new ParserError.Expected(expected ?? $"token with flags: {flags}");
+        return inp => {
+            if (inp.Empty || (inp.Next.Flags & flags) == 0)
+                return new(err, inp.Index);
+            return new(inp.Next, null, inp.Index, inp.Index);
+        };
+    }
 
-    private static Parser<Token, Token> Flags(TokenFlags flags, string? expected = null) =>
-        Satisfy((Token inp) => (inp.Flags & flags) > 0, expected).IsPresent();
-    private static Parser<Token, Unit> NotFlags(TokenFlags flags, string? unexpected = null) =>
-        Satisfy((Token inp) => (inp.Flags & flags) > 0).IsNotPresent(unexpected);
-
-    private static readonly Parser<Token, Token> Whitespace = Flags(TokenFlags.PrecededByWhitespace, "whitespace");
-    private static readonly Parser<Token, Unit> NoWhitespace = NotFlags(TokenFlags.PrecededByWhitespace, "whitespace");
+    private static Parser<Token, Unit> NotFlags(TokenFlags notFlags, string? unexpected = null) {
+        var err = new ParserError.Unexpected(unexpected ?? $"token with flags: {notFlags}");
+        return inp => {
+            if (inp.Empty)
+                return new(unexpectedEof, inp.Index);
+            if ((inp.Next.Flags & notFlags) > 0)
+                return new(err, inp.Index);
+            return new(Unit.Default, null, inp.Index, inp.Index);
+        };
+    }
 
     /// <summary>
     /// Create a <see cref="MethodSignature"/> for the method on type `t` named `method`.
@@ -130,63 +154,12 @@ public static class LangParser {
         (a, t, b) => new ST.FunctionCall(a.Position.Merge(b.Position), FnIdentFor(t, overloads), a, b) { OverloadsInterchangeable = true };
     
     private static Parser<Token, Token> op(string op) => TokenOfTypeValue(TokenType.Operator, op);
-    private static Parser<Token, Token> sop(string sop) => TokenOfTypeValue(TokenType.SpecialOperator, sop);
-    private static Parser<Token, Token> opNoFlag(string op, TokenFlags f, string desc) => 
-        TokenOfTypeValueNotFlag(TokenType.Operator, op, f, desc);
-
-    private static Parser<Token, Token> infixOp(string op) =>
-        opNoFlag(op, TokenFlags.ImplicitBreak, $"infix operator `{op}`");
-
-
-    //specialized parser that gets one of many possible operators of equivalent priority/precedence,
-    // and which doesn't provide LocatedParserError (since it is dropped in the operator table parser anyways)
-    private static Parser<Token, Token> multiOpParser(TokenFlags notFlags, string[] ops) => inp => {
-        if (inp.Empty)
-            goto fail;
-        var nxt = inp.Next;
-        if (nxt.Type != TokenType.Operator || (nxt.Flags & notFlags) > 0)
-            goto fail;
-        foreach (var op in ops)
-            if (nxt.Content == op)
-                return new(new(nxt), null, inp.Index, inp.Step(1));
-        fail: ;
-        return ParseResult<Token>.SilentErr(inp.Index);
-    };
-
-    private static MethodSignature[] multiOpOverloads(Type cls, params string[] methNames) =>
-        methNames.SelectToArr(m => Meth(cls, m));
-    
-    private static Op multiInfix(Associativity assoc, int precedence, string[] ops, MethodSignature[] overloads) {
-        if (ops.Length != overloads.Length)
-            throw new StaticException($"Incorrect infix count for {assoc}:{precedence}");
-        return new Op.Infix(multiOpParser(TokenFlags.ImplicitBreak, ops), (a, t, b) =>
-                new ST.FunctionCall(a.Position.Merge(b.Position), FnIdentFor(t, overloads[ops.IndexOf(t.Content)]), a, b),
-            assoc, precedence
-        );
-    }
     
     //NB: It is critical to have the noWhitespace parse for +/- operators, because if we don't,
     // then curried function application of a unary number becomes higher precedence than arithmetic.
     // eg. `x - y` has higher precedence as Curried(x, Negate(y)) than Subtract(x, y).
     //F# handles this by parsing only no-whitespace +/- as unary.
     //It's not strictly necessary for the ! operator, but we require it for uniformity.
-    private static Op multiPrefix(int precedence, string[] ops, MethodSignature[] overloads) {
-        if (ops.Length != overloads.Length)
-            throw new StaticException($"Incorrect prefix count for {precedence}");
-        return new Op.Prefix(multiOpParser(TokenFlags.PostcededByWhitespace, ops), (t, x) =>
-                new ST.FunctionCall(t.Position.Merge(x.Position), FnIdentFor(t, overloads[ops.IndexOf(t.Content)]), x),
-            precedence
-        );
-    }
-    private static Op multiPostfix(int precedence, string[] ops, MethodSignature[] overloads) {
-        if (ops.Length != overloads.Length)
-            throw new StaticException($"Incorrect postfix count for {precedence}");
-        return new Op.Postfix(multiOpParser(TokenFlags.PrecededByWhitespace, ops), (x, t) =>
-                new ST.FunctionCall(x.Position.Merge(t.Position), FnIdentFor(t, overloads[ops.IndexOf(t.Content)]), x),
-            precedence
-        );
-    }
-    
     private static FPrefix<Token,ST> fprefix(string op, MethodSignature meth) {
         var err = Lexer.ExpectNoFlag($"prefix operator `{op}`", TokenFlags.PostcededByWhitespace);
         return new(new(TokenType.Operator, new PositionRange(), op), (t, x) => 
@@ -209,60 +182,6 @@ public static class LangParser {
     }
     private static FInfix<Token,ST> assigner(string op, string method) =>
         finfix(op, Associativity.Right, 2, Meth(typeof(ExMAssign), method));
-
-    /*
-    private static readonly Op[] tightOperators = [
-        multiPostfix(20, ["++", "--"], multiOpOverloads(typeof(ExMAssign), 
-            nameof(ExMAssign.PostIncrement), nameof(ExMAssign.PostDecrement))),
-        
-        multiPrefix(19, ["++", "--"], multiOpOverloads(typeof(ExMAssign),
-            nameof(ExMAssign.PreIncrement), nameof(ExMAssign.PreDecrement))),
-        
-        multiPrefix(18, ["+", "-", "!"], multiOpOverloads(typeof(ExMOperators), 
-            nameof(ExMOperators.ReturnSame), nameof(ExMOperators.Negate), nameof(ExMOperators.Not))),
-    ];
-    
-    //these operators are lower precedence than curried function application.
-    //eg. f x op y = f(x) op y
-    private static readonly Op[] looseOperators = [
-        multiInfix(Associativity.Left, 16, ["^", "^^", "^-"], 
-            multiOpOverloads(typeof(ExMOperators), 
-                nameof(ExMOperators.Pow), nameof(ExMOperators.NPow), nameof(ExMOperators.PowSub))),
-        
-        new Op.Infix(infixOp("*"), 
-            InfixCallerEquivOverloads(
-                //If we have two ints, then it's best to use MulInt instead of allowing conversion
-                //If we have one int and a float, then we need to cast to MulFloat instead of using Mul/MulRev, which
-                // produce incorrect (int,float)->int signatures
-                Meth(typeof(ExMOperators), nameof(ExMOperators.MulFloat)),
-                Meth(typeof(ExMOperators), nameof(ExMOperators.MulInt)),
-                Meth(typeof(ExMOperators), nameof(ExMOperators.Mul)),
-                Meth(typeof(ExMOperators), nameof(ExMOperators.MulRev))
-            ), Associativity.Left, 14),
-        multiInfix(Associativity.Left, 14, ["%", "/"], multiOpOverloads(typeof(ExMOperators), 
-            nameof(ExMOperators.Modulo), nameof(ExMOperators.Div))),
-        //infix("//", Associativity.Left, 14, Lift(typeof(ExM), nameof(ExM.FDiv))),
-
-        multiInfix(Associativity.Left, 12, ["+", "-"], multiOpOverloads(typeof(ExMOperators), 
-            nameof(ExMOperators.Add), nameof(ExMOperators.Sub))),
-
-        multiInfix(Associativity.Left, 10, ["<", ">", "<=", ">="], multiOpOverloads(typeof(ExMOperators), 
-                nameof(ExMOperators.Lt), nameof(ExMOperators.Gt),nameof(ExMOperators.Leq), nameof(ExMOperators.Geq))),
-
-        multiInfix(Associativity.Left, 8, ["==", "!="], multiOpOverloads(typeof(ExMOperators), 
-            nameof(ExMOperators.Eq), nameof(ExMOperators.Neq))),
-        
-        //& is defined to be the same as &&, not bitwise
-        multiInfix(Associativity.Left, 6, ["&&", "||", "&", "|"], multiOpOverloads(typeof(ExMOperators),
-            nameof(ExMOperators.And), nameof(ExMOperators.Or), nameof(ExMOperators.And), nameof(ExMOperators.Or))),
-        
-        new Op.Infix(TokenOfTypeValue(TokenType.Keyword, "as"), (obj, c, typ) => new ST.TypeAs(obj, c.Position, typ), Associativity.Left, 4),
-
-        multiInfix(Associativity.Right, 2, ["=", "+=", "-=", "*=", "/=", "%=", "&=", "|="], multiOpOverloads(typeof(ExMAssign),
-            nameof(ExMAssign.Assign), nameof(ExMAssign.AddAssign), nameof(ExMAssign.SubAssign), nameof(ExMAssign.MulAssign),
-            nameof(ExMAssign.DivAssign), nameof(ExMAssign.ModAssign), nameof(ExMAssign.AndAssign), nameof(ExMAssign.OrAssign)))
-    ];*/
-    
     
     //prefix/postfix operators are higher precedence than curried function application.
     // eg. f x op y = f(x, op(y)) or f(op(x), y)
@@ -347,7 +266,7 @@ public static class LangParser {
     }
     
     private static Parser<Token, (PositionRange allPosition, List<T> args)> Paren<T>(Parser<Token, T> p, Parser<Token, T>? first = null, bool atleastOne = false) {
-        var args = p.SepBy(comma, atleastOne: atleastOne, first: first);
+        var args = p.SepBy(comma, atleastOne: atleastOne, first: first, silence: true);
         var openErr = new ParserError.Expected($"{TokenType.OpenParen}");
         var closeErr = new ParserError.Expected($"{TokenType.CloseParen}");
         return inp => {
@@ -359,7 +278,7 @@ public static class LangParser {
             if (!rval.Result.Valid)
                 return new(rval.Error, starti, rval.End);
             if (inp.Empty || inp.Next.Type != TokenType.CloseParen)
-                return new(new LocatedParserError(inp.Index, closeErr), starti, inp.Index);
+                return new(LocatedParserError.Merge(rval.Error, new LocatedParserError(inp.Index, closeErr)), starti, inp.Index);
             inp.Step();
             return new((inp.Source[starti].Position.Merge(inp.Source[inp.Index-1].Position), rval.Result.Value), 
                 rval.Error, starti, inp.Index);
@@ -482,7 +401,7 @@ public static class LangParser {
     // constructor `new X(y)`, C#-style function application `f(x, y)`, partial function call `$(f, x)`,
     //Haskell-style function application `f x y` is handled in term2.
     private static readonly Parser<Token, ST> term =
-        ChoiceL("term (identifier, number, array, block, parenthesized expression, constructor, member/indexer access, or partial function)",
+        ChoiceL("term (identifier, number, array, block, tuple, constructor, member/method/indexer, or partial function)",
             Sequential(Kw("new"), IdentOrType, Paren(ValueOrFailure, Value), ST (kw, typ, args) => 
                     new ST.Constructor(kw.Position.Merge(args.allPosition), kw.Position, typ, args.args.ToArray()))
                 .LabelV("constructor"),
@@ -508,7 +427,7 @@ public static class LangParser {
                     return x;
                 }
             ),
-            sop("$").IgThen(NoWhitespace).IgThen(
+            TokenOfTypeValueFatalNotFlag(TokenType.SpecialOperator, "$", TokenFlags.PostcededByWhitespace, "`$`").IgThen(
                 Paren(ValueOrFailure, Value, atleastOne: true).FMap(ST (pa) => 
                     new ST.PartialFunctionCall(pa.allPosition, pa.args[0], pa.args.Skip(1).ToArray())
                 )).LabelV("partial function application $(f,x,y..)")
@@ -519,8 +438,10 @@ public static class LangParser {
         ParsePrefixPostfixFast(term, new TokenMatchEq(), fastPrefixOps, fastPostfixOps);
         //ParseOperators(tightOperators, term);
 
-    private static readonly Parser<Token, Token> curryFnAppSep = NotFlags(TokenFlags.ImplicitBreak, 
-        "indent: curried function application across newlines must change the indentation level").IgThen(Whitespace);
+        private static readonly Parser<Token, Token> curryFnAppSep =
+            FlagsAndNotFlags(TokenFlags.PrecededByWhitespace, TokenFlags.ImplicitBreak,
+                "whitespace between curried arguments",
+                "newline: curried function application across newlines must increase the indentation level");
     
     //Term + tight operators + curried function application
     private static readonly Parser<Token, ST> term2 = inp => {
@@ -531,7 +452,7 @@ public static class LangParser {
         var start = rf.Start;
         while (true) {
             var rsep = curryFnAppSep(inp);
-            //this separator cannot fatal
+            //this separator consumes nothing and cannot fatal
             if (rsep.Status != ResultStatus.OK)
                 return new(f, rf.MergeErrors(rsep), start, rf.End);
             rf = termOps1(inp);

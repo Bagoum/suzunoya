@@ -42,19 +42,37 @@ Functions:", ef.Debug());
         Assert.AreEqual(-1, "2 + (2 - 5)".Value<float>());
         AssertHelpers.ThrowsMessage("Expected term", () => "2 + (2 - 5 + )".Value<float>());
         AssertHelpers.ThrowsMessage("partial function application", () => "var w = $()".Value<float>());
-        AssertHelpers.ThrowsMessage("partial function application.*CloseParen", () => "var w = $(f, 5 6)".Value<float>());
+        //well-formed (but f,g don't exist)
         "var w = $(f, g 6)".AssertFailsAnnotation("any method by the name `f`");
+        //5 6 cannot be a partial function so observing 6 is a fatal
+        AssertHelpers.ThrowsMessage("partial function application.*CloseParen", () => "var w = $(f, 5 6)".Value<float>());
         AssertHelpers.ThrowsMessage("partial function application", () => "var w = $ (f, x, y)".Value<float>());
         Assert.AreEqual(-5, "2.0\n-5.0".Value<float>());
-        AssertHelpers.ThrowsMessage("no implicit break before infix", () => "2.0\n- 5.0".Value<float>());
+        AssertHelpers.ThrowsMessage("not expect implicit break before infix", () => "2.0\n- 5.0".Value<float>());
         Assert.AreEqual(-3, "2.0\n\t- 5.0".Value<float>());
-        AssertHelpers.ThrowsMessage("no whitespace after prefix", () => "true & ! false".Value<bool>());
-        AssertHelpers.ThrowsMessage("no whitespace after prefix", () => "true & !! false".Value<bool>());
+        AssertHelpers.ThrowsMessage("not expect whitespace after prefix", () => "true & ! false".Value<bool>());
+        AssertHelpers.ThrowsMessage("not expect whitespace after prefix", () => "true & !! false".Value<bool>());
         //this one doesn't work since nonfatals that bubble up to `statement` choice are silenced
-        //AssertHelpers.ThrowsMessage("no whitespace after prefix", () => "! false".Value<bool>());
-        AssertHelpers.ThrowsMessage("no whitespace before postfix", () => "5 ++ + 4".Value<bool>());
+        //AssertHelpers.ThrowsMessage("not expect whitespace after prefix", () => "! false".Value<bool>());
+        AssertHelpers.ThrowsMessage("not expect whitespace before postfix", () => "5 ++ + 4".Value<bool>());
         AssertHelpers.ThrowsMessage("function application.*Operator: :", () => "BMath.Mod<T>(false ? 2)".Value<float>());
         AssertHelpers.ThrowsMessage("function application.*Operator: :", () => "BMath.Mod(false ? 2)".Value<float>());
+    }
+
+    [Test]
+    public static void TestPartialFn() {
+        //well-formed curry across lines
+        "f\n\tx".AssertFailsAnnotation("no static method");
+        "f\n\tx\n\ty".AssertFailsAnnotation("no static method");
+        //x -> y dedent is not an implicit break since the block indent is 0
+        "f\n\t\tx\n\ty".AssertFailsAnnotation("no static method");
+        //reports curry failure or allow closing paren
+        AssertHelpers.ThrowsMessage("increase the indentation.*CloseParen", () => "(f\nx)".Value<float>());
+        AssertHelpers.ThrowsMessage("increase the indentation.*CloseParen", () => "(2, f\nx)".Value<float>());
+        //if there's no parentheses, then f will be treated as a value and x as a value
+        "f\nx".AssertFailsAnnotation("what \"f\" refers to");
+        //reports curry failure or require end of line
+        AssertHelpers.ThrowsMessage("whitespace between curried.*semicolon", () => "f (x)y".Value<float>());
     }
     
     private delegate int MyDelegateType(int a, int b, out EnvFrame ef);

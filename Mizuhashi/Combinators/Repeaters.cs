@@ -47,7 +47,7 @@ public static partial class Combinators {
     /// </summary>
     /// <param name="p">Parser to apply repeatedly</param>
     /// <param name="atleastOne">If true, then will require at least one result</param>
-    /// <param name="silence">If true, then no errors will be returned on success</param>
+    /// <param name="silence">If true, then errors from the final errored application of `p` will not be returned</param>
     /// <returns></returns>
     public static Parser<T, List<R>> Many<T, R>(this Parser<T, R> p, bool atleastOne=false, bool silence=false) => input => {
         var results = new List<R>();
@@ -62,7 +62,7 @@ public static partial class Combinators {
                     return new(next.Error?.Error ?? new ParserError.IncorrectNumber(atleastOne ? 1 : 0, results.Count,
                         null, next.Error), start);
                 else
-                    return new(results, silence ? null : LocatedParserError.Merge(lastErr, next.Error), start, next.End);
+                    return new(results, silence ? lastErr : LocatedParserError.Merge(lastErr, next.Error), start, next.End);
             } else if (!next.Consumed)
                 return new(manyNoConsumeErr, next.Start);
             else {
@@ -117,12 +117,15 @@ public static partial class Combinators {
 
     /// <summary>
     /// Parse `p (sep p)*`.
-    /// <br/>If atleastOne is false, then allows parsing nothing.
-    /// <br/>`sep` may be non-consuming.
     /// <br/>If `first` is nonnull, then it will be used to parse the first element.
     /// <br/>FParsec sepBy
     /// </summary>
-    public static Parser<T, List<R>> SepBy<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep, bool atleastOne = false, Parser<T, R>? first = null) =>
+    /// <param name="ele">Element</param>
+    /// <param name="sep">Separator. May be non-consuming</param>
+    /// <param name="atleastOne">If false, allows parsing nothing.</param>
+    /// <param name="first">If nonnull, will be used to parse the first element instead of `ele`.</param>
+    /// <param name="silence">If true, then errors from the final errored application of `sep` will not be returned.</param>
+    public static Parser<T, List<R>> SepBy<T, R, U>(this Parser<T, R> ele, Parser<T, U> sep, bool atleastOne = false, Parser<T, R>? first = null, bool silence=false) =>
         input => {
             var results = new List<R>();
             var start = input.Index;
@@ -143,7 +146,7 @@ public static partial class Combinators {
                 if (sepParsed.Status == ResultStatus.FATAL)
                     return sepParsed.CastFailure<List<R>>();
                 else if (sepParsed.Status == ResultStatus.ERROR)
-                    return new(results, next.MergeErrors(sepParsed), start, next.End);
+                    return new(results, silence ? next.Error : next.MergeErrors(sepParsed), start, next.End);
 
                 next = ele(input);
                 if (next.Status == ResultStatus.OK)

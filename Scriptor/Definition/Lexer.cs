@@ -630,27 +630,26 @@ public static class Lexer {
     /// Helper to create a parser error for when a flag is not expected.
     /// </summary>
     public static ParserError ExpectNoFlag(string desc, TokenFlags notFlag) {
-        return new ParserError.Expected(notFlag switch {
-            TokenFlags.PrecededByWhitespace => $"no whitespace before {desc}",
-            TokenFlags.PostcededByWhitespace => $"no whitespace after {desc}",
-            TokenFlags.ImplicitBreak => $"no implicit break before {desc}",
+        return new ParserError.Unexpected(notFlag switch {
+            TokenFlags.PrecededByWhitespace => $"whitespace before {desc}",
+            TokenFlags.PostcededByWhitespace => $"whitespace after {desc}",
+            TokenFlags.ImplicitBreak => $"implicit break before {desc}",
             _ => throw new NotImplementedException()
         });
     }
     
     /// <summary>
-    /// Parse a token of the provided type and with the given string content, but NOT marked with the given flag.
+    /// Parse a token of the provided type and with the given string content but NOT marked with the given flag.
+    /// If the type/content matches but the flag does not, then fail fatally.
     /// </summary>
-    public static Parser<Token, Token> TokenOfTypeValueNotFlag(TokenType typ, string value, TokenFlags flag, string desc) {
+    public static Parser<Token, Token> TokenOfTypeValueFatalNotFlag(TokenType typ, string value, TokenFlags flag, string desc) {
         var err = new ParserError.Expected(desc);
         var flagErr = ExpectNoFlag(desc, flag);
         return input => {
             if (input.Empty || input.Next.Type != typ || input.Next.Content != value)
                 return new(err, input.Index);
             else if ((input.Next.Flags & flag) > 0) {
-                //this is too noisy-- maybe there's a better way to do this
-                //input.Rollback(input.Stative, new(input.Index, flagErr));
-                return new(flagErr, input.Index);
+                return new(flagErr, input.Index, input.Step(1)); //fatal!
             }
             else
                 return new(new(input.Next), null, input.Index, input.Step(1));
